@@ -77,9 +77,13 @@ jobs:
           # -p: 非交互式，直接输出结果
           # --dangerously-skip-permissions: 跳过文件读写和网络请求的二次确认
           claude -p "$PROMPT" --dangerously-skip-permissions
-
+          
+          # 🔴 核心调试：打印一下到底有没有文件被修改！
+          echo "==== 检查 AI 修改状态 ===="
+          git status
       - name: 🚀 Push & Create Pull Request
-        uses: peter-evans/create-pull-request@v6
+        # ⚠️ 这里从 v6 升级到了 v7，解决 Node 20 弃用报错！
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "feat: 🤖 Auto-resolved issue #${{ github.event.issue.number }} via Claude Code"

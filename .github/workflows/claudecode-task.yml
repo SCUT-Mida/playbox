@@ -41,14 +41,15 @@ jobs:
           # ===================================================
           # 核心魔法：通过环境变量将 Claude Code 路由到国内模型
           # ===================================================
-          # 1. 填入你本地 .claude/settings.json 中配置的那个兼容 Anthropic 协议的 Base URL
-          ANTHROPIC_BASE_URL: ${{ secrets.GLM_BASE_URL }}
+          # 1. 模型地址+模型制定环境配置
+          "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic"
+          "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-4.7"
+          "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5.2[1m]",
+          "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5.2[1m]",
 
           # 2. 填入你的国内模型 API Key
           ANTHROPIC_API_KEY: ${{ secrets.GLM_API_KEY }}
 
-          # 3. (可选) 如果你的接口需要指定特定的模型名称(比如 glm-4 等)，可以通过此变量覆盖 Claude 默认的模型名
-          ANTHROPIC_MODEL: "glm-5.2"
           # ===================================================
 
         run: |

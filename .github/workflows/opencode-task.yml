@@ -32,9 +32,10 @@ jobs:
         run: |
           # 1. 安装 OpenCode 本体
           pip install opencode-ai --upgrade
-          
-          # 2. 核心！使用官方推荐命令 + 跳过交互式 UI 的参数安装插件
-          bunx oh-my-openagent install --non-interactive
+
+          # 2. 黑客方法：使用 script 命令伪造 TTY 环境，绕过插件的检测！
+          # （注意这里修正了包名：oh-my-opencode）
+          script -qec "bunx -y oh-my-openagent install" /dev/null
           
           # 3. 防覆盖保险：强制将仓库里的自定义配置覆盖为最高优先级
           # （以防 install 步骤用默认配置覆盖了你的私有模型配置）

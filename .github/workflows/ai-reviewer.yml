@@ -6,35 +6,44 @@ on:
 
 jobs:
   review:
-    # 只审查 AI 生成的 PR
+    # 仅限 AI 创建的分支触发，防止人类提交的 PR 被乱搞
     if: startsWith(github.head_ref, 'ai-fix/issue-')
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
-      contents: read
+      contents: write
 
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # 获取完整历史以便对比 Diff
+          fetch-depth: 0 # 必须是 0，脚本中的 git diff 才能拿到完整记录
 
       - name: 🟢 Setup Node.js
         uses: actions/setup-node@v6.4.0
         with:
           node-version: '24'
 
-      - name: 🔍 Generate PR Diff
+      - name: 📝 Generate Prompt via Local Script
         run: |
-          git fetch origin main
-          # 将 diff 保存为文件供 Claude 读取
-          git diff origin/main...HEAD > pr_diff.txt
-          echo "Diff 生成完成。"
+          TASK_DIR=".ai-tasks/issue-${{ github.event.pull_request.number }}"
+          
+          # 👇【核心逻辑：计算当前审查轮次】
+          # 查找已有的 review_result_r*.md 文件数量
+          EXISTING_REVIEWS=$(ls -1 "$TASK_DIR"/review_result_r*.md 2>/dev/null | wc -l)
+          CURRENT_ROUND=$((EXISTING_REVIEWS + 1))
+          
+          # 将轮次写入 GITHUB_ENV，供后续步骤使用
+          echo "CURRENT_ROUND=$CURRENT_ROUND" >> $GITHUB_ENV
+          
+          echo "检测到当前是第 $CURRENT_ROUND 轮审查"
+          
+          # 执行本地脚本 (传入：目录, 角色, 轮次)
+          chmod +x ./scripts/generate-ai-task.sh
+          ./scripts/generate-ai-task.sh "$TASK_DIR" "reviewer" "$CURRENT_ROUND"
 
       - name: 🤖 Execute Claude Code Agent (Reviewer)
         env:
-          # ===================================================
-          # 核心魔法：通过环境变量将 Claude Code 路由到国内模型
           # ===================================================
           "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic"
           "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-4.7"
@@ -45,38 +54,48 @@ jobs:
           "API_TIMEOUT_MS": "3000000"
           ANTHROPIC_AUTH_TOKEN: ${{ secrets.GLM_API_KEY }}
           # ===================================================
-
+          TASK_DIR: .ai-tasks/issue-${{ github.event.pull_request.number }}
+          ROUND: ${{ env.CURRENT_ROUND }}
         run: |
-          # 1. 极速安装 Claude Code CLI
           npm install -g @anthropic-ai/claude-code
           
-          # 2. 构造 Prompt
-          PROMPT="请作为一个极其严格、甚至有些刁钻的资深代码审查员。请阅读当前目录下的 'pr_diff.txt' 文件。检查是否有 Bug、逻辑错误、安全问题或性能瓶颈。请严格按照以下纯文本格式输出你的审查结果，不要输出其他任何内容：
-          DECISION: APPROVE 或 REQUEST_CHANGES
-          COMMENT: 你的详细审查意见"
+          # 动态拼接 Prompt 文件名和输出结果文件名
+          PROMPT_FILE="$TASK_DIR/ai-reviewer-prompt_r${ROUND}.md"
+          OUTPUT_FILE="$TASK_DIR/review_result_r${ROUND}.md"
           
-          # 3. 运行 Claude Code！(无头模式)
-          claude -p "$PROMPT" --dangerously-skip-permissions > review_result.txt
+          echo "正在读取 $PROMPT_FILE 并执行审查..."
+          claude -p "$(cat $PROMPT_FILE)" --dangerously-skip-permissions > "$OUTPUT_FILE"
           
-          echo "=== 审查结果 ==="
-          cat review_result.txt
+          echo "=== 本轮审查结果 ==="
+          cat "$OUTPUT_FILE"
 
       - name: ⚙️ Parse Review & Action
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          TASK_DIR: .ai-tasks/issue-${{ github.event.pull_request.number }}
+          ROUND: ${{ env.CURRENT_ROUND }}
         run: |
-          # 提取 LLM 的判断结果
-          DECISION=$(grep "^DECISION:" review_result.txt | awk '{print $2}')
-          COMMENT=$(sed -n '/^COMMENT:/,$p' review_result.txt | sed 's/^COMMENT://')
+          RESULT_FILE="$TASK_DIR/review_result_r${ROUND}.md"
           
+          # 解析结果
+          DECISION=$(grep "^DECISION:" "$RESULT_FILE" | awk '{print $2}')
+          COMMENT=$(sed -n '/^COMMENT:/,$p' "$RESULT_FILE" | sed 's/^COMMENT://')
+          
+          # 提交审查日志记录到代码仓
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$TASK_DIR/"
+          git commit -m "🕵️ docs: 记录 Issue #${PR_NUMBER} 第 ${ROUND} 轮 AI 审查日志"
+          git push
+          
+          # 根据决策执行动作
           if [ "$DECISION" = "APPROVE" ]; then
             echo "✅ 代码审查通过，批准合并..."
             gh pr review $PR_NUMBER --approve --body "🤖 AI 审查通过！代码质量优秀。$COMMENT"
           else
             echo "❌ 代码审查不通过，触发 AI-Fixer..."
-            # 触发修复员
+            # 触发修复员，将意见评论到 PR 中
             gh pr comment $PR_NUMBER --body "/claude-fix 审查员发现了以下问题，请立即修改代码：\n\n$COMMENT"
-            # 标记为请求修改
             gh pr review $PR_NUMBER --request-changes --body "需要修改：$COMMENT"
           fi

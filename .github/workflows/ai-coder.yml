@@ -2,11 +2,10 @@ name: 🤖 AI Coder
 
 on:
   issues:
-    types: [ labeled ]
+    types: [labeled]
 
 jobs:
   run-claude:
-    # 只有打上 "ai-task" 标签才触发
     if: github.event.label.name == 'ai-task'
     runs-on: ubuntu-latest
     permissions:
@@ -17,15 +16,13 @@ jobs:
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: 🟢 Setup Node.js
         uses: actions/setup-node@v6.4.0
         with:
           node-version: '24'
 
-      - name: 💡 Comment on Issue (通知开始)
+      - name: 💡 Comment on Issue
         uses: actions/github-script@v7
         with:
           script: |
@@ -33,15 +30,21 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `🚀 **Claude Code 已接管任务**！\n\nAgent 已装载，正在通过 Anthropic 协议路由至你配置的国内大模型。开始分析代码并准备修改，请耐心等候...`
+              body: `🚀 **Claude Code 已接管任务**！\n\n开始分析Issue并准备实现代码，请耐心等候...`
             });
+
+      - name: 📝 Generate Prompt via Local Script
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          # 赋予脚本执行权限并调用
+          chmod +x ./scripts/generate-ai-task.sh
+          ./scripts/generate-ai-task.sh ".ai-tasks/issue-${{ github.event.issue.number }}" "coder"
 
       - name: 🛠️ Execute Claude Code Agent
         env:
           # ===================================================
-          # 核心魔法：通过环境变量将 Claude Code 路由到国内模型
-          # ===================================================
-          # 1. 模型地址+模型制定环境配置
           "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic"
           "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-4.7"
           "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5.2[1m]"
@@ -49,58 +52,33 @@ jobs:
           "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1000000"
           "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": 1
           "API_TIMEOUT_MS": "3000000"
-
-          # 2. 填入你的国内模型 API Key
           ANTHROPIC_AUTH_TOKEN: ${{ secrets.GLM_API_KEY }}
-
           # ===================================================
-
+          TASK_DIR: .ai-tasks/issue-${{ github.event.issue.number }}
         run: |
-          # 1. 极速安装 Claude Code CLI
           npm install -g @anthropic-ai/claude-code
-          
-          # 2. 提取 Issue 信息
-          ISSUE_TITLE="${{ github.event.issue.title }}"
-          ISSUE_BODY="${{ github.event.issue.body }}"
-          
-          # 3. 构造 Prompt
-          PROMPT="请作为一个资深开发者解决这个 GitHub Issue。标题: $ISSUE_TITLE. 详细内容: $ISSUE_BODY. 请直接分析并修改项目中的代码文件来解决这个问题，不要做过多的文字解释。"
-          
-          # 4. 配置 Git 身份
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # 5. 创建新分支
           git checkout -b "ai-fix/issue-${{ github.event.issue.number }}"
           
-          # 6. 运行 Claude Code！(无头模式，自动同意所有读写操作)
-          # -p: 非交互式，直接输出结果
-          # --dangerously-skip-permissions: 跳过文件读写和网络请求的二次确认
-          claude -p "$PROMPT" --dangerously-skip-permissions
+          # 直接读取生成好的 MD 文件传给 Claude
+          claude -p "$(cat $TASK_DIR/ai-coder-prompt.md)" --dangerously-skip-permissions
           
-          # 7. 检查 AI 是否真的修改了代码
           if [ -z "$(git status --porcelain)" ]; then
-            echo "⚠️ 警告: AI 没有修改任何代码文件！请检查上方的 Claude 运行日志是否有 API 报错。"
+            echo "⚠️ 警告: AI 没有修改任何代码文件！"
           else
             echo "✅ 发现代码修改，准备提交"
           fi
-      - name: 🚀 Push & Create Pull Request (纯原生无插件)
+
+      - name: 🚀 Push & Create Pull Request
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # 将所有修改加入暂存区
           git add .
-          
-          # 提交代码
           git commit -m "feat: 🤖 Auto-resolved issue #${{ github.event.issue.number }} via Claude Code"
-          
-          # 推送分支 (使用 --force 以防分支已存在)
           git push --force origin "ai-fix/issue-${{ github.event.issue.number }}"
-          
-          # 使用 GitHub 官方 CLI 创建 PR
           gh pr create \
             --title "[AI Generated] Fixes: ${{ github.event.issue.title }}" \
-            --body "### 🤖 由 Claude Code Agent 自动生成
-          关联 Issue: #${{ github.event.issue.number }}" \
+            --body "关联 Issue: #${{ github.event.issue.number }}" \
             --base main \
             --head "ai-fix/issue-${{ github.event.issue.number }}"

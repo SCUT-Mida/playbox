@@ -33,10 +33,17 @@ jobs:
           # 1. 安装 OpenCode 本体
           pip install opencode-ai --upgrade
           
-          # 2. 核心修改：使用 --non-interactive 参数静默安装 oh-my-opencode
-          bunx -y oh-my-opencode install --non-interactive
+          # 2. 安装 Bun 运行环境 (因为官方命令依赖 bunx)
+          curl -fsSL https://bun.sh/install | bash
           
-          # 3. 防覆盖保险：强制将仓库里的自定义配置覆盖为最高优先级
+          # 3. 将 Bun 加入系统环境变量
+          export BUN_INSTALL="$HOME/.bun"
+          export PATH="$BUN_INSTALL/bin:$PATH"
+          
+          # 4. 使用官方推荐命令安装插件 (加上 -y 防止卡在确认环节)
+          bunx -y oh-my-openagent install
+          
+          # 5. 防覆盖保险：强制将仓库里的自定义配置覆盖为最高优先级
           # （以防 install 步骤用默认配置覆盖了你的私有模型配置）
           if [ -f ".opencode/oh-my-opencode.json" ]; then
             cp -f .opencode/oh-my-opencode.json ./oh-my-opencode.json

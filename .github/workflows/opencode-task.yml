@@ -1,0 +1,83 @@
+name: 🤖 OpenCode Auto Dev
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  run-opencode:
+    # 只有打上 "ai-task" 标签才触发
+    if: github.event.label.name == 'ai-task'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install OpenCode & oh-my-opencode
+        run: |
+          # 1. 安装 OpenCode 本体 (假设它发布在 PyPI 上名为 opencode-ai)
+          pip install opencode-ai --upgrade
+          
+          # 2. 安装 oh-my-opencode 插件
+          pip install oh-my-opencode --upgrade
+          
+          # 【备选方案】：如果 omo 不在 PyPI，而是纯 GitHub 仓库，请用以下命令克隆：
+          # git clone https://github.com/<作者用户名>/oh-my-opencode.git /tmp/oh-my-opencode
+          # cd /tmp/oh-my-opencode && pip install -e .
+
+      - name: 💡 Comment on Issue (通知开始)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🚀 **OpenCode 已接管任务**！\n\n正在读取 \`.opencode/config.toml\` 配置，加载 \`oh-my-opencode\` 插件进行开发，请稍候...`
+            });
+
+      - name: 🛠️ Execute OpenCode
+        env:
+          # 将 Secrets 传给容器内部
+          OPENAI_API_KEY: ${{ secrets.GLM_API_KEY }}
+          LLM_API_KEY: ${{ secrets.GLM_API_KEY }}
+          LLM_BASE_URL: ${{ secrets.GLM_BASE_URL }}
+        run: |
+          # 1. 提取 Issue 的标题和内容
+          ISSUE_TITLE="${{ github.event.issue.title }}"
+          ISSUE_BODY="${{ github.event.issue.body }}"
+          
+          # 2. 拼凑给 AI 的 Prompt
+          PROMPT="请解决这个 GitHub Issue。标题: $ISSUE_TITLE. 详细内容: $ISSUE_BODY. 请直接修改代码。"
+          
+          # 3. 创建新分支
+          git checkout -b "ai-fix/issue-${{ github.event.issue.number }}"
+          
+          # 4. 运行 opencode (它会自动读取当前目录的 .opencode/config.toml)
+          # 这里的 CLI 参数 --auto-apply --no-interaction 是为了适配自动化无人值守环境
+          opencode run "$PROMPT" --auto-apply --no-interaction
+
+      - name: 🚀 Push & Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "fix: 🤖 Auto-resolved issue #${{ github.event.issue.number }}"
+          branch: "ai-fix/issue-${{ github.event.issue.number }}"
+          title: "[AI Generated] Fixes: ${{ github.event.issue.title }}"
+          body: |
+            ### 🤖 由 OpenCode + oh-my-opencode 自动生成
+            关联 Issue: #${{ github.event.issue.number }}
+            
+            请检视代码变更。

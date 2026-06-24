@@ -1,4 +1,4 @@
-name: 🤖 OpenCode Auto Dev
+name: 🤖 OpenCode Auto Dev (ULW Loop)
 
 on:
   issues:
@@ -19,23 +19,29 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # 拉取代码后，你的 .opencode/config.toml 和 .opencode/oh-my-opencode.json 都在工作区中了
 
       - name: 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: 📦 Install OpenCode & oh-my-opencode
+      - name: 🥖 Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: 📦 Install OpenCode & oh-my-openagent
         run: |
-          # 1. 安装 OpenCode 本体 (假设它发布在 PyPI 上名为 opencode-ai)
+          # 1. 安装 OpenCode 本体
           pip install opencode-ai --upgrade
           
-          # 2. 安装 oh-my-opencode 插件
-          pip install oh-my-opencode --upgrade
+          # 2. 使用官方推荐命令安装插件环境
+          bunx -y oh-my-openagent install
           
-          # 【备选方案】：如果 omo 不在 PyPI，而是纯 GitHub 仓库，请用以下命令克隆：
-          # git clone https://github.com/<作者用户名>/oh-my-opencode.git /tmp/oh-my-opencode
-          # cd /tmp/oh-my-opencode && pip install -e .
+          # 3. 防覆盖保险：确保我们的自定义配置绝对优先
+          # 如果 install 命令在根目录生成了默认配置，强制用我们 .opencode 目录里的覆盖它
+          if [ -f ".opencode/oh-my-opencode.json" ]; then
+            cp -f .opencode/oh-my-opencode.json ./oh-my-opencode.json
+          fi
 
       - name: 💡 Comment on Issue (通知开始)
         uses: actions/github-script@v7
@@ -45,39 +51,39 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `🚀 **OpenCode 已接管任务**！\n\n正在读取 \`.opencode/config.toml\` 配置，加载 \`oh-my-opencode\` 插件进行开发，请稍候...`
+              body: `🚀 **OpenCode 已接管任务**！\n\n检测到复杂任务，已加载 `.opencode/oh-my-opencode.json` 自定义配置并启动 \`/ulw-loop\` 模式。多 Agent 正在分析中，请耐心等候...`
             });
 
-      - name: 🛠️ Execute OpenCode
+      - name: 🛠️ Execute OpenCode ULW Loop
         env:
-          # 将 Secrets 传给容器内部
+          # 全局注入你的 API，配合 config.toml 中定义的路由规则生效
           OPENAI_API_KEY: ${{ secrets.GLM_API_KEY }}
-          LLM_API_KEY: ${{ secrets.GLM_API_KEY }}
-          LLM_BASE_URL: ${{ secrets.GLM_BASE_URL }}
+          OPENAI_BASE_URL: ${{ secrets.GLM_BASE_URL }}
         run: |
-          # 1. 提取 Issue 的标题和内容
+          # 提取 Issue 信息
           ISSUE_TITLE="${{ github.event.issue.title }}"
           ISSUE_BODY="${{ github.event.issue.body }}"
           
-          # 2. 拼凑给 AI 的 Prompt
-          PROMPT="请解决这个 GitHub Issue。标题: $ISSUE_TITLE. 详细内容: $ISSUE_BODY. 请直接修改代码。"
+          # 构造 Prompt
+          PROMPT="/ulw-loop 请解决这个 GitHub Issue。标题: $ISSUE_TITLE. 详细内容: $ISSUE_BODY. 请直接修改代码，不要做过多的解释。"
           
-          # 3. 创建新分支
+          # 配置 Git 身份
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 创建新分支
           git checkout -b "ai-fix/issue-${{ github.event.issue.number }}"
           
-          # 4. 运行 opencode (它会自动读取当前目录的 .opencode/config.toml)
-          # 这里的 CLI 参数 --auto-apply --no-interaction 是为了适配自动化无人值守环境
+          # 运行 opencode
           opencode run "$PROMPT" --auto-apply --no-interaction
 
       - name: 🚀 Push & Create Pull Request
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "fix: 🤖 Auto-resolved issue #${{ github.event.issue.number }}"
+          commit-message: "feat: 🤖 Auto-resolved issue #${{ github.event.issue.number }} via ULW-Loop"
           branch: "ai-fix/issue-${{ github.event.issue.number }}"
           title: "[AI Generated] Fixes: ${{ github.event.issue.title }}"
           body: |
-            ### 🤖 由 OpenCode + oh-my-opencode 自动生成
+            ### 🤖 由 OpenCode + oh-my-openagent (/ulw-loop) 自动生成
             关联 Issue: #${{ github.event.issue.number }}
-            
-            请检视代码变更。

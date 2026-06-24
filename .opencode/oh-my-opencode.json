@@ -1,0 +1,185 @@
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
+  "agents": {
+    "sisyphus": {
+      "model": "zhipuai-coding-plan/glm-5.2",
+      "variant": "max",
+      "fallback_models": [
+        {
+          "model": "opencode/deepseek-v4-flash-free"
+        },
+        {
+          "model": "opencode/big-pickle"
+        }
+      ]
+    },
+    "hephaestus": {
+      "model": "opencode/deepseek-v4-flash-free",
+      "variant": "high"
+    },
+    "oracle": {
+      "model": "x-openai/Nvidia/qwen3.5-397b-a17b",
+      "variant": "max",
+      "fallback_models": [
+        {
+          "model": "opencode/deepseek-v4-flash-free"
+        },
+        {
+          "model": "opencode/big-pickle"
+        }
+      ]
+    },
+    "explore": {
+      "model": "opencode/north-mini-code-free",
+      "fallback_models": [
+        {
+          "model": "opencode/nemotron-3-ultra-free"
+        }
+      ]
+    },
+    "multimodal-looker": {
+      "model": "opencode/mimo-v2.5-free",
+      "variant": "high",
+      "fallback_models": [
+        {
+          "model": "opencode/big-pickle"
+        }
+      ]
+    },
+    "prometheus": {
+      "model": "opencode/deepseek-v4-flash-free",
+      "variant": "max",
+      "fallback_models": [
+        {
+          "model": "x-openai/Nvidia/qwen3.5-397b-a17b"
+        },
+        {
+          "model": "opencode/mimo-v2.5-free"
+        }
+      ]
+    },
+    "metis": {
+      "model": "opencode/mimo-v2.5-free",
+      "variant": "high",
+      "fallback_models": [
+        {
+          "model": "opencode/nemotron-3-ultra-free"
+        }
+      ]
+    },
+    "momus": {
+      "model": "opencode/deepseek-v4-flash-free",
+      "variant": "high",
+      "fallback_models": [
+        {
+          "model": "opencode/big-pickle"
+        }
+      ]
+    },
+    "atlas": {
+      "model": "opencode/big-pickle"
+    },
+    "sisyphus-junior": {
+      "model": "opencode/north-mini-code-free",
+      "fallback_models": [
+        {
+          "model": "opencode/deepseek-v4-flash-free"
+        }
+      ]
+    },
+    "librarian": {
+      "model": "opencode/north-mini-code-free"
+    }
+  },
+  "categories": {
+    "visual-engineering": {
+      "model": "opencode/big-pickle",
+      "variant": "high",
+      "fallback_models": [
+        {
+          "model": "opencode/deepseek-v4-flash-free"
+        },
+        {
+          "model": "opencode/nemotron-3-ultra-free"
+        }
+      ]
+    },
+    "ultrabrain": {
+      "model": "opencode/deepseek-v4-flash-free",
+      "variant": "high",
+      "fallback_models": [
+        {
+          "model": "x-openai/Nvidia/qwen3.5-397b-a17b"
+        },
+        {
+          "model": "opencode/big-pickle"
+        }
+      ]
+    },
+    "deep": {
+      "model": "opencode/deepseek-v4-flash-free",
+      "variant": "medium",
+      "fallback_models": [
+        {
+          "model": "x-openai/Nvidia/qwen3.5-397b-a17b"
+        },
+        {
+          "model": "opencode/big-pickle"
+        }
+      ]
+    },
+    "artistry": {
+      "model": "opencode/mimo-v2.5-free",
+      "variant": "high",
+      "fallback_models": [
+        {
+          "model": "opencode/nemotron-3-ultra-free"
+        },
+        {
+          "model": "opencode/big-pickle"
+        }
+      ]
+    },
+    "quick": {
+      "model": "opencode/north-mini-code-free",
+      "fallback_models": [
+        {
+          "model": "opencode/big-pickle"
+        },
+        {
+          "model": "opencode/nemotron-3-ultra-free"
+        }
+      ]
+    },
+    "unspecified-low": {
+      "model": "opencode/north-mini-code-free",
+      "fallback_models": [
+        {
+          "model": "opencode/big-pickle"
+        },
+        {
+          "model": "opencode/nemotron-3-ultra-free"
+        }
+      ]
+    },
+    "unspecified-high": {
+      "model": "opencode/deepseek-v4-flash-free",
+      "fallback_models": [
+        {
+          "model": "opencode/big-pickle"
+        },
+        {
+          "model": "opencode/nemotron-3-ultra-free"
+        }
+      ]
+    },
+    "writing": {
+      "model": "opencode/nemotron-3-ultra-free",
+      "fallback_models": [
+        {
+          "model": "opencode/north-mini-code-free"
+        }
+      ]
+    }
+  }
+}

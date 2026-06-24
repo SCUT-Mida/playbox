@@ -1,0 +1,86 @@
+name: 🤖 Claude Code Auto Dev (支持国内大模型)
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  run-claude:
+    # 只有打上 "ai-task" 标签才触发
+    if: github.event.label.name == 'ai-task'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 💡 Comment on Issue (通知开始)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🚀 **Claude Code 已接管任务**！\n\nAgent 已装载，正在通过 Anthropic 协议路由至你配置的国内大模型。开始分析代码并准备修改，请耐心等候...`
+            });
+
+      - name: 🛠️ Execute Claude Code Agent
+        env:
+          # ===================================================
+          # 核心魔法：通过环境变量将 Claude Code 路由到国内模型
+          # ===================================================
+          # 1. 填入你本地 .claude/settings.json 中配置的那个兼容 Anthropic 协议的 Base URL
+          ANTHROPIC_BASE_URL: ${{ secrets.GLM_BASE_URL }}
+
+          # 2. 填入你的国内模型 API Key
+          ANTHROPIC_API_KEY: ${{ secrets.GLM_API_KEY }}
+
+          # 3. (可选) 如果你的接口需要指定特定的模型名称(比如 glm-4 等)，可以通过此变量覆盖 Claude 默认的模型名
+          ANTHROPIC_MODEL: "glm-5.2"
+          # ===================================================
+
+        run: |
+          # 1. 极速安装 Claude Code CLI
+          npm install -g @anthropic-ai/claude-code
+          
+          # 2. 提取 Issue 信息
+          ISSUE_TITLE="${{ github.event.issue.title }}"
+          ISSUE_BODY="${{ github.event.issue.body }}"
+          
+          # 3. 构造 Prompt
+          PROMPT="请作为一个资深开发者解决这个 GitHub Issue。标题: $ISSUE_TITLE. 详细内容: $ISSUE_BODY. 请直接分析并修改项目中的代码文件来解决这个问题，不要做过多的文字解释。"
+          
+          # 4. 配置 Git 身份
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 5. 创建新分支
+          git checkout -b "ai-fix/issue-${{ github.event.issue.number }}"
+          
+          # 6. 运行 Claude Code！(无头模式，自动同意所有读写操作)
+          # -p: 非交互式，直接输出结果
+          # --dangerously-skip-permissions: 跳过文件读写和网络请求的二次确认
+          claude -p "$PROMPT" --dangerously-skip-permissions
+
+      - name: 🚀 Push & Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "feat: 🤖 Auto-resolved issue #${{ github.event.issue.number }} via Claude Code"
+          branch: "ai-fix/issue-${{ github.event.issue.number }}"
+          title: "[AI Generated] Fixes: ${{ github.event.issue.title }}"
+          body: |
+            ### 🤖 由 Claude Code Agent 自动生成
+            关联 Issue: #${{ github.event.issue.number }}

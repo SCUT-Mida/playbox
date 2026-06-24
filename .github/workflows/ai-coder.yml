@@ -1,4 +1,4 @@
-name: 🤖 AI Coder (Issue to PR)
+name: 🤖 AI Coder
 
 on:
   issues:

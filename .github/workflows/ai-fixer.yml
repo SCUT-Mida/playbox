@@ -1,4 +1,4 @@
-name: 🛠️ AI Code Fixer (Fix PR After Review)
+name: 🛠️ AI Code Fixer
 
 on:
   issue_comment:

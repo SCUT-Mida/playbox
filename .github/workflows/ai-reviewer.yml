@@ -39,8 +39,8 @@ jobs:
           echo "检测到当前是第 $CURRENT_ROUND 轮审查"
           
           # 执行本地脚本 (传入：目录, 角色, 轮次)
-          chmod +x ./scripts/generate-ai-task.sh
-          ./scripts/generate-ai-task.sh "$TASK_DIR" "reviewer" "$CURRENT_ROUND"
+          chmod +x ./.ai-tasks/scripts/generate-ai-task.sh
+          ./.ai-tasks/scripts/generate-ai-task.sh "$TASK_DIR" "reviewer" "$CURRENT_ROUND"
 
       - name: 🤖 Execute Claude Code Agent (Reviewer)
         env:

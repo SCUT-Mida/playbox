@@ -39,8 +39,8 @@ jobs:
           ISSUE_BODY: ${{ github.event.issue.body }}
         run: |
           # 赋予脚本执行权限并调用
-          chmod +x ./scripts/generate-ai-task.sh
-          ./scripts/generate-ai-task.sh ".ai-tasks/issue-${{ github.event.issue.number }}" "coder"
+          chmod +x ./.ai-tasks/scripts/generate-ai-task.sh
+          ./.ai-tasks/scripts/generate-ai-task.sh ".ai-tasks/issue-${{ github.event.issue.number }}" "coder"
 
       - name: 🛠️ Execute Claude Code Agent
         env:

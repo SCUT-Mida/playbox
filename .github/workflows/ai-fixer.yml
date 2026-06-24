@@ -1,0 +1,77 @@
+name: 🛠️ AI Code Fixer (Fix PR After Review)
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  fix:
+    # 必须是 PR 上的评论，且包含特定指令
+    if: contains(github.event.comment.body, '/claude-fix') && github.event.issue.pull_request
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
+
+    steps:
+      - name: 📥 Get PR Branch Info
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        id: pr_data
+        run: |
+          PR_DATA=$(gh pr view ${{ github.event.issue.number }} --json headRefName --jq '.headRefName')
+          echo "branch=$PR_DATA" >> $GITHUB_OUTPUT
+
+      - name: 📥 Checkout PR Branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr_data.outputs.branch }}
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v6.4.0
+        with:
+          node-version: '24'
+
+      - name: 🤖 Execute Claude Code Agent (Fixer)
+        env:
+          # ===================================================
+          # 核心魔法：通过环境变量将 Claude Code 路由到国内模型
+          # ===================================================
+          "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic"
+          "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-4.7"
+          "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5.2[1m]"
+          "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5.2[1m]"
+          "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1000000"
+          "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": 1
+          "API_TIMEOUT_MS": "3000000"
+          ANTHROPIC_AUTH_TOKEN: ${{ secrets.GLM_API_KEY }}
+          # ===================================================
+          COMMENT_BODY: ${{ github.event.comment.body }}
+
+        run: |
+          # 1. 极速安装 Claude Code CLI
+          npm install -g @anthropic-ai/claude-code
+          
+          # 2. 构造 Prompt
+          PROMPT="请作为一个资深开发工程师。以下是代码审查员给你的修改建议，请直接分析并修改当前项目中的代码文件来满足这些要求，不要做过多的文字解释。修改建议：$COMMENT_BODY"
+          
+          # 3. 配置 Git 身份
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 4. 运行 Claude Code 修改代码！
+          claude -p "$PROMPT" --dangerously-skip-permissions
+
+      - name: 🚀 Push Fix Code
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 检查是否有文件修改
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "⚠️ 警告: AI 没有修改任何代码文件！"
+          else
+            echo "✅ 发现代码修改，准备提交"
+            git add .
+            git commit -m "🛠️ fix: 根据审查员意见重构代码"
+            git push
+          fi

@@ -1,0 +1,37 @@
+name: 🎯 Auto Merger
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  auto_merge:
+    # 只有 AI 提的 PR 且状态是 approved 时触发
+    if: startsWith(github.event.pull_request.head.ref, 'ai-fix/issue-') && github.event.review.state == 'approved'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
+      issues: write
+
+    steps:
+      - name: 🔄 Enable Auto-Merge (Squash)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # 执行自动合并并删除分支
+          gh pr merge $PR_NUMBER --squash --auto --delete-branch
+
+      - name: 🏁 Close Related Issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
+          # 提取数字编号
+          ISSUE_NUMBER=$(echo "$BRANCH_NAME" | grep -oP 'issue-\K\d+')
+          
+          if [ -n "$ISSUE_NUMBER" ]; then
+            gh pr comment ${{ github.event.pull_request.number }} --body "✅ 代码已合入主分支。"
+            gh issue close $ISSUE_NUMBER --comment "🤖 本问题已通过自动化流水线解决并合并。"
+          fi

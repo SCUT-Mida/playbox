@@ -1,0 +1,82 @@
+name: 🕵️ AI Code Reviewer (Review PR)
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review:
+    # 只审查 AI 生成的 PR
+    if: startsWith(github.head_ref, 'ai-fix/issue-')
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 获取完整历史以便对比 Diff
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v6.4.0
+        with:
+          node-version: '24'
+
+      - name: 🔍 Generate PR Diff
+        run: |
+          git fetch origin main
+          # 将 diff 保存为文件供 Claude 读取
+          git diff origin/main...HEAD > pr_diff.txt
+          echo "Diff 生成完成。"
+
+      - name: 🤖 Execute Claude Code Agent (Reviewer)
+        env:
+          # ===================================================
+          # 核心魔法：通过环境变量将 Claude Code 路由到国内模型
+          # ===================================================
+          "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic"
+          "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-4.7"
+          "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5.2[1m]"
+          "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5.2[1m]"
+          "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1000000"
+          "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": 1
+          "API_TIMEOUT_MS": "3000000"
+          ANTHROPIC_AUTH_TOKEN: ${{ secrets.GLM_API_KEY }}
+          # ===================================================
+
+        run: |
+          # 1. 极速安装 Claude Code CLI
+          npm install -g @anthropic-ai/claude-code
+          
+          # 2. 构造 Prompt
+          PROMPT="请作为一个极其严格、甚至有些刁钻的资深代码审查员。请阅读当前目录下的 'pr_diff.txt' 文件。检查是否有 Bug、逻辑错误、安全问题或性能瓶颈。请严格按照以下纯文本格式输出你的审查结果，不要输出其他任何内容：
+          DECISION: APPROVE 或 REQUEST_CHANGES
+          COMMENT: 你的详细审查意见"
+          
+          # 3. 运行 Claude Code！(无头模式)
+          claude -p "$PROMPT" --dangerously-skip-permissions > review_result.txt
+          
+          echo "=== 审查结果 ==="
+          cat review_result.txt
+
+      - name: ⚙️ Parse Review & Action
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # 提取 LLM 的判断结果
+          DECISION=$(grep "^DECISION:" review_result.txt | awk '{print $2}')
+          COMMENT=$(sed -n '/^COMMENT:/,$p' review_result.txt | sed 's/^COMMENT://')
+          
+          if [ "$DECISION" = "APPROVE" ]; then
+            echo "✅ 代码审查通过，批准合并..."
+            gh pr review $PR_NUMBER --approve --body "🤖 AI 审查通过！代码质量优秀。$COMMENT"
+          else
+            echo "❌ 代码审查不通过，触发 AI-Fixer..."
+            # 触发修复员
+            gh pr comment $PR_NUMBER --body "/claude-fix 审查员发现了以下问题，请立即修改代码：\n\n$COMMENT"
+            # 标记为请求修改
+            gh pr review $PR_NUMBER --request-changes --body "需要修改：$COMMENT"
+          fi

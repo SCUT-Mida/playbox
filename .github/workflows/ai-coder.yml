@@ -1,4 +1,4 @@
-name: 🤖 Claude Code Auto Dev (支持国内大模型)
+name: 🤖 AI Coder (Issue to PR)
 
 on:
   issues:

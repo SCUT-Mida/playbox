@@ -34,7 +34,7 @@ jobs:
           pip install opencode-ai --upgrade
           
           # 2. 核心！使用官方推荐命令 + 跳过交互式 UI 的参数安装插件
-          bunx -y oh-my-opencode install --non-interactive
+          bunx oh-my-openagent install
           
           # 3. 防覆盖保险：强制将仓库里的自定义配置覆盖为最高优先级
           # （以防 install 步骤用默认配置覆盖了你的私有模型配置）

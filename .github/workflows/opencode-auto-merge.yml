@@ -1,0 +1,55 @@
+name: 🤖 Auto Review & Merge PR
+
+on:
+  pull_request:
+    types: [opened, synchronize] # PR 被打开或更新时
+
+jobs:
+  auto-merge:
+    # 只处理 OpenCode 提交的 PR
+    if: startsWith(github.head_ref, 'opencode/issue-')
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
+      checks: read
+
+    steps:
+      - name: ⏳ Wait for CI Checks (等待单元测试)
+        uses: lewagon/wait-on-check-action@v1.3.4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          check-name: 'tests' # 替换为你仓库实际的测试 Job 名称
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 15
+
+      - name: 🧠 AI Code Review (使用 GitHub Copilot / 或其他审查机器人)
+        uses: githubnext/workspace-github/copilot-for-prs-action@v1
+        # 这里你可以替换为任何你喜欢的 AI review action
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🔄 Enable Auto-Merge
+        uses: peter-evans/enable-pull-request-automerge@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          pull-request-number: ${{ github.event.pull_request.number }}
+          merge-method: squash
+
+      - name: ✅ Auto Approve PR (可选：如果完全信任测试和 AI)
+        uses: hmarr/auto-approve-action@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🔗 Close related Issue
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issueNumber = context.payload.pull_request.head.ref.split('-')[1];
+            github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: parseInt(issueNumber),
+              state: 'closed'
+            });

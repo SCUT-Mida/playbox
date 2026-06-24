@@ -44,11 +44,14 @@ jobs:
           # 1. 模型地址+模型制定环境配置
           "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic"
           "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-4.7"
-          "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5.2[1m]",
-          "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5.2[1m]",
+          "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5.2[1m]"
+          "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5.2[1m]"
+          "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1000000"
+          "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": 1
+          "API_TIMEOUT_MS": "3000000"
 
           # 2. 填入你的国内模型 API Key
-          ANTHROPIC_API_KEY: ${{ secrets.GLM_API_KEY }}
+          ANTHROPIC_AUTH_TOKEN: ${{ secrets.GLM_API_KEY }}
 
           # ===================================================
 

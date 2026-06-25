@@ -17,6 +17,9 @@ jobs:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
         with:
+          # 必须显式 checkout PR 源分支，否则默认是 detached HEAD，
+          # 后续 git commit + git push 会报 "fatal: You are not currently on a branch"
+          ref: ${{ github.head_ref }}
           fetch-depth: 0 # 必须是 0，脚本中的 git diff 才能拿到完整记录
 
       - name: 🟢 Setup Node.js

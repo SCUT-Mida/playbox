@@ -25,8 +25,16 @@ jobs:
           node-version: '24'
 
       - name: 📝 Generate Prompt via Local Script
+        env:
+          HEAD_REF: ${{ github.head_ref }}
         run: |
-          TASK_DIR=".ai-tasks/issue-${{ github.event.pull_request.number }}"
+          # 👇【致命 BUG 修复】：从 PR 分支名提取真实的 Issue 编号，不能用 PR 号
+          ISSUE_NUMBER=$(echo "$HEAD_REF" | grep -oiE 'issue-[0-9]+' | grep -oiE '[0-9]+' | head -n 1)
+          if [ -z "$ISSUE_NUMBER" ]; then ISSUE_NUMBER=${{ github.event.pull_request.number }}; fi
+          
+          TASK_DIR=".ai-tasks/issue-${ISSUE_NUMBER}"
+          # 👇【关键修复】: 将 TASK_DIR 暴露给后续步骤使用
+          echo "TASK_DIR=$TASK_DIR" >> $GITHUB_ENV
           
           # 👇【核心逻辑：计算当前审查轮次】
           # 查找已有的 review_result_r*.md 文件数量
@@ -36,7 +44,7 @@ jobs:
           # 将轮次写入 GITHUB_ENV，供后续步骤使用
           echo "CURRENT_ROUND=$CURRENT_ROUND" >> $GITHUB_ENV
           
-          echo "检测到当前是第 $CURRENT_ROUND 轮审查"
+          echo "检测到当前是 Issue #$ISSUE_NUMBER 的第 $CURRENT_ROUND 轮审查"
           
           # 执行本地脚本 (传入：目录, 角色, 轮次)
           chmod +x ./.ai-tasks/scripts/generate-ai-task.sh
@@ -54,7 +62,7 @@ jobs:
           "API_TIMEOUT_MS": "3000000"
           ANTHROPIC_AUTH_TOKEN: ${{ secrets.GLM_API_KEY }}
           # ===================================================
-          TASK_DIR: .ai-tasks/issue-${{ github.event.pull_request.number }}
+          TASK_DIR: ${{ env.TASK_DIR }} # 👈 修改为从 env 获取
           ROUND: ${{ env.CURRENT_ROUND }}
         run: |
           npm install -g @anthropic-ai/claude-code
@@ -73,7 +81,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          TASK_DIR: .ai-tasks/issue-${{ github.event.pull_request.number }}
+          TASK_DIR: ${{ env.TASK_DIR }} # 👈 修改为从 env 获取
           ROUND: ${{ env.CURRENT_ROUND }}
           HEAD_REF: ${{ github.head_ref }} # 👈 注入当前 PR 的分支名
         run: |
@@ -100,5 +108,6 @@ jobs:
             echo "❌ 代码审查不通过，触发 AI-Fixer..."
             # 触发修复员，将意见评论到 PR 中
             gh pr comment $PR_NUMBER --body "/claude-fix 审查员发现了以下问题，请立即修改代码：\n\n$COMMENT"
-            gh pr review $PR_NUMBER --request-changes --body "需要修改：$COMMENT"
+            # 👈【关键修复】: bot 无法对自己的 PR request changes，改为普通评论
+            gh pr review $PR_NUMBER --comment --body "⚠️ 审查未通过，需要修改：$COMMENT"
           fi

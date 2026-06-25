@@ -18,7 +18,8 @@ jobs:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         id: pr_data
         run: |
-          PR_DATA=$(gh pr view ${{ github.event.issue.number }} --json headRefName --jq '.headRefName')
+          # 👈【关键修复】：加上 --repo 参数，避免在无 .git 目录时报错
+          PR_DATA=$(gh pr view ${{ github.event.issue.number }} --repo ${{ github.repository }} --json headRefName --jq '.headRefName')
           echo "branch=$PR_DATA" >> $GITHUB_OUTPUT
 
       - name: 📥 Checkout PR Branch

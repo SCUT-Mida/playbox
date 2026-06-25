@@ -11,16 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
-      contents: write
+      contents: write # 👈 需要 write 权限才能 push
 
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
         with:
-          # 必须显式 checkout PR 源分支，否则默认是 detached HEAD，
-          # 后续 git commit + git push 会报 "fatal: You are not currently on a branch"
-          ref: ${{ github.head_ref }}
-          fetch-depth: 0 # 必须是 0，脚本中的 git diff 才能拿到完整记录
+          fetch-depth: 0
 
       - name: 🟢 Setup Node.js
         uses: actions/setup-node@v6.4.0
@@ -78,6 +75,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           TASK_DIR: .ai-tasks/issue-${{ github.event.pull_request.number }}
           ROUND: ${{ env.CURRENT_ROUND }}
+          HEAD_REF: ${{ github.head_ref }} # 👈 注入当前 PR 的分支名
         run: |
           RESULT_FILE="$TASK_DIR/review_result_r${ROUND}.md"
           
@@ -90,7 +88,9 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add "$TASK_DIR/"
           git commit -m "🕵️ docs: 记录 Issue #${PR_NUMBER} 第 ${ROUND} 轮 AI 审查日志"
-          git push
+          
+          # 👈【关键修复】: 显式指定推送到 PR 的源分支，解决 detached HEAD 报错
+          git push origin "HEAD:$HEAD_REF"
           
           # 根据决策执行动作
           if [ "$DECISION" = "APPROVE" ]; then

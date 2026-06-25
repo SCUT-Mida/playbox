@@ -37,8 +37,15 @@ jobs:
         env:
           # 将触发评论的内容暴露为环境变量，供脚本读取
           COMMENT_BODY: ${{ github.event.comment.body }}
+          HEAD_REF: ${{ steps.pr_data.outputs.branch }} # 👈 注入当前 PR 的分支名
         run: |
-          TASK_DIR=".ai-tasks/issue-${{ github.event.issue.number }}"
+          # 👇【致命 BUG 修复】：从 PR 分支名提取真实的 Issue 编号
+          ISSUE_NUMBER=$(echo "$HEAD_REF" | grep -oiE 'issue-[0-9]+' | grep -oiE '[0-9]+' | head -n 1)
+          if [ -z "$ISSUE_NUMBER" ]; then ISSUE_NUMBER=${{ github.event.issue.number }}; fi
+          
+          TASK_DIR=".ai-tasks/issue-${ISSUE_NUMBER}"
+          # 👇【关键修复】: 将 TASK_DIR 暴露给后续步骤使用
+          echo "TASK_DIR=$TASK_DIR" >> $GITHUB_ENV
           
           # 👇【核心逻辑：计算当前修复轮次】
           EXISTING_FIXES=$(ls -1 "$TASK_DIR"/ai-fixer-prompt_r*.md 2>/dev/null | wc -l)
@@ -47,7 +54,7 @@ jobs:
           # 将轮次写入 GITHUB_ENV
           echo "CURRENT_ROUND=$CURRENT_ROUND" >> $GITHUB_ENV
           
-          echo "检测到当前是第 $CURRENT_ROUND 轮修复"
+          echo "检测到当前是 Issue #$ISSUE_NUMBER 的第 $CURRENT_ROUND 轮修复"
           
           # 执行本地脚本 (传入：目录, 角色, 轮次)
           chmod +x ./.ai-tasks/scripts/generate-ai-task.sh
@@ -65,7 +72,7 @@ jobs:
           "API_TIMEOUT_MS": "3000000"
           ANTHROPIC_AUTH_TOKEN: ${{ secrets.GLM_API_KEY }}
           # ===================================================
-          TASK_DIR: .ai-tasks/issue-${{ github.event.issue.number }}
+          TASK_DIR: ${{ env.TASK_DIR }} # 👈 修改为从 env 获取
           ROUND: ${{ env.CURRENT_ROUND }}
         run: |
           npm install -g @anthropic-ai/claude-code

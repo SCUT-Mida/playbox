@@ -20,16 +20,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          # 执行自动合并并删除分支
-          gh pr merge $PR_NUMBER --squash --auto --delete-branch
+          # 去掉 --auto，执行立刻合并并删除分支
+          gh pr merge $PR_NUMBER --squash --delete-branch
 
       - name: 🏁 Close Related Issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
-          # 提取数字编号
-          ISSUE_NUMBER=$(echo "$BRANCH_NAME" | grep -oP 'issue-\K\d+')
+          # 👇【微调】：使用更通用、更安全的 ERE 正则提取数字，与前面工作流保持一致
+          ISSUE_NUMBER=$(echo "$BRANCH_NAME" | grep -oiE 'issue-[0-9]+' | grep -oiE '[0-9]+' | head -n 1)
           
           if [ -n "$ISSUE_NUMBER" ]; then
             gh pr comment ${{ github.event.pull_request.number }} --body "✅ 代码已合入主分支。"

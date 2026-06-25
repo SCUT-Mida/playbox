@@ -6,12 +6,10 @@ on:
 
 jobs:
   review:
-    # 仅限 AI 创建的分支触发
     if: startsWith(github.head_ref, 'ai-fix/issue-')
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
-      # 删掉了 contents: write，彻底禁止它提交代码
 
     steps:
       - name: 📥 Checkout code
@@ -38,8 +36,7 @@ jobs:
           CURRENT_ROUND=$((EXISTING_REVIEWS + 1))
           echo "CURRENT_ROUND=$CURRENT_ROUND" >> $GITHUB_ENV
           
-          echo "检测到当前是 Issue #$ISSUE_NUMBER 的第 $CURRENT_ROUND 轮审查"
-          
+          sed -i 's/\r$//' ./.ai-tasks/scripts/generate-ai-task.sh
           chmod +x ./.ai-tasks/scripts/generate-ai-task.sh
           ./.ai-tasks/scripts/generate-ai-task.sh "$TASK_DIR" "reviewer" "$CURRENT_ROUND"
 
@@ -74,15 +71,12 @@ jobs:
           RESULT_FILE="$TASK_DIR/review_result_r${ROUND}.md"
 
           DECISION=$(grep "^DECISION:" "$RESULT_FILE" | awk '{print $2}')
-          # 提取 COMMENT，并去掉文本中可能破坏 shell 的特殊字符
           COMMENT=$(sed -n '/^COMMENT:/,$p' "$RESULT_FILE" | sed 's/^COMMENT://' | tr -d '\r')
 
           if [ "$DECISION" = "APPROVE" ]; then
             echo "✅ 代码审查通过，批准合并..."
-            # 批准合并
             gh pr review $PR_NUMBER --approve --body "🕵️ AI 审查通过！代码质量优秀。\n\n$COMMENT"
           else
             echo "❌ 代码审查不通过，触发 AI-Fixer..."
-            # 👇【关键修复】：在评论正文开头强制加入 /claude-fix 指令前缀！
             gh pr comment $PR_NUMBER --body "/claude-fix 🛠️ **请立即根据以下审查意见修改代码：** \n\n> 以下是第 $ROUND 轮审查未通过的意见：\n\n$COMMENT"
           fi

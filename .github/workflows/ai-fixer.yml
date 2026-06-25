@@ -6,7 +6,6 @@ on:
 
 jobs:
   fix:
-    # 仅在 PR 评论中包含 /claude-fix 时触发
     if: contains(github.event.comment.body, '/claude-fix') && github.event.issue.pull_request
     runs-on: ubuntu-latest
     permissions:
@@ -16,7 +15,7 @@ jobs:
     steps:
       - name: 📥 Get PR Branch Info
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         id: pr_data
         run: |
           PR_DATA=$(gh pr view ${{ github.event.issue.number }} --json headRefName --jq '.headRefName')
@@ -35,34 +34,25 @@ jobs:
 
       - name: 📝 Generate Prompt via Local Script
         env:
-          # 将触发评论的内容暴露为环境变量，供脚本读取
           COMMENT_BODY: ${{ github.event.comment.body }}
-          HEAD_REF: ${{ steps.pr_data.outputs.branch }} # 👈 注入当前 PR 的分支名
+          HEAD_REF: ${{ steps.pr_data.outputs.branch }}
         run: |
-          # 👇【致命 BUG 修复】：从 PR 分支名提取真实的 Issue 编号
           ISSUE_NUMBER=$(echo "$HEAD_REF" | grep -oiE 'issue-[0-9]+' | grep -oiE '[0-9]+' | head -n 1)
           if [ -z "$ISSUE_NUMBER" ]; then ISSUE_NUMBER=${{ github.event.issue.number }}; fi
           
           TASK_DIR=".ai-tasks/issue-${ISSUE_NUMBER}"
-          # 👇【关键修复】: 将 TASK_DIR 暴露给后续步骤使用
           echo "TASK_DIR=$TASK_DIR" >> $GITHUB_ENV
           
-          # 👇【核心逻辑：计算当前修复轮次】
-          EXISTING_FIXES=$(ls -1 "$TASK_DIR"/ai-fixer-prompt_r*.md 2>/dev/null | wc -l)
+          # 根据 reviewer 生成的 r*.md 计算当前修复轮次
+          EXISTING_FIXES=$(ls -1 "$TASK_DIR"/fixer-round-*.md 2>/dev/null | wc -l)
           CURRENT_ROUND=$((EXISTING_FIXES + 1))
-          
-          # 将轮次写入 GITHUB_ENV
           echo "CURRENT_ROUND=$CURRENT_ROUND" >> $GITHUB_ENV
           
-          echo "检测到当前是 Issue #$ISSUE_NUMBER 的第 $CURRENT_ROUND 轮修复"
-          
-          # 执行本地脚本 (传入：目录, 角色, 轮次)
           chmod +x ./.ai-tasks/scripts/generate-ai-task.sh
           ./.ai-tasks/scripts/generate-ai-task.sh "$TASK_DIR" "fixer" "$CURRENT_ROUND"
 
       - name: 🤖 Execute Claude Code Agent (Fixer)
         env:
-          # ===================================================
           "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic"
           "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-4.7"
           "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5.2[1m]"
@@ -71,8 +61,7 @@ jobs:
           "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": 1
           "API_TIMEOUT_MS": "3000000"
           ANTHROPIC_AUTH_TOKEN: ${{ secrets.GLM_API_KEY }}
-          # ===================================================
-          TASK_DIR: ${{ env.TASK_DIR }} # 👈 修改为从 env 获取
+          TASK_DIR: ${{ env.TASK_DIR }}
           ROUND: ${{ env.CURRENT_ROUND }}
         run: |
           npm install -g @anthropic-ai/claude-code
@@ -80,23 +69,23 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # 动态拼接 Prompt 文件名
-          PROMPT_FILE="$TASK_DIR/ai-fixer-prompt_r${ROUND}.md"
+          # 👇【读取脚本组装好的 fixer-round-x.md 交互文档】
+          PROMPT_FILE="$TASK_DIR/fixer-round-${ROUND}.md"
           
           echo "正在读取 $PROMPT_FILE 并执行代码修复..."
           claude -p "$(cat $PROMPT_FILE)" --dangerously-skip-permissions
 
-      - name: 🚀 Push Fix Code
+      - name: 🚀 Push Fix Code & Archive Doc
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
           ROUND: ${{ env.CURRENT_ROUND }}
         run: |
           if [ -z "$(git status --porcelain)" ]; then
             echo "⚠️ 警告: AI 没有修改任何代码文件！"
           else
             echo "✅ 发现代码修改，准备提交第 ${ROUND} 轮修复"
-            # 同时提交代码修改和记录的 Prompt 历史文件
+            # 同时提交代码修改和记录的 Prompt 历史文件，归档进仓库
             git add .
-            git commit -m "🛠️ fix: 根据审查员意见完成第 ${ROUND} 轮代码重构"
+            git commit -m "🛠️ fix: 根据审查员意见完成第 ${ROUND} 轮代码重构 (归档交互文档)"
             git push
           fi

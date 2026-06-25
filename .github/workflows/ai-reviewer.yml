@@ -6,12 +6,12 @@ on:
 
 jobs:
   review:
-    # 仅限 AI 创建的分支触发，防止人类提交的 PR 被乱搞
+    # 仅限 AI 创建的分支触发
     if: startsWith(github.head_ref, 'ai-fix/issue-')
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
-      contents: write # 👈 需要 write 权限才能 push
+      # 👈 删掉了 contents: write，彻底禁止它提交代码
 
     steps:
       - name: 📥 Checkout code
@@ -28,31 +28,23 @@ jobs:
         env:
           HEAD_REF: ${{ github.head_ref }}
         run: |
-          # 👇【致命 BUG 修复】：从 PR 分支名提取真实的 Issue 编号，不能用 PR 号
           ISSUE_NUMBER=$(echo "$HEAD_REF" | grep -oiE 'issue-[0-9]+' | grep -oiE '[0-9]+' | head -n 1)
           if [ -z "$ISSUE_NUMBER" ]; then ISSUE_NUMBER=${{ github.event.pull_request.number }}; fi
           
           TASK_DIR=".ai-tasks/issue-${ISSUE_NUMBER}"
-          # 👇【关键修复】: 将 TASK_DIR 暴露给后续步骤使用
           echo "TASK_DIR=$TASK_DIR" >> $GITHUB_ENV
           
-          # 👇【核心逻辑：计算当前审查轮次】
-          # 查找已有的 review_result_r*.md 文件数量
           EXISTING_REVIEWS=$(ls -1 "$TASK_DIR"/review_result_r*.md 2>/dev/null | wc -l)
           CURRENT_ROUND=$((EXISTING_REVIEWS + 1))
-          
-          # 将轮次写入 GITHUB_ENV，供后续步骤使用
           echo "CURRENT_ROUND=$CURRENT_ROUND" >> $GITHUB_ENV
           
           echo "检测到当前是 Issue #$ISSUE_NUMBER 的第 $CURRENT_ROUND 轮审查"
           
-          # 执行本地脚本 (传入：目录, 角色, 轮次)
           chmod +x ./.ai-tasks/scripts/generate-ai-task.sh
           ./.ai-tasks/scripts/generate-ai-task.sh "$TASK_DIR" "reviewer" "$CURRENT_ROUND"
 
       - name: 🤖 Execute Claude Code Agent (Reviewer)
         env:
-          # ===================================================
           "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic"
           "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-4.7"
           "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5.2[1m]"
@@ -61,53 +53,38 @@ jobs:
           "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": 1
           "API_TIMEOUT_MS": "3000000"
           ANTHROPIC_AUTH_TOKEN: ${{ secrets.GLM_API_KEY }}
-          # ===================================================
-          TASK_DIR: ${{ env.TASK_DIR }} # 👈 修改为从 env 获取
+          TASK_DIR: ${{ env.TASK_DIR }}
           ROUND: ${{ env.CURRENT_ROUND }}
         run: |
           npm install -g @anthropic-ai/claude-code
           
-          # 动态拼接 Prompt 文件名和输出结果文件名
           PROMPT_FILE="$TASK_DIR/ai-reviewer-prompt_r${ROUND}.md"
           OUTPUT_FILE="$TASK_DIR/review_result_r${ROUND}.md"
           
           echo "正在读取 $PROMPT_FILE 并执行审查..."
           claude -p "$(cat $PROMPT_FILE)" --dangerously-skip-permissions > "$OUTPUT_FILE"
-          
-          echo "=== 本轮审查结果 ==="
-          cat "$OUTPUT_FILE"
 
       - name: ⚙️ Parse Review & Action
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          TASK_DIR: ${{ env.TASK_DIR }} # 👈 修改为从 env 获取
+          TASK_DIR: ${{ env.TASK_DIR }}
           ROUND: ${{ env.CURRENT_ROUND }}
-          HEAD_REF: ${{ github.head_ref }} # 👈 注入当前 PR 的分支名
         run: |
           RESULT_FILE="$TASK_DIR/review_result_r${ROUND}.md"
           
-          # 解析结果
           DECISION=$(grep "^DECISION:" "$RESULT_FILE" | awk '{print $2}')
           COMMENT=$(sed -n '/^COMMENT:/,$p' "$RESULT_FILE" | sed 's/^COMMENT://')
           
-          # 提交审查日志记录到代码仓
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add "$TASK_DIR/"
-          git commit -m "🕵️ docs: 记录 Issue #${PR_NUMBER} 第 ${ROUND} 轮 AI 审查日志"
+          # 🚨【核心修改】：彻底删掉了 git config / git add / git commit / git push !!!
+          # 审查日志不需要提交到代码仓，直接通过评论发给 Fixer 即可。
           
-          # 👈【关键修复】: 显式指定推送到 PR 的源分支，解决 detached HEAD 报错
-          git push origin "HEAD:$HEAD_REF"
-          
-          # 根据决策执行动作
           if [ "$DECISION" = "APPROVE" ]; then
             echo "✅ 代码审查通过，批准合并..."
             gh pr review $PR_NUMBER --approve --body "🤖 AI 审查通过！代码质量优秀。$COMMENT"
           else
             echo "❌ 代码审查不通过，触发 AI-Fixer..."
-            # 触发修复员，将意见评论到 PR 中
+            # 将审查意见作为评论发出，Fixer 监听到后会把意见抓取下来组装进 MD 文档
             gh pr comment $PR_NUMBER --body "/claude-fix 审查员发现了以下问题，请立即修改代码：\n\n$COMMENT"
-            # 👈【关键修复】: bot 无法对自己的 PR request changes，改为普通评论
             gh pr review $PR_NUMBER --comment --body "⚠️ 审查未通过，需要修改：$COMMENT"
           fi

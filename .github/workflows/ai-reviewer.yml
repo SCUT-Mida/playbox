@@ -120,6 +120,7 @@ jobs:
       - name: ⚙️ Parse Review & Action
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          BOT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           TASK_DIR: ${{ env.TASK_DIR }}
           ROUND: ${{ env.CURRENT_ROUND }}
@@ -131,8 +132,10 @@ jobs:
 
           if [ "$DECISION" = "APPROVE" ]; then
             echo "✅ 代码审查通过，批准合并..."
-            gh pr review $PR_NUMBER --approve --body "🕵️ AI 审查通过！代码质量优秀。\n\n$COMMENT"
+            # 用 BOT_TOKEN (Actions bot) 批准，避免 PAT_TOKEN 与 PR 作者相同导致 "can not approve your own PR"
+            GH_TOKEN="$BOT_TOKEN" gh pr review $PR_NUMBER --approve --body "🕵️ AI 审查通过！代码质量优秀。\n\n$COMMENT"
           else
             echo "❌ 代码审查不通过，触发 AI-Fixer..."
+            # 用 PAT_TOKEN 评论，因为 issue_comment 事件不触发 GITHUB_TOKEN 的评论
             gh pr comment $PR_NUMBER --body "/claude-fix 🛠️ **请立即根据以下审查意见修改代码：** \n\n> 以下是第 $ROUND 轮审查未通过的意见：\n\n$COMMENT"
           fi

@@ -134,6 +134,11 @@ const SFX = {
     tone({ freq: 320, type: 'sawtooth', dur: 0.4, vol: 0.16 });
     tone({ freq: 240, type: 'sawtooth', dur: 0.4, vol: 0.12, delay: 0.02 });
   },
+  waveclear() {
+    // 本波清剿完成：明亮短促的上行双音，区别于整局胜利的 win 长琶音
+    tone({ freq: 784, type: 'triangle', dur: 0.14, vol: 0.16 });
+    tone({ freq: 1175, type: 'sine', dur: 0.22, vol: 0.15, delay: 0.08 });
+  },
   ult() {
     // 火烧连营：噪声 + 下行铜管
     noise({ dur: 0.5, vol: 0.22, filterType: 'bandpass', freq: 800 });

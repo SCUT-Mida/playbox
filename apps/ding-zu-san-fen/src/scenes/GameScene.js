@@ -259,8 +259,13 @@ export default class GameScene extends Phaser.Scene {
     // 波次进入"波间空档"（无存活敌军的干净检查点）→ 更新存档快照
     const ws = this.waveManager.state;
     if (ws !== this._lastWaveState) {
+      const prev = this._lastWaveState;
       this._lastWaveState = ws;
-      if (ws === 'between') this._saveBattle();
+      if (ws === 'between') {
+        // 由 running 切入波间：本波清剿完成，补一记清脆提示（首波 idle / 续战恢复均不会触发）
+        if (prev === 'running') audio.play('waveclear');
+        this._saveBattle();
+      }
     }
 
     // 阻挡分配

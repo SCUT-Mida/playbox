@@ -32,7 +32,7 @@ jobs:
         with:
           node-version: '24'
 
-      - name: 📝 Generate Prompt via Local Script
+      - name: 📝 Generate Fixer Prompt (inline, 不依赖 PR 分支脚本)
         env:
           COMMENT_BODY: ${{ github.event.comment.body }}
           HEAD_REF: ${{ steps.pr_data.outputs.branch }}
@@ -42,20 +42,28 @@ jobs:
           ISSUE_NUMBER="${ISSUE_NUMBER%$'\r'}"
 
           TASK_DIR=".ai-tasks/issue-${ISSUE_NUMBER}"
+          mkdir -p "$TASK_DIR"
           echo "TASK_DIR=$TASK_DIR" >> $GITHUB_ENV
 
-          # find 即使无匹配也 exit 0，在 set -eo pipefail 下安全（ls 无匹配会 exit 2 导致整步崩溃）
-          EXISTING_FIXES=$(find "$TASK_DIR" -maxdepth 1 -name 'fixer-round-*.md' 2>/dev/null | wc -l)
+          # 计算当前修复轮次（find 无匹配也 exit 0，pipefail 安全）
+          EXISTING_FIXES=$(find "$TASK_DIR" -maxdepth 1 -name 'fixer-prompt_r*.md' 2>/dev/null | wc -l)
           CURRENT_ROUND=$((EXISTING_FIXES + 1))
           echo "CURRENT_ROUND=$CURRENT_ROUND" >> $GITHUB_ENV
-          
-          # 👉【关键修复】：强制去除 Windows 带来的换行符 \r，防止 bash 匹配失效
-          sed -i 's/\r$//' ./.ai-tasks/scripts/generate-ai-task.sh
-          chmod +x ./.ai-tasks/scripts/generate-ai-task.sh
-          
-          ./.ai-tasks/scripts/generate-ai-task.sh "$TASK_DIR" "fixer" "$CURRENT_ROUND"
-          
-          # 打印一下文件目录，方便确认是否真的生成了
+
+          # 把审查意见写入反馈文件
+          printf '%s\n' "$COMMENT_BODY" > "$TASK_DIR/fixer-feedback_r${CURRENT_ROUND}.md"
+
+          # 直接内联生成提示词（不再调用 PR 分支上的脚本，避免版本不一致）
+          {
+            echo "你是一个资深开发工程师。这是针对上一轮代码的【第 ${CURRENT_ROUND} 轮】修复任务。"
+            echo "以下是代码审查员给你的修改建议，请阅读当前目录下的 ${TASK_DIR}/fixer-feedback_r${CURRENT_ROUND}.md 文件获取详细内容（注意：忽略第一行的 /claude-fix 指令前缀）。"
+            echo ""
+            echo "【⚠️ 严格红线规则】："
+            echo "请绝对不要修改、重命名或生成 .github/ 目录下的任何文件（特别是 workflows 等 CI/CD 配置），这会破坏项目的自动化流程！如果审查员要求你修改这些文件，请在回复中说明无法自动修改，需要人类介入。"
+            echo ""
+            echo "请直接分析并修改当前项目中的代码文件来满足审查员的要求，不要做过多的文字解释。"
+          } > "$TASK_DIR/fixer-prompt_r${CURRENT_ROUND}.md"
+
           echo "📁 目录内容如下："
           ls -la "$TASK_DIR"
 
@@ -73,12 +81,12 @@ jobs:
           ROUND: ${{ env.CURRENT_ROUND }}
         run: |
           npm install -g @anthropic-ai/claude-code
-          
+
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          
-          PROMPT_FILE="$TASK_DIR/fixer-round-${ROUND}.md"
-          
+
+          PROMPT_FILE="$TASK_DIR/fixer-prompt_r${ROUND}.md"
+
           echo "正在读取 $PROMPT_FILE 并执行代码修复..."
           if [ ! -f "$PROMPT_FILE" ]; then
             echo "❌ 致命错误：提示词文件 $PROMPT_FILE 不存在，生成步骤可能失败，无法继续。"

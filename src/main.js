@@ -44,6 +44,10 @@ app.innerHTML = `
   <div class="game-overlay" id="game-overlay" hidden>
     <div class="game-stage">
       <button class="game-close" id="game-close" type="button" aria-label="退出游戏">✕</button>
+      <div class="game-loading" id="game-loading">
+        <span class="game-loading__spinner" aria-hidden="true"></span>
+        <span class="game-loading__text">加载中…</span>
+      </div>
       <div class="game-mount" id="game-mount"></div>
     </div>
   </div>
@@ -54,29 +58,45 @@ const playLabel = playBtn.querySelector('.play-btn__label')
 const overlay = document.getElementById('game-overlay')
 const mount = document.getElementById('game-mount')
 const closeBtn = document.getElementById('game-close')
+const loadingEl = document.getElementById('game-loading')
 
 const GAME_KEY = '__PLAYBOX_DZF__' // 暴露实例便于调试 / 自动化冒烟测试
 let game = null
 let loading = false
+let loadSeq = 0 // 取消令牌：每次 closeGame / 重新 openGame 递增，使飞行中的加载作废
 
 async function openGame() {
-  if (game || loading) return
+  // 若游戏已存在，仅恢复 overlay 显示（不重复创建）
+  if (game) {
+    overlay.hidden = false
+    return
+  }
+  if (loading) return
+
+  const id = ++loadSeq
   loading = true
   playBtn.disabled = true
   playBtn.classList.add('is-loading')
   playLabel.textContent = '加载中…'
 
   overlay.hidden = false
+  loadingEl.hidden = false
   try {
     // 动态 import：仅在真正游玩时才拉取 Phaser（~1.5MB），保持落地页轻量
     const { createGame } = await import('../apps/ding-zu-san-fen/src/main.js')
+    // 取消令牌检查：若加载期间被 closeGame 中断，丢弃结果
+    if (id !== loadSeq) return
     game = createGame(mount)
+    loadingEl.hidden = true
     if (typeof window !== 'undefined') window[GAME_KEY] = game
   } catch (err) {
+    if (id !== loadSeq) return // 被取消，静默丢弃
     console.error('游戏加载失败：', err)
     overlay.hidden = true
+    loadingEl.hidden = true
     playLabel.textContent = '加载失败，点击重试'
   } finally {
+    if (id !== loadSeq) return // 被取消，不要修改 UI 状态
     loading = false
     playBtn.disabled = false
     playBtn.classList.remove('is-loading')
@@ -85,12 +105,16 @@ async function openGame() {
 }
 
 function closeGame() {
+  // 递增取消令牌，使飞行中的 openGame import 作废
+  loadSeq++
+
   if (game) {
     game.destroy(true)
     game = null
   }
   if (typeof window !== 'undefined') window[GAME_KEY] = undefined
   mount.innerHTML = ''
+  loadingEl.hidden = true
   overlay.hidden = true
   playLabel.textContent = '开始游戏'
 }

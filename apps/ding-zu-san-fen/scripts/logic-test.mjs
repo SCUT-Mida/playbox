@@ -1,6 +1,6 @@
 // 纯逻辑自测（不依赖 Phaser / 浏览器）
 import {
-  computeDamage, cellKey,
+  computeDamage, cellKey, MAP_Y, MAP_HEIGHT, TILE,
 } from '../src/config.js';
 import MapManager from '../src/managers/MapManager.js';
 import WaveManager from '../src/managers/WaveManager.js';
@@ -43,8 +43,8 @@ for (const key of LEVEL_LIST) {
   // 中间点应在路径上
   const pMid = m.pointAt(m.length / 2);
   ok(pMid.x !== p0.x || pMid.y !== p0.y, `${key}: mid point differs from start`);
-  // base 在右侧出场
-  ok(pEnd.x > 1000, `${key}: base near right edge (x=${Math.round(pEnd.x)})`);
+  // base 在底部（竖屏路径自上而下，终点贴近底边）
+  ok(pEnd.y > MAP_Y + MAP_HEIGHT - TILE - 1, `${key}: base near bottom edge (y=${Math.round(pEnd.y)})`);
 }
 
 // ---------- 羁绊 ----------

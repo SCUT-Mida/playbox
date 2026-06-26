@@ -1,8 +1,8 @@
 // Enemy: 敌军单位 —— 沿路径移动、可被近战阻挡、护甲减伤、状态效果
 import { TILE, COLORS, computeDamage } from '../config.js';
 import { ENEMIES } from '../data/enemies.js';
+import { drawChibi, optsForEnemy } from '../utils/Chibi.js';
 
-const HP_BAR_W = TILE * 0.72;
 const HP_BAR_H = 5;
 
 export default class Enemy {
@@ -46,30 +46,28 @@ export default class Enemy {
   _build() {
     const s = this.scene;
     const scale = this.boss ? 1.5 : 1.0;
+    const size = TILE * 0.72 * scale;
+    this.size = size;
+    const feetY = size * 0.42;
+    this.feetY = feetY;
     this.container = s.add.container(0, 0);
     this.container.setDepth(30);
 
     // 阴影
     this.shadow = s.add.graphics();
     this.shadow.fillStyle(0x000000, 0.28);
-    this.shadow.fillEllipse(0, 6, TILE * 0.5 * scale, TILE * 0.22 * scale);
+    this.shadow.fillEllipse(0, feetY + 3, size * 0.6, size * 0.24);
     this.container.add(this.shadow);
 
-    // 本体
-    const body = s.add.graphics();
-    const r = (TILE * 0.32) * scale;
-    body.fillStyle(this.def.color, 1);
-    body.lineStyle(2.5, COLORS.ink, 1);
-    this._drawShape(body, r);
-    body.fillPath();
-    body.strokePath();
-    this.container.add(body);
-    this.body = body;
+    // Q版敌军小人（开罗风格）
+    this.body = s.add.graphics();
+    drawChibi(this.body, { ...optsForEnemy(this.def), size });
+    this.container.add(this.body);
 
     // 血条
     this.hpBg = s.add.graphics();
     this.hpFill = s.add.graphics();
-    const by = -r - 10;
+    const by = -size * 0.5 - 10;
     this.hpBgY = by;
     this.container.add(this.hpBg);
     this.container.add(this.hpFill);
@@ -79,7 +77,7 @@ export default class Enemy {
     this.container.add(this.statusFx);
 
     if (this.boss) {
-      const label = s.add.text(0, -r - 22, this.def.name, {
+      const label = s.add.text(0, -size * 0.5 - 26, this.def.name, {
         fontFamily: '"PingFang SC","Microsoft YaHei",sans-serif',
         fontSize: '16px',
         color: '#ffe08a',
@@ -91,41 +89,6 @@ export default class Enemy {
     }
 
     this._refreshHpBar();
-  }
-
-  _drawShape(g, r) {
-    const sh = this.def.shape;
-    g.beginPath();
-    if (sh === 'circle' || sh === 'hex') {
-      const sides = sh === 'hex' ? 6 : 24;
-      for (let i = 0; i < sides; i++) {
-        const a = (i / sides) * Math.PI * 2 - Math.PI / 2;
-        const px = Math.cos(a) * r;
-        const py = Math.sin(a) * r;
-        if (i === 0) g.moveTo(px, py);
-        else g.lineTo(px, py);
-      }
-      g.closePath();
-    } else if (sh === 'diamond') {
-      g.moveTo(0, -r);
-      g.lineTo(r, 0);
-      g.lineTo(0, r);
-      g.lineTo(-r, 0);
-      g.closePath();
-    } else if (sh === 'rect') {
-      const w = r * 1.5;
-      g.moveTo(-w * 0.5, -r * 0.8);
-      g.lineTo(w * 0.5, -r * 0.8);
-      g.lineTo(w * 0.5, r * 0.8);
-      g.lineTo(-w * 0.5, r * 0.8);
-      g.closePath();
-    } else {
-      // tri
-      g.moveTo(0, -r);
-      g.lineTo(r * 0.9, r * 0.7);
-      g.lineTo(-r * 0.9, r * 0.7);
-      g.closePath();
-    }
   }
 
   applySlow(factor, dur) {
@@ -158,7 +121,7 @@ export default class Enemy {
 
   _refreshHpBar() {
     const ratio = Math.max(0, this.hp / this.maxHp);
-    const w = HP_BAR_W;
+    const w = this.size * 0.9;
     const y = this.hpBgY;
     this.hpBg.clear();
     this.hpBg.fillStyle(0x000000, 0.5);
@@ -221,17 +184,18 @@ export default class Enemy {
     this.container.x = p.x;
     this.container.y = p.y;
 
-    // 状态特效
+    // 状态特效（悬于头顶血条之上）
     this.statusFx.clear();
+    const sy = this.hpBgY - 6;
     let ox = -10;
     if (this.slowT > 0) {
       this.statusFx.fillStyle(COLORS.morale, 1);
-      this.statusFx.fillCircle(ox, -22, 3);
+      this.statusFx.fillCircle(ox, sy, 3);
       ox += 8;
     }
     if (this.burnT > 0) {
       this.statusFx.fillStyle(0xff7a2a, 1);
-      this.statusFx.fillCircle(ox, -22, 3);
+      this.statusFx.fillCircle(ox, sy, 3);
     }
   }
 

@@ -3,7 +3,7 @@ import {
   GAME_WIDTH, GAME_HEIGHT, TILE, slotTypeForClass, COLORS,
 } from '../config.js';
 import { upgradeCost, retreatRefund, MAX_LEVEL } from '../data/generals.js';
-import { unlockedGenerals } from '../data/meta.js';
+import { unlockedGenerals, generalStar, MAX_STAR } from '../data/meta.js';
 import { drawChibi, optsForGeneral } from '../utils/Chibi.js';
 import audio from '../audio/Audio.js';
 
@@ -249,6 +249,14 @@ export default class UIScene extends Phaser.Scene {
     cont.add(this.add.text(w / 2 - 8, -h / 2 + 8, String(def.cost), {
       fontFamily: 'serif', fontSize: '12px', color: '#ffe08a', fontStyle: 'bold',
     }).setOrigin(0.5).setName('cost'));
+
+    // 星级角标（合并升级 >1 星时显示，左上角）
+    const star = generalStar(def.id);
+    if (star > 1) {
+      cont.add(this.add.text(-w / 2 + 4, -h / 2 + 2, '★'.repeat(Math.min(star, MAX_STAR)), {
+        fontFamily: 'serif', fontSize: '10px', color: star >= MAX_STAR ? '#ffd27a' : '#b0e0ff',
+      }).setOrigin(0, 0));
+    }
 
     // 不可负担时的遮罩
     const dim = this.add.graphics();

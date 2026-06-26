@@ -1,15 +1,17 @@
 // General: 武将塔 —— 近战(阻挡)/远程(射击)/策士(法术)，含技能与羁绊 buff
 import { TILE, COLORS, gridToPixel } from '../config.js';
 import { LEVEL_MULT, MAX_LEVEL } from '../data/generals.js';
+import { starAtkMult, starHpMult } from '../data/meta.js';
 import { drawChibi, optsForGeneral } from '../utils/Chibi.js';
 import audio from '../audio/Audio.js';
 
 export default class General {
-  constructor(scene, def, col, row) {
+  constructor(scene, def, col, row, star = 1) {
     this.scene = scene;
     this.def = def;
     this.col = col;
     this.row = row;
+    this.star = Math.max(1, star | 0); // 星级（抽卡合并升级带来的永久加成）
     const p = gridToPixel(col, row);
     this.x = p.x;
     this.y = p.y;
@@ -41,10 +43,10 @@ export default class General {
   }
 
   _computeMaxHp() {
-    return Math.round(this.def.hp * LEVEL_MULT.hp[this.level - 1] * this.buffHp);
+    return Math.round(this.def.hp * LEVEL_MULT.hp[this.level - 1] * this.buffHp * starHpMult(this.star));
   }
   get atk() {
-    return this.def.atk * LEVEL_MULT.atk[this.level - 1] * this.buffAtk;
+    return this.def.atk * LEVEL_MULT.atk[this.level - 1] * this.buffAtk * starAtkMult(this.star);
   }
   get rangePx() {
     return this.def.range * TILE;
@@ -130,11 +132,19 @@ export default class General {
 
   _drawLevel() {
     this.levelFx.clear();
-    if (this.level <= 1) return;
     const y = this.feetY + 13;
+    // 战场等级（金币升级）：金色圆点
     for (let i = 0; i < this.level - 1; i++) {
       this.levelFx.fillStyle(COLORS.gold, 1);
       this.levelFx.fillCircle(-10 + i * 9, y, 3);
+    }
+    // 星级（抽卡合并升级）：青色描边小星点，仅 >1 星时显示
+    const star = this.star || 1;
+    for (let i = 0; i < star - 1; i++) {
+      this.levelFx.fillStyle(0x9ad0ff, 1);
+      this.levelFx.fillCircle(12 + i * 7, y, 2.6);
+      this.levelFx.lineStyle(1, 0xffffff, 0.85);
+      this.levelFx.strokeCircle(12 + i * 7, y, 2.6);
     }
   }
 
@@ -176,6 +186,14 @@ export default class General {
     this._drawLevel();
     this.pulse(1.18);
     return true;
+  }
+
+  // 恢复存档时直接设置战场等级（不触发动画/扣费），并重算血量上限
+  applySavedLevel(level) {
+    this.level = Math.max(1, Math.min(MAX_LEVEL, level | 0));
+    this.maxHp = this._computeMaxHp();
+    this.hp = this.maxHp;
+    this._drawLevel();
   }
 
   takeDamageFromEnemy(dmg) {

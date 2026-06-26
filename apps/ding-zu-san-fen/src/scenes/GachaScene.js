@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { COLORS, GAME_WIDTH, GAME_HEIGHT } from '../config.js';
 import { GENERALS, GENERAL_BY_ID } from '../data/generals.js';
 import {
-  getMeta, DRAW_COST, DRAW_COST_TEN, performDraw, performDrawTen, unlockedGenerals,
+  getMeta, DRAW_COST, DRAW_COST_TEN, MAX_STAR, performDraw, performDrawTen, unlockedGenerals,
 } from '../data/meta.js';
 import { drawChibi, optsForGeneral } from '../utils/Chibi.js';
 import audio from '../audio/Audio.js';
@@ -73,8 +73,8 @@ export default class GachaScene extends Phaser.Scene {
     this.add.text(width / 2, cy - 200, '广 纳 贤 才', {
       fontFamily: 'serif', fontSize: '30px', color: '#e6d4ac',
     }).setOrigin(0.5).setDepth(4);
-    this.add.text(width / 2, cy - 164, '招募天下名将，扩充麾下阵容', {
-      fontFamily: '"PingFang SC",sans-serif', fontSize: '16px', color: '#cbb888',
+    this.add.text(width / 2, cy - 164, '招募天下名将；抽到重复卡可合并升星，战力成长', {
+      fontFamily: '"PingFang SC",sans-serif', fontSize: '15px', color: '#cbb888',
     }).setOrigin(0.5).setDepth(4);
 
     // 中央"？"牌（未揭晓时的占位）
@@ -135,17 +135,19 @@ export default class GachaScene extends Phaser.Scene {
   }
 
   // 刷新金币/收集数/按钮可用性
+  // 注：即便已收录全部武将，仍可继续抽卡（重复卡合并升星），故不再因"集齐"禁用按钮。
   _refresh() {
     const m = getMeta();
     this._goldText.setText(`金 ${m.gold}`);
     const unlocked = unlockedGenerals().length;
-    this._countText.setText(`已收录 ${unlocked} / ${GENERALS.length}`);
-    const collected = unlocked >= GENERALS.length;
+    // 总星数体现合并进度
+    const totalStars = Object.values(m.stars || {}).reduce((a, s) => a + (s || 0), 0);
+    this._countText.setText(`已收录 ${unlocked} / ${GENERALS.length}　·　★ ${totalStars}`);
 
-    const can1 = !collected && m.gold >= DRAW_COST;
-    const can10 = !collected && m.gold >= DRAW_COST_TEN;
-    this._setBtn(this._draw1Btn, can1, collected ? '已集齐' : `${DRAW_COST} 金`, collected);
-    this._setBtn(this._draw10Btn, can10, collected ? '已集齐' : `${DRAW_COST_TEN} 金`, collected);
+    const can1 = m.gold >= DRAW_COST;
+    const can10 = m.gold >= DRAW_COST_TEN;
+    this._setBtn(this._draw1Btn, can1, `${DRAW_COST} 金`, false);
+    this._setBtn(this._draw10Btn, can10, `${DRAW_COST_TEN} 金`, false);
   }
 
   _setBtn(btn, enabled, costLabel, collected) {
@@ -157,12 +159,10 @@ export default class GachaScene extends Phaser.Scene {
 
   // ---------------- 抽卡 ----------------
   _doSingle() {
-    const before = getMeta().unlocked.length;
     const res = performDraw();
     if (!res) { audio.play('error'); return; } // 金币不足
-    if (res.allCollected) { audio.play('error'); this._refresh(); return; }
     audio.play('gacha');
-    this._revealSingle(res.id);
+    this._revealSingle(res);
     this._refresh();
   }
 
@@ -170,16 +170,29 @@ export default class GachaScene extends Phaser.Scene {
     const res = performDrawTen();
     if (!res) { audio.play('error'); return; }
     audio.play('gacha');
-    this._revealTen(res.got);
+    this._revealTen(res.got, res.refunded || 0);
     this._refresh();
   }
 
   // 单抽揭晓：卡牌翻转动画
-  _revealSingle(id) {
+  // 揭晓结果文案 / 配色 / 音效（按 kind 区分：新收录 / 合并升星 / 满星返金）
+  _bannerFor(res) {
+    if (res.kind === 'new') {
+      return { text: '✦ 新收录 ✦', color: '#ffe08a', sound: 'unlock' };
+    }
+    if (res.kind === 'max') {
+      return { text: `★ 已满星 · 返还 ${res.refunded} 金`, color: '#ffd27a', sound: 'coin' };
+    }
+    // dup：合并升星
+    return { text: `★ 合并升星 · ${res.star} 星`, color: '#b0e0ff', sound: 'skill' };
+  }
+
+  _revealSingle(res) {
     const { width, height } = this.scale;
-    const def = GENERAL_BY_ID[id];
+    const def = GENERAL_BY_ID[res.id];
     const cx = width / 2;
     const cy = height / 2 - 60;
+    const star = res.star || 1;
     if (this._placeholder) this._placeholder.setVisible(false);
 
     const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.5).setDepth(90);
@@ -219,11 +232,17 @@ export default class GachaScene extends Phaser.Scene {
       drawChibi(portrait, { ...optsForGeneral(def), size: 80 });
       portrait.setPosition(0, -6);
       c.add(portrait);
-      c.add(this.add.text(0, 64, def.name, {
+      c.add(this.add.text(0, 60, def.name, {
         fontFamily: 'serif', fontSize: '26px', color: '#ffe9b8', fontStyle: 'bold',
       }).setOrigin(0.5));
-      c.add(this.add.text(0, 88, `${def.faction} · ${CLS_LABEL[def.cls]}`, {
+      c.add(this.add.text(0, 84, `${def.faction} · ${CLS_LABEL[def.cls]}`, {
         fontFamily: '"PingFang SC",sans-serif', fontSize: '13px', color: '#cdb888',
+      }).setOrigin(0.5));
+      // 星级（满星额外高亮）
+      const starColor = star >= MAX_STAR ? '#ffd27a' : '#ffe08a';
+      c.add(this.add.text(0, 106, '★'.repeat(star), {
+        fontFamily: 'serif', fontSize: '16px', color: starColor,
+        stroke: '#3a2a10', strokeThickness: 3,
       }).setOrigin(0.5));
     };
 
@@ -246,11 +265,12 @@ export default class GachaScene extends Phaser.Scene {
       },
     });
 
-    // "新收录" 横幅
+    // 结果横幅（新收录 / 合并升星 / 满星返金）
     this.time.delayedCall(560, () => {
-      audio.play('unlock');
-      const banner = this.add.text(cx, cy - 130, '✦ 新收录 ✦', {
-        fontFamily: '"PingFang SC",sans-serif', fontSize: '22px', color: '#ffe08a',
+      const b = this._bannerFor(res);
+      audio.play(b.sound);
+      const banner = this.add.text(cx, cy - 130, b.text, {
+        fontFamily: '"PingFang SC",sans-serif', fontSize: '22px', color: b.color,
         stroke: '#2c2418', strokeThickness: 4, fontStyle: 'bold',
       }).setOrigin(0.5).setDepth(92).setAlpha(0);
       this.tweens.add({ targets: banner, alpha: 1, y: cy - 124, duration: 200 });
@@ -265,8 +285,8 @@ export default class GachaScene extends Phaser.Scene {
     this._reveal = { overlay, card };
   }
 
-  // 十连揭晓：2×5 网格
-  _revealTen(ids) {
+  // 十连揭晓：2×5 网格。results: [{id,kind,star,refunded?}]；refunded 为满星溢出返金合计
+  _revealTen(results, refunded = 0) {
     const { width, height } = this.scale;
     if (this._placeholder) this._placeholder.setVisible(false);
 
@@ -284,22 +304,30 @@ export default class GachaScene extends Phaser.Scene {
       fontFamily: 'serif', fontSize: '28px', color: '#ffe9b8', fontStyle: 'bold',
     }).setOrigin(0.5));
 
+    // kind → 角标文案/配色：new=新(金) dup=升星(青) max=满(橙)
+    const badgeFor = (kind) => {
+      if (kind === 'new') return { t: '新', c: '#ffe08a' };
+      if (kind === 'max') return { t: '满', c: '#ffb27a' };
+      return { t: '★', c: '#b0e0ff' };
+    };
+
     // 2 行 × 5 列
     const cellW = 108;
     const gap = 8;
     const totalW = 5 * cellW + 4 * gap;
-    ids.forEach((id, i) => {
+    results.forEach((res, i) => {
       const col = i % 5;
       const row = Math.floor(i / 5);
       const x = -totalW / 2 + cellW / 2 + col * (cellW + gap);
       const y = -120 + row * (cellW + 40);
-      const def = GENERAL_BY_ID[id];
+      const def = GENERAL_BY_ID[res.id];
+      const star = res.star || 1;
       const cell = this.add.container(x, y);
       const fac = COLORS.faction[def.faction] || COLORS.ink;
       const cg = this.add.graphics();
       cg.fillStyle(0x000000, 0.3);
       cg.fillRoundedRect(-cellW / 2 + 2, -cellW / 2 + 2, cellW, cellW, 10);
-      cg.fillStyle(0x5a4632, 1);
+      cg.fillStyle(res.kind === 'new' ? 0x6a5238 : 0x5a4632, 1);
       cg.fillRoundedRect(-cellW / 2, -cellW / 2, cellW, cellW, 10);
       cg.fillStyle(fac, 1);
       cg.fillRoundedRect(-cellW / 2, -cellW / 2, cellW, 18, 10);
@@ -311,8 +339,18 @@ export default class GachaScene extends Phaser.Scene {
       drawChibi(portrait, { ...optsForGeneral(def), size: 60 });
       portrait.setPosition(0, -2);
       cell.add(portrait);
-      cell.add(this.add.text(0, cellW / 2 - 14, def.name, {
-        fontFamily: 'serif', fontSize: '15px', color: '#ffe9b8', fontStyle: 'bold',
+      cell.add(this.add.text(0, cellW / 2 - 16, def.name, {
+        fontFamily: 'serif', fontSize: '14px', color: '#ffe9b8', fontStyle: 'bold',
+      }).setOrigin(0.5));
+      // 星级
+      cell.add(this.add.text(0, cellW / 2 - 1, '★'.repeat(star), {
+        fontFamily: 'serif', fontSize: '12px', color: star >= MAX_STAR ? '#ffd27a' : '#ffe08a',
+      }).setOrigin(0.5));
+      // kind 角标（左上）
+      const bd = badgeFor(res.kind);
+      cell.add(this.add.text(-cellW / 2 + 12, -cellW / 2 + 12, bd.t, {
+        fontFamily: 'serif', fontSize: '15px', color: bd.c, fontStyle: 'bold',
+        stroke: '#2c2418', strokeThickness: 3,
       }).setOrigin(0.5));
       cell.setScale(0);
       panel.add(cell);
@@ -322,7 +360,14 @@ export default class GachaScene extends Phaser.Scene {
       });
     });
 
-    this.time.delayedCall(ids.length * 80 + 200, () => audio.play('unlock'));
+    // 满星溢出返金汇总
+    if (refunded > 0) {
+      panel.add(this.add.text(0, 196, `满星溢出 · 返还 ${refunded} 金`, {
+        fontFamily: '"PingFang SC",sans-serif', fontSize: '15px', color: '#ffd27a',
+      }).setOrigin(0.5));
+    }
+
+    this.time.delayedCall(results.length * 80 + 200, () => audio.play('unlock'));
 
     this._revealActionBtns(width / 2, height, null, () => this._closeReveal());
     this._reveal = { overlay, panel };

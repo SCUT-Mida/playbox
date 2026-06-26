@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { COLORS, GAME_WIDTH, GAME_HEIGHT } from '../config.js';
 import { GENERALS, GENERAL_BY_ID } from '../data/generals.js';
 import { bondsForGeneral, bondPartners } from '../data/bonds.js';
-import { isUnlocked, unlockedGenerals } from '../data/meta.js';
+import { isUnlocked, unlockedGenerals, generalStar, starAtkMult, starHpMult, MAX_STAR } from '../data/meta.js';
 import { drawChibi, optsForGeneral, shade } from '../utils/Chibi.js';
 import audio from '../audio/Audio.js';
 
@@ -102,6 +102,7 @@ export default class RosterScene extends Phaser.Scene {
     const cont = this.add.container(cx, cy).setDepth(4);
     const fac = COLORS.faction[def.faction] || COLORS.ink;
     const unlocked = isUnlocked(def.id);
+    const star = unlocked ? generalStar(def.id) : 0;
 
     const g = this.add.graphics();
     g.fillStyle(0x000000, 0.3);
@@ -131,13 +132,22 @@ export default class RosterScene extends Phaser.Scene {
         fontFamily: '"PingFang SC",sans-serif', fontSize: '13px', color: unlocked ? '#cdb888' : '#8a7a5a',
       }).setOrigin(0, 0.5));
 
-    // 关键属性预览
+    // 关键属性预览（已解锁时显示星级加成后的数值）
+    const atkShow = unlocked ? Math.round(def.atk * starAtkMult(star)) : def.atk;
+    const hpShow = unlocked ? Math.round(def.hp * starHpMult(star)) : def.hp;
     const statTxt = def.cls === 'MELEE'
-      ? `攻 ${def.atk}   血 ${def.hp}   挡 ${def.block}`
-      : `攻 ${def.atk}   血 ${def.hp}   程 ${def.range.toFixed(1)}`;
+      ? `攻 ${atkShow}   血 ${hpShow}   挡 ${def.block}`
+      : `攻 ${atkShow}   血 ${hpShow}   程 ${def.range.toFixed(1)}`;
     cont.add(this.add.text(-CARD_W / 2 + 100, -CARD_H / 2 + 70, statTxt, {
       fontFamily: '"PingFang SC",sans-serif', fontSize: '14px', color: unlocked ? '#e6d4ac' : '#7a6a4a',
     }).setOrigin(0, 0.5));
+
+    // 星级（合并升级）标识
+    if (unlocked && star > 0) {
+      cont.add(this.add.text(CARD_W / 2 - 16, -CARD_H / 2 + 18, '★'.repeat(star), {
+        fontFamily: 'serif', fontSize: '12px', color: star >= MAX_STAR ? '#ffd27a' : '#ffe08a',
+      }).setOrigin(1, 0.5));
+    }
 
     // 锁标
     if (!unlocked) {
@@ -162,6 +172,7 @@ export default class RosterScene extends Phaser.Scene {
     if (this._detail) this._closeDetail();
     const { width, height } = this.scale;
     const unlocked = isUnlocked(def.id);
+    const star = unlocked ? generalStar(def.id) : 0;
 
     const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.55).setDepth(90);
     overlay.setInteractive(); // 拦截下层点击，点击空白处关闭
@@ -197,17 +208,29 @@ export default class RosterScene extends Phaser.Scene {
       `${def.faction} · ${CLS_LABEL[def.cls]} · 费 ${def.cost}${unlocked ? '' : '（未解锁）'}`, {
         fontFamily: '"PingFang SC",sans-serif', fontSize: '16px', color: '#cdb888',
       }).setOrigin(0, 0.5));
+    // 星级（合并升级）—— 未解锁不显示
+    if (unlocked) {
+      panel.add(this.add.text(pw / 2 - 40, -ph / 2 + 50,
+        `${'★'.repeat(star)}${'☆'.repeat(Math.max(0, MAX_STAR - star))}`, {
+          fontFamily: 'serif', fontSize: '20px', color: star >= MAX_STAR ? '#ffd27a' : '#ffe08a',
+        }).setOrigin(1, 0.5));
+      panel.add(this.add.text(pw / 2 - 40, -ph / 2 + 78, `星级 ${star}/${MAX_STAR}`, {
+        fontFamily: '"PingFang SC",sans-serif', fontSize: '13px', color: '#cdb888',
+      }).setOrigin(1, 0.5));
+    }
 
     // 描述
     panel.add(this.add.text(0, -ph / 2 + 120, def.desc, {
       fontFamily: '"PingFang SC",sans-serif', fontSize: '15px', color: '#cbb888',
     }).setOrigin(0.5, 0));
 
-    // 属性表
+    // 属性表（已解锁时显示星级加成后的攻击/血量）
+    const atkShow = unlocked ? Math.round(def.atk * starAtkMult(star)) : def.atk;
+    const hpShow = unlocked ? Math.round(def.hp * starHpMult(star)) : def.hp;
     const statsY = -ph / 2 + 156;
     const stats = [
-      ['攻击', String(def.atk)],
-      ['血量', String(def.hp)],
+      ['攻击', String(atkShow)],
+      ['血量', String(hpShow)],
       ['射程', def.range.toFixed(1)],
       ['阻挡', def.cls === 'MELEE' ? String(def.block) : '—'],
       ['攻速', `${def.atkCD.toFixed(2)}s`],

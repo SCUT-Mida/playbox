@@ -1,17 +1,44 @@
-// 元进度系统：跨对局持久化的金币 / 已解锁武将 / 通关记录 / 静音状态
+// 元进度系统：跨对局持久化的金币 / 已解锁武将 / 武将星级 / 通关记录 / 静音状态
 // 与"对局内金币"（用于部署/升级）相互独立 —— 这里是"主公府"层面的战略货币，
 // 通关获得、抽卡消耗。localStorage 不可用时回退到内存，保证纯逻辑测试可用。
 
 import { GENERALS, GENERAL_BY_ID } from './generals.js';
 
-const STORAGE_KEY = 'dzsf_meta_v1';
+const STORAGE_KEY = 'dzsf_meta_v2';
 
-// 开局默认解锁的武将：覆盖近战/远程/策士三类，并具备五虎+桃园雏形，足以通关教学关
-export const STARTER_GENERALS = ['guanyu', 'zhangfei', 'zhaoyun', 'huangzhong', 'zhuge'];
+// 开局默认解锁的武将：仅作为"保底可玩"的最小阵容，覆盖近战/远程/策士三类且跨蜀/魏/吴三国，
+// 不再清一色同国 —— 主力阵容交由玩家用开局金币去点将台抽取（多国、随机）。
+export const STARTER_GENERALS = ['zhaoyun', 'caocao', 'zhouyu'];
+
+// 开局赠送的金币：足够一次十连（DRAW_COST_TEN）并留少量余裕，让初始阵容"来自抽卡"。
+export const START_GOLD = 1500;
 
 // 抽卡价格
 export const DRAW_COST = 150;
 export const DRAW_COST_TEN = 1350; // 十连九折
+
+// —— 星级（合并升级）系统 ——
+// 抽到已解锁的相同武将视为"重复卡"，可合并升星；每升 1 星永久提升该武将的攻击/血量。
+export const MAX_STAR = 5;
+// 每星相对 1 星的属性加成（线性）：1 星为基准 1.0，每多 1 星 +STAR_BONUS。
+export const STAR_BONUS = { atk: 0.12, hp: 0.12 };
+// 满星后再抽到重复卡：溢出转化为金币（避免浪费）
+export const DUPE_GOLD_REFUND = 80;
+// 抽卡权重中，未解锁武将的优先倍数 —— 优先获取新将，但已解锁武将仍可被抽到（用于升星合并）
+export const LOCK_FAVOR = 4;
+
+export function starAtkMult(star) {
+  return 1 + STAR_BONUS.atk * Math.max(0, (star || 0) - 1);
+}
+
+export function starHpMult(star) {
+  return 1 + STAR_BONUS.hp * Math.max(0, (star || 0) - 1);
+}
+
+export function starOf(id) {
+  const m = loadMeta();
+  return m.stars[id] || 0;
+}
 
 // 通关金币奖励（每次通关）+ 首通额外奖励（仅首次）
 export const LEVEL_REWARD = { huangjin: 220, hulao: 320 };
@@ -19,8 +46,9 @@ export const FIRST_CLEAR_BONUS = 150;
 
 function defaults() {
   return {
-    gold: 0,
+    gold: START_GOLD,
     unlocked: [...STARTER_GENERALS],
+    stars: Object.fromEntries(STARTER_GENERALS.map((id) => [id, 1])),
     cleared: [],
     muted: false,
   };
@@ -36,6 +64,17 @@ function storageAvailable() {
   }
 }
 
+// 由解锁列表推导星级表（旧档无 stars 字段时迁移：已解锁一律视为 1 星）
+function migrateStars(unlocked, rawStars) {
+  const stars = {};
+  for (const id of unlocked) {
+    if (!GENERAL_BY_ID[id]) continue;
+    const s = rawStars && Number.isFinite(rawStars[id]) ? Math.floor(rawStars[id]) : 1;
+    stars[id] = Math.min(MAX_STAR, Math.max(1, s));
+  }
+  return stars;
+}
+
 export function loadMeta() {
   if (cache) return cache;
   const base = defaults();
@@ -44,11 +83,13 @@ export function loadMeta() {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const p = JSON.parse(raw);
+        // 解锁列表若损坏则回退默认阵容，避免开局无将可用
+        const unlocked = Array.isArray(p.unlocked) && p.unlocked.length
+          ? p.unlocked.filter((id) => GENERAL_BY_ID[id]) : base.unlocked;
         cache = {
           gold: typeof p.gold === 'number' ? p.gold : base.gold,
-          // 解锁列表若损坏则回退默认阵容，避免开局无将可用
-          unlocked: Array.isArray(p.unlocked) && p.unlocked.length
-            ? p.unlocked : base.unlocked,
+          unlocked,
+          stars: migrateStars(unlocked, p.stars),
           cleared: Array.isArray(p.cleared) ? p.cleared : base.cleared,
           muted: !!p.muted,
         };
@@ -122,6 +163,24 @@ export function unlockGeneral(id) {
   const m = loadMeta();
   if (m.unlocked.includes(id)) return false;
   m.unlocked.push(id);
+  if (!m.stars[id]) m.stars[id] = 1;
+  saveMeta();
+  return true;
+}
+
+// 武将当前星级（未解锁为 0）
+export function generalStar(id) {
+  const m = loadMeta();
+  return m.stars[id] || 0;
+}
+
+// 升星（合并重复卡）；返回是否实际提升
+export function upgradeStar(id) {
+  const m = loadMeta();
+  if (!m.unlocked.includes(id)) return false;
+  const cur = m.stars[id] || 1;
+  if (cur >= MAX_STAR) return false;
+  m.stars[id] = cur + 1;
   saveMeta();
   return true;
 }
@@ -150,23 +209,30 @@ export function grantLevelClear(key) {
 }
 
 // —— 抽卡核心（纯函数，便于测试）——
+// 抽卡池为全部武将：未解锁的优先出（LOCK_FAVOR 倍权重），
+// 已解锁的也会被抽到 —— 此时视为"重复卡"，合并升星；满星则溢出返金。
 
-// 尚未解锁的武将池
+// 尚未解锁的武将池（仅用于"已收录 X/Y"展示）
 export function lockedPool(meta = loadMeta()) {
   const have = new Set(meta.unlocked);
   return GENERALS.filter((g) => !have.has(g.id));
 }
 
-// 权重：便宜的武将更易出（260/费用，最低 1）
-export function drawWeights(pool) {
-  return pool.map((g) => Math.max(1, Math.round(260 / g.cost)));
+// 抽卡池：全部武将（含已解锁，用于抽到重复卡合并升星）
+export function drawPool() {
+  return GENERALS.slice();
 }
 
-// 从池中按权重抽取一个 id（不修改状态）。rng 注入便于确定性测试
+// 权重：便宜的武将更易出（260/费用，最低 1）；未解锁再 ×LOCK_FAVOR 优先获取
+export function drawWeights(pool = drawPool(), meta = loadMeta()) {
+  const have = new Set(meta.unlocked);
+  return pool.map((g) => Math.max(1, Math.round(260 / g.cost)) * (have.has(g.id) ? 1 : LOCK_FAVOR));
+}
+
+// 从池中按权重抽取一个武将定义（不修改状态）。rng 注入便于确定性测试
 export function rollDraw(meta = loadMeta(), rng = Math.random) {
-  const pool = lockedPool(meta);
-  if (pool.length === 0) return { id: null, allCollected: true };
-  const weights = drawWeights(pool);
+  const pool = drawPool();
+  const weights = drawWeights(pool, meta);
   const sum = weights.reduce((a, b) => a + b, 0);
   let r = rng() * sum;
   let pick = pool[pool.length - 1];
@@ -174,35 +240,54 @@ export function rollDraw(meta = loadMeta(), rng = Math.random) {
     r -= weights[i];
     if (r <= 0) { pick = pool[i]; break; }
   }
-  return { id: pick.id, allCollected: false };
+  return pick;
 }
 
-// 执行单抽：扣费 + 解锁（池空返回 allCollected，金币不足返回 null）
+// 把抽到的武将 id 结算到 meta：
+//   新解锁 → kind:'new'，star 1
+//   已解锁且未满星 → 合并升星 kind:'dup'，star+1
+//   已满星 → 溢出返金 kind:'max'，refunded=DUPE_GOLD_REFUND
+// 不写盘（由调用方统一 saveMeta）。
+function applyDrawResult(m, id) {
+  if (!GENERAL_BY_ID[id]) return { id, kind: 'invalid' };
+  if (!m.unlocked.includes(id)) {
+    m.unlocked.push(id);
+    m.stars[id] = 1;
+    return { id, kind: 'new', star: 1 };
+  }
+  const cur = m.stars[id] || 1;
+  if (cur >= MAX_STAR) {
+    m.gold += DUPE_GOLD_REFUND;
+    return { id, kind: 'max', star: MAX_STAR, refunded: DUPE_GOLD_REFUND };
+  }
+  m.stars[id] = cur + 1;
+  return { id, kind: 'dup', star: cur + 1 };
+}
+
+// 执行单抽：扣费 + 结算（金币不足返回 null，状态不变）
 export function performDraw(rng = Math.random) {
   const m = loadMeta();
-  if (lockedPool(m).length === 0) return { allCollected: true };
   if (m.gold < DRAW_COST) return null;
   m.gold -= DRAW_COST;
-  const { id } = rollDraw(m, rng);
-  if (id) m.unlocked.push(id);
+  const def = rollDraw(m, rng);
+  const res = applyDrawResult(m, def.id);
   saveMeta();
-  return { id, allCollected: false, remaining: m.gold };
+  return { ...res, remaining: m.gold };
 }
 
-// 执行十连：扣费 + 依次解锁（中途集齐则提前结束，已扣费用作"溢出捐赠"）
+// 执行十连：扣费 + 依次结算（每张可能 新解锁/升星/满星返金）
 export function performDrawTen(rng = Math.random) {
   const m = loadMeta();
   if (m.gold < DRAW_COST_TEN) return null;
   m.gold -= DRAW_COST_TEN;
   const got = [];
+  let refunded = 0;
   for (let i = 0; i < 10; i++) {
-    if (lockedPool(m).length === 0) break;
-    const { id } = rollDraw(m, rng);
-    if (id) {
-      m.unlocked.push(id);
-      got.push(id);
-    }
+    const def = rollDraw(m, rng);
+    const res = applyDrawResult(m, def.id);
+    if (res.refunded) refunded += res.refunded;
+    got.push(res);
   }
   saveMeta();
-  return { got, remaining: m.gold };
+  return { got, remaining: m.gold, refunded };
 }

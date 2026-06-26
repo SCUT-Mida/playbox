@@ -88,7 +88,7 @@ async function openGame() {
     if (id !== loadSeq) return
     game = createGame(mount)
     loadingEl.hidden = true
-    if (typeof window !== 'undefined') window[GAME_KEY] = game
+    window[GAME_KEY] = game
   } catch (err) {
     if (id !== loadSeq) return // 被取消，静默丢弃
     console.error('游戏加载失败：', err)
@@ -96,7 +96,13 @@ async function openGame() {
     loadingEl.hidden = true
     playLabel.textContent = '加载失败，点击重试'
   } finally {
-    if (id !== loadSeq) return // 被取消，不要修改 UI 状态
+    // 取消令牌：被取消时仍需恢复按钮状态，否则 playBtn 永久 disabled
+    if (id !== loadSeq) {
+      loading = false
+      playBtn.disabled = false
+      playBtn.classList.remove('is-loading')
+      return
+    }
     loading = false
     playBtn.disabled = false
     playBtn.classList.remove('is-loading')
@@ -112,7 +118,7 @@ function closeGame() {
     game.destroy(true)
     game = null
   }
-  if (typeof window !== 'undefined') window[GAME_KEY] = undefined
+  window[GAME_KEY] = undefined
   mount.innerHTML = ''
   loadingEl.hidden = true
   overlay.hidden = true

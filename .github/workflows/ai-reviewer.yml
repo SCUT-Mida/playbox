@@ -81,21 +81,33 @@ jobs:
             exit 1
           fi
 
-          # 暂时关 set -e，捕获 claude 的退出码和错误输出
-          set +e
-          claude -p "$(cat "$PROMPT_FILE")" --dangerously-skip-permissions > "$OUTPUT_FILE" 2>&1
-          CLAUDE_EXIT=$?
-          set -e
+          # 带重试的 claude 调用（GLM API 偶发 529 过载时自动等 60s 重试）
+          MAX_RETRIES=3
+          for ATTEMPT in $(seq 1 $MAX_RETRIES); do
+            echo "🔄 第 $ATTEMPT/$MAX_RETRIES 次尝试..."
+            set +e
+            claude -p "$(cat "$PROMPT_FILE")" --dangerously-skip-permissions > "$OUTPUT_FILE" 2>&1
+            CLAUDE_EXIT=$?
+            set -e
+
+            if [ $CLAUDE_EXIT -eq 0 ]; then
+              echo "✅ Claude 审查完成"
+              break
+            fi
+
+            echo "⚠️ 第 $ATTEMPT 次失败 (exit $CLAUDE_EXIT)，错误："
+            cat "$OUTPUT_FILE"
+
+            if [ $ATTEMPT -lt $MAX_RETRIES ]; then
+              echo "⏳ 等待 60 秒后重试..."
+              sleep 60
+            fi
+          done
 
           if [ $CLAUDE_EXIT -ne 0 ]; then
-            echo "❌ Claude 审查失败 (exit code: $CLAUDE_EXIT)"
-            echo "=== Claude 输出/错误信息 ==="
-            cat "$OUTPUT_FILE"
-            echo "=== end ==="
+            echo "❌ $MAX_RETRIES 次重试均失败，放弃。"
             exit 1
           fi
-
-          echo "✅ Claude 审查完成"
 
       - name: ⚙️ Parse Review & Action
         env:

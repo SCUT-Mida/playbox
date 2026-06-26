@@ -34,4 +34,12 @@ export const ENEMIES = {
     name: '相国·董卓', hp: 11000, speed: 30, armor: 'HEAVY', dmg: 55, atkCD: 1.0,
     gold: 360, morale: 120, color: 0x8c6d3f, boss: true, leakLives: 8,
   },
+  boss_yuanshao: {
+    name: '盟主·袁绍', hp: 9500, speed: 32, armor: 'HEAVY', dmg: 50, atkCD: 1.0,
+    gold: 300, morale: 110, color: 0xb89a4a, boss: true, leakLives: 6,
+  },
+  boss_caofleet: {
+    name: '曹军旗舰', hp: 14000, speed: 28, armor: 'HEAVY', dmg: 60, atkCD: 1.0,
+    gold: 420, morale: 140, color: 0x5a6a8a, boss: true, leakLives: 8,
+  },
 };

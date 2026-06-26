@@ -39,6 +39,19 @@ export default class GachaScene extends Phaser.Scene {
     bg.fillRect(0, 0, width, height);
   }
 
+  // 以 (0,0) 为圆心绘制由 dashes 段虚线组成的圆环（旋转时可见，区别于均匀实心圆）
+  _drawDashedCircle(g, radius, lw, color, alpha, dashes) {
+    g.lineStyle(lw, color, alpha);
+    const gap = (Math.PI * 2) / dashes;
+    const seg = gap * 0.6;
+    for (let i = 0; i < dashes; i++) {
+      const a0 = i * gap;
+      g.beginPath();
+      g.arc(0, 0, radius, a0, a0 + seg, false);
+      g.strokePath();
+    }
+  }
+
   _buildHeader(width) {
     const g = this.add.graphics().setDepth(5);
     g.fillStyle(0x3a2e20, 0.96);
@@ -62,13 +75,37 @@ export default class GachaScene extends Phaser.Scene {
 
   _buildCenter(width, height) {
     const cy = height / 2 - 60;
-    // 召唤阵：金色光环
-    const ring = this.add.graphics().setDepth(3);
-    ring.lineStyle(3, COLORS.gold, 0.5);
-    ring.strokeCircle(width / 2, cy, 130);
-    ring.lineStyle(2, 0xb08bd6, 0.4);
-    ring.strokeCircle(width / 2, cy, 96);
-    this.tweens.add({ targets: ring, angle: 360, duration: 12000, repeat: -1 });
+    // 召唤法阵：原地旋转的双层虚线圆环 + 符文点。
+    // 注意：Graphics 必须先 setPosition 到中心、再以 (0,0) 为圆心绘制，
+    // 这样 angle 旋转才会"原地自转"；否则会绕画布原点公转（从右滑到左后飞出屏幕）。
+    const cx = width / 2;
+    const outer = this.add.graphics().setDepth(3).setPosition(cx, cy);
+    this._drawDashedCircle(outer, 132, 3, COLORS.gold, 0.6, 18);
+    outer.fillStyle(COLORS.gold, 0.7);
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      outer.fillCircle(Math.cos(a) * 132, Math.sin(a) * 132, 3.5);
+    }
+    this.tweens.add({ targets: outer, angle: 360, duration: 16000, repeat: -1 });
+
+    const inner = this.add.graphics().setDepth(3).setPosition(cx, cy);
+    this._drawDashedCircle(inner, 98, 2, 0xb08bd6, 0.55, 12);
+    this.tweens.add({ targets: inner, angle: -360, duration: 10000, repeat: -1 });
+
+    // 中心辉光呼吸
+    const glow = this.add.graphics().setDepth(2).setPosition(cx, cy);
+    const drawGlow = (a) => {
+      glow.clear();
+      glow.fillStyle(0xb08bd6, 0.10 * a);
+      glow.fillCircle(0, 0, 86);
+      glow.fillStyle(COLORS.gold, 0.08 * a);
+      glow.fillCircle(0, 0, 56);
+    };
+    drawGlow(1);
+    this.tweens.add({
+      targets: { v: 1 }, v: 0.4, duration: 1400, yoyo: true, repeat: -1,
+      onUpdate: (tween) => drawGlow(tween.getValue()),
+    });
 
     this.add.text(width / 2, cy - 200, '广 纳 贤 才', {
       fontFamily: 'serif', fontSize: '30px', color: '#e6d4ac',

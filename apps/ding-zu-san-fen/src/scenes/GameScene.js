@@ -12,6 +12,7 @@ import Enemy from '../entities/Enemy.js';
 import General from '../entities/General.js';
 import Projectile from '../entities/Projectile.js';
 import Fx from '../utils/Fx.js';
+import audio from '../audio/Audio.js';
 
 const ULT_COST = 100;
 const ULT_DAMAGE = 900;
@@ -279,6 +280,7 @@ export default class GameScene extends Phaser.Scene {
     this.gold += e.def.gold;
     this.morale = Math.min(100, this.morale + e.def.morale);
     this.fx.spark(e.x, e.y, e.def.color);
+    audio.play('kill');
     this._emitState();
   }
 
@@ -287,6 +289,7 @@ export default class GameScene extends Phaser.Scene {
     // 即时夹紧至 0，避免 BOSS 漏怪(leakLives 5/8)导致 _emitState 推送负 lives（同帧 _checkEnd 才夹紧）
     this.lives = Math.max(0, this.lives - loss);
     this.fx.impact(this.map.getBase().x + 20, this.map.getBase().y, 60, COLORS.base);
+    audio.play('hurt');
     this._emitState();
   }
 
@@ -331,6 +334,7 @@ export default class GameScene extends Phaser.Scene {
     this.generals.set(cellKey(col, row), g);
     this._bondsDirty = true;
     this.fx.impact(g.x, g.y, TILE * 0.8, COLORS.faction[def.faction] || COLORS.gold);
+    audio.play('place');
     this._emitState();
     return true;
   }
@@ -343,6 +347,7 @@ export default class GameScene extends Phaser.Scene {
     g.upgrade();
     this._bondsDirty = true;
     this.fx.impact(g.x, g.y, TILE * 0.9, COLORS.gold);
+    audio.play('coin');
     this._emitState();
     return true;
   }
@@ -355,6 +360,7 @@ export default class GameScene extends Phaser.Scene {
     g.destroy();
     this.generals.delete(key);
     this._bondsDirty = true;
+    audio.play('click');
     this._emitState();
     return refund;
   }
@@ -363,6 +369,7 @@ export default class GameScene extends Phaser.Scene {
     if (this.morale < ULT_COST || this.ended) return false;
     this.morale -= ULT_COST;
     this.fx.fireAssault(this.map.waypoints);
+    audio.play('ult');
     for (const e of this.enemies) {
       if (!e.alive) continue;
       e.takeDamage(ULT_DAMAGE, 'MAGIC');
@@ -376,8 +383,11 @@ export default class GameScene extends Phaser.Scene {
     // 仅波间空档"提前迎战"才发放奖励，第一波（idle）正常开始不计
     const wasBetween = this.waveManager.state === 'between';
     const started = this.waveManager.startNextWave();
-    if (started && wasBetween) {
-      this.gold += EARLY_BONUS;
+    if (started) {
+      audio.play('wave');
+      if (wasBetween) {
+        this.gold += EARLY_BONUS;
+      }
       this._emitState();
     }
     return started;
@@ -442,6 +452,7 @@ export default class GameScene extends Phaser.Scene {
     this.result = result;
     this.registry.set('result', result);
     this.registry.set('levelKey', this.levelKey);
+    audio.play(result === 'win' ? 'win' : 'lose');
     this.scene.launch('GameOverScene');
     this.scene.pause();
     this.scene.pause('UIScene');

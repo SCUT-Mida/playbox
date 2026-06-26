@@ -6,6 +6,8 @@ import MenuScene from './scenes/MenuScene.js';
 import GameScene from './scenes/GameScene.js';
 import UIScene from './scenes/UIScene.js';
 import GameOverScene from './scenes/GameOverScene.js';
+import RosterScene from './scenes/RosterScene.js';
+import GachaScene from './scenes/GachaScene.js';
 
 // 全局配置：移动端优先，Scale.FIT 自适应缩放并居中
 // 导出为工厂函数，便于主框架（落地页）按需挂载到任意容器，
@@ -26,7 +28,7 @@ export function createGame(parent) {
     render: {
       pixelArt: false,
     },
-    scene: [BootScene, PreloadScene, MenuScene, GameScene, UIScene, GameOverScene],
+    scene: [BootScene, PreloadScene, MenuScene, GameScene, UIScene, GameOverScene, RosterScene, GachaScene],
   });
 }
 

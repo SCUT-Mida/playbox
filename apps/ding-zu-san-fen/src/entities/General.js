@@ -190,7 +190,9 @@ export default class General {
 
   // 选取目标（最前方 = progress 最大）；近战优先命中被阻挡者
   acquireTarget(enemies) {
-    const range = this.rangePx;
+    const range2 = this.rangePx * this.rangePx; // 预计算平方，避免循环内重复乘法
+    const sx = this.x;
+    const sy = this.y;
     let best = null;
     let bestProg = -1;
     if (this.def.cls === 'MELEE' && this.blockedEnemies.length) {
@@ -205,9 +207,9 @@ export default class General {
     }
     for (const e of enemies) {
       if (!e.alive) continue;
-      const dx = e.x - this.x;
-      const dy = e.y - this.y;
-      if (dx * dx + dy * dy <= range * range) {
+      const dx = e.x - sx;
+      const dy = e.y - sy;
+      if (dx * dx + dy * dy <= range2) {
         if (e.progress > bestProg) {
           bestProg = e.progress;
           best = e;
@@ -308,5 +310,7 @@ export default class General {
   destroy() {
     this.alive = false;
     this.container.destroy();
+    // 置空受击闪白引用，避免延迟回调对已销毁对象调用 setAlpha 触发 Phaser 警告
+    this.nameText = null;
   }
 }

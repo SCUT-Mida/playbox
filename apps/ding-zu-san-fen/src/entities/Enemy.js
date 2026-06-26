@@ -138,13 +138,16 @@ export default class Enemy {
     this.burnT = Math.max(this.burnT, dur);
   }
 
-  takeDamage(baseAmount, dmgType) {
+  // flash: 是否触发受击闪白。持续伤害(燃烧 DoT)应传 false，避免每帧堆积闪白回调与高频闪烁
+  takeDamage(baseAmount, dmgType, flash = true) {
     if (!this.alive) return 0;
     const amount = computeDamage(baseAmount, dmgType, this.armor);
     this.hp -= amount;
-    // 受击闪白
-    this.body.setAlpha(0.45);
-    this.scene.time.delayedCall(60, () => this.body && this.body.setAlpha(1));
+    // 受击闪白（仅瞬时命中触发；燃烧等持续伤害走 flash=false 绕开）
+    if (flash) {
+      this.body.setAlpha(0.45);
+      this.scene.time.delayedCall(60, () => this.body && this.body.setAlpha(1));
+    }
     if (this.hp <= 0 && !this.dying) {
       this.dying = true;
       this.alive = false;
@@ -183,9 +186,9 @@ export default class Enemy {
   update(dt, scene) {
     if (!this.alive) return;
 
-    // 燃烧
+    // 燃烧（持续伤害：flash=false 绕开受击闪白，避免每帧堆积回调与闪烁）
     if (this.burnT > 0) {
-      this.takeDamage(this.burnDps * dt, 'MAGIC');
+      this.takeDamage(this.burnDps * dt, 'MAGIC', false);
       this.burnT -= dt;
       if (!this.alive) return;
     }
@@ -234,5 +237,7 @@ export default class Enemy {
 
   destroy() {
     this.container.destroy();
+    // 置空受击闪白引用，避免延迟回调对已销毁对象调用 setAlpha 触发 Phaser 警告
+    this.body = null;
   }
 }

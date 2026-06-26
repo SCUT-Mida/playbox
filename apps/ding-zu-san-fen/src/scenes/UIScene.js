@@ -32,6 +32,10 @@ export default class UIScene extends Phaser.Scene {
     this._menu = null;
     this._selected = null;
     this._lastBondIds = null;
+    // 菜单就地刷新相关：仅在选中变化/等级变化/金币跨过升级阈值时重建，否则就地 setText
+    this._menuGen = null; // 当前菜单绑定的武将实例
+    this._menuSig = ''; // 触发重建的签名：selection|level|upMax|affordable
+    this._menuStat = null; // 就地更新的数值文本引用
 
     this._buildTopHud();
     this._buildCardBar();
@@ -363,6 +367,19 @@ export default class UIScene extends Phaser.Scene {
     this._selected = general;
     this.gameScene.selectGeneral(general);
     this._buildMenu();
+    this._menuGen = general;
+    this._menuSig = this._menuSignature();
+  }
+
+  // 触发菜单重建的签名：选中实例 + 等级 + 是否满级 + 当前金币能否负担升级费
+  // 金币仅在跨过升级阈值时才会改变 affordable，故签名不会随金币连续变化而抖动
+  _menuSignature() {
+    const g = this._selected;
+    if (!g) return '';
+    const upCost = upgradeCost(g.def, g.level);
+    const upMax = g.level >= MAX_LEVEL;
+    const affordable = this.gameScene.gold >= upCost ? 1 : 0;
+    return `${g.def.id}|${g.level}|${upMax ? 1 : 0}|${affordable}`;
   }
 
   _refreshMenu() {
@@ -370,12 +387,32 @@ export default class UIScene extends Phaser.Scene {
       this._closeMenu();
       return;
     }
-    this._buildMenu();
+    // 仅在选中变化/等级变化/金币跨过升级阈值时重建菜单；其余就地刷新数值文本
+    const sig = this._menuSignature();
+    if (this._menuGen !== this._selected || sig !== this._menuSig) {
+      this._menuGen = this._selected;
+      this._menuSig = sig;
+      this._buildMenu();
+    } else {
+      this._updateMenuLive();
+    }
+  }
+
+  // 就地刷新会随战斗连续变化的数值（血量/攻击），避免 destroy+重建整个容器
+  _updateMenuLive() {
+    if (!this._selected || !this._menuStat) return;
+    const g = this._selected;
+    const atk = Math.round(g.atk);
+    const statTxt = g.def.cls === 'MELEE'
+      ? `攻 ${atk}  血 ${Math.round(g.hp)}/${g.maxHp}\n挡 ${g.def.block}  程 ${g.def.range.toFixed(1)}`
+      : `攻 ${atk}  程 ${g.def.range.toFixed(1)}\n${g.def.cls === 'MAGE' ? '法术伤害' : '物理伤害'} · ${g.def.atkCD.toFixed(2)}s`;
+    this._menuStat.setText(statTxt);
   }
 
   _buildMenu() {
     if (this._menu) this._menu.destroy(true);
     this._menuButtons = [];
+    this._menuStat = null;
     const gs = this.gameScene;
     const g = this._selected;
     if (!g || !g.alive) {
@@ -410,9 +447,11 @@ export default class UIScene extends Phaser.Scene {
     const statTxt = g.def.cls === 'MELEE'
       ? `攻 ${atk}  血 ${Math.round(g.hp)}/${g.maxHp}\n挡 ${g.def.block}  程 ${g.def.range.toFixed(1)}`
       : `攻 ${atk}  程 ${g.def.range.toFixed(1)}\n${g.def.cls === 'MAGE' ? '法术伤害' : '物理伤害'} · ${g.def.atkCD.toFixed(2)}s`;
-    cont.add(this.add.text(0, -h / 2 + 58, statTxt, {
+    // 保留引用以便就地 setText 刷新血量，无需重建容器
+    this._menuStat = this.add.text(0, -h / 2 + 58, statTxt, {
       fontFamily: '"PingFang SC",sans-serif', fontSize: '13px', color: '#e6d4ac', align: 'center',
-    }).setOrigin(0.5).setLineSpacing(3));
+    }).setOrigin(0.5).setLineSpacing(3);
+    cont.add(this._menuStat);
 
     // 按钮区
     const by = h / 2 - 24;
@@ -465,6 +504,9 @@ export default class UIScene extends Phaser.Scene {
       this._menu = null;
     }
     this._menuButtons = [];
+    this._menuStat = null;
+    this._menuGen = null;
+    this._menuSig = '';
     this._selected = null;
     this.gameScene.selectGeneral(null);
   }

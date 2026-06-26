@@ -273,7 +273,8 @@ export default class GameScene extends Phaser.Scene {
 
   _handleLeak(e) {
     const loss = e.def.leakLives || 1;
-    this.lives -= loss;
+    // 即时夹紧至 0，避免 BOSS 漏怪(leakLives 5/8)导致 _emitState 推送负 lives（同帧 _checkEnd 才夹紧）
+    this.lives = Math.max(0, this.lives - loss);
     this.fx.impact(this.map.getBase().x + 20, this.map.getBase().y, 60, COLORS.base);
     this._emitState();
   }

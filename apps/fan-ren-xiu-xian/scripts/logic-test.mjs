@@ -2,9 +2,9 @@
 import {
   REALMS, SPIRIT_ROOTS, globalLevel, fromGlobalLevel, xpNeeded, MAX_GLOBAL_LEVEL,
   passiveXpPerSec, breakthroughChance, computeDamage, counterMult, clamp,
+  PITTY_THRESHOLD, PITTY_BOOST,
 } from '../src/config.js';
 import { ITEMS, TREASURE_SKILLS } from '../src/data/items.js';
-import { ALCHEMY_RECIPES, FORGE_BLUEPRINTS, RECIPE_BY_ID } from '../src/data/recipes.js';
 import { makeEnemy } from '../src/data/enemies.js';
 import { EVENTS, eligibleEvents } from '../src/data/events.js';
 import {
@@ -141,10 +141,19 @@ const logs = applyReward(p, { stones: 100, items: [{ id: 'herb_qingmu', qty: 2 }
 ok(logs.length > 0, 'applyReward 返回日志');
 ok(p.stones === stonesBefore + 100, 'applyReward 灵石 +100');
 ok(countItem(p, 'herb_qingmu') >= 2, 'applyReward 入袋');
-// 保底：连续无稀有 → pity 递增
-p.pity.explore = 0;
-for (let i = 0; i < 5; i++) { const e = rollExplore(p, makeRng(1 + i)); if (e && e.encounter && !isRareEncounter(e)) p.pity.explore++; }
-ok(p.pity.explore > 0, 'pity 计数器递增');
+// 保底机制（核心随机性链路）：pity >= PITTY_THRESHOLD 时，稀有事件权重 ×(1+PITTY_BOOST)。
+// 用受控 rng 序列证明：同一随机源下，保底激活会把"普通妖兽(common)"选择翻转为"稀有空间裂缝(rare)"。
+// 序列首值 0.6 → pick 场景 'ruin'(idx2)；次值 0.72 → weighted 落点恰好在保底前后跨越 common/rare 边界。
+{
+  const makeP = () => { const q = newPlayer(() => 0); q.tier = 2; q.sub = 0; recompute(q); q.hp = q.maxHp; q.mp = q.maxMp; return q; };
+  const seqRng = (seq) => { let i = 0; return () => (i < seq.length ? seq[i++] : 0.5); };
+  const q0 = makeP(); q0.pity.explore = 0;
+  const noBoost = rollExplore(q0, seqRng([0.6, 0.72]));
+  const q1 = makeP(); q1.pity.explore = PITTY_THRESHOLD;
+  const withBoost = rollExplore(q1, seqRng([0.6, 0.72]));
+  ok(!noBoost.error && noBoost.encounter.kind === 'battle', '保底未激活：同 rng 命中普通妖兽事件(common)');
+  ok(!withBoost.error && withBoost.encounter.kind === 'choice', `保底激活(PITTY_BOOST=${PITTY_BOOST})：同 rng 翻转为稀有空间裂缝(rare)`);
+}
 
 // ---------- 战斗 ----------
 console.log('— battle —');
@@ -220,13 +229,12 @@ p.recipes = ['rcp_huitian'];
 ok(hasMaterials(p, { herb_qingmu: 99 }) === false, '材料不足检测');
 addItem(p, 'herb_qingmu', 5);
 ok(hasMaterials(p, { herb_qingmu: 2 }) === true, '材料充足检测');
-const a0 = countItem(p, 'rcp_huitian_out' in ITEMS ? 'rcp_huitian_out' : 'pill_huitian');
 const al = tryAlchemy(p, 'rcp_huitian', () => 0.99); // 高 rng 易成功
 ok(al.ok === true, '炼丹返回 ok');
-// 反复炼直到至少一次失败与一次成功，覆盖统计
-let alOk = 0; let alFail = 0;
+// 反复炼直到至少一次成功，覆盖统计
+let alOk = 0;
 addItem(p, 'herb_qingmu', 200);
-for (let i = 0; i < 60; i++) { addItem(p, 'herb_qingmu', 2); const r = tryAlchemy(p, 'rcp_huition' in RECIPE_BY_ID ? 'rcp_huitian' : 'rcp_huitian', makeRng(i)); if (r.success) alOk++; else if (r.ok) alFail++; }
+for (let i = 0; i < 60; i++) { addItem(p, 'herb_qingmu', 2); const r = tryAlchemy(p, 'rcp_huitian', makeRng(i)); if (r.success) alOk++; }
 ok(alOk > 0, '炼丹存在成功');
 // 炼器
 p.recipes.push('bp_feijian');
@@ -302,7 +310,3 @@ process.exit(fail ? 1 : 0);
 
 // —— 辅助 ——
 function SCENE_VALID(s) { return ['mountain', 'cave', 'ruin', 'wild'].includes(s); }
-function isRareEncounter(exp) {
-  // 探索结果无法直接判定稀有，这里仅作占位：只要不是 battle 即视为普通
-  return false;
-}

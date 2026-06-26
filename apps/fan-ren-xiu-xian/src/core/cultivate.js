@@ -9,13 +9,15 @@ import { addXp, healHp, healMp } from './player.js';
 import { chance } from './rng.js';
 
 // 被动修炼一帧（seconds 秒）：累积修为 + 气血/灵力回复
-export function passiveTick(player, seconds) {
+// opts.hp = false 时跳过气血回复（用于战斗/渡劫期间保留压力）
+export function passiveTick(player, seconds, opts = {}) {
+  const allowHp = opts.hp !== false;
   const mult = cultivateSpeedMult(player);
   const xp = passiveXpPerSec(player.tier, mult) * seconds;
   const gained = addXp(player, xp);
-  player.hp = Math.min(player.maxHp, player.hp + hpRegenPerSec(player.maxHp) * seconds);
+  if (allowHp) player.hp = Math.min(player.maxHp, player.hp + hpRegenPerSec(player.maxHp) * seconds);
   player.mp = Math.min(player.maxMp, player.mp + mpRegenPerSec(player.maxMp) * seconds);
-  player.hp = Math.round(player.hp * 100) / 100;
+  if (allowHp) player.hp = Math.round(player.hp * 100) / 100;
   player.mp = Math.round(player.mp * 100) / 100;
   return gained;
 }

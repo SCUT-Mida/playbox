@@ -102,7 +102,9 @@ export function cultivateSpeedMult(player) {
 // ── 战斗伤害公式 ────────────────────────────────────────────────────────────
 // atk × (0.8~1.2 随机) − def，下限 1；克制倍率（金木水火土循环克制，可选）
 export function computeDamage(atk, def, rng, counterMult = 1) {
-  const variance = 0.8 + ((rng && rng()) || Math.random()) * 0.4; // 0.8~1.2
+  // 显式判空：注入的 rng() 合法返回 0 时不能被 || 兜底（否则破坏种子化/确定性）
+  const r = rng ? rng() : Math.random();
+  const variance = 0.8 + r * 0.4; // 0.8~1.2
   const raw = atk * variance * counterMult - def;
   return Math.max(1, Math.round(raw));
 }

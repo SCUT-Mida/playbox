@@ -92,7 +92,6 @@ const loadingEl = document.getElementById('game-loading')
 
 const GAME_KEY = '__PLAYBOX_GAME__' // 暴露实例便于调试 / 自动化冒烟测试
 let game = null
-let currentDef = null // 当前游玩的展品定义（用于重置按钮文案）
 let loading = false
 let loadSeq = 0 // 取消令牌：每次 closeGame / 重新 openGame 递增，使飞行中的加载作废
 
@@ -120,8 +119,6 @@ async function openGame(def, btn) {
     // 取消令牌检查：若加载期间被 closeGame 中断，丢弃结果
     if (id !== loadSeq) return
     game = createGame(mount)
-    currentDef = def
-    btn._label = playLabel // 记下当前按钮，便于 close 时复位
     loadingEl.hidden = true
     window[GAME_KEY] = game
   } catch (err) {
@@ -161,7 +158,6 @@ function closeGame() {
     game.destroy(true)
     game = null
   }
-  currentDef = null
   window[GAME_KEY] = undefined
   mount.innerHTML = ''
   loadingEl.hidden = true

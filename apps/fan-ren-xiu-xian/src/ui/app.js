@@ -52,6 +52,9 @@ export class GameUI {
     this.tickTimer = null;
     this.saveTimer = null;
     this.ui = {};
+    // 绑定 visibilitychange 回调：addEventListener 注册的普通函数 this 为事件目标(document)，
+    // 不绑定则 this.player 为 undefined，切后台存档会抛错被静默吞掉。绑定后 add/remove 用同一引用。
+    this._onVis = this._onVis.bind(this);
   }
 
   mount() {
@@ -490,9 +493,9 @@ export class GameUI {
       p.stats.deaths += 1;
       const lostStones = Math.floor(p.stones * 0.1);
       p.stones -= lostStones;
-      addXp(p, -Math.floor(p.xpMax * 0.05) || 0);
-      // addXp 不支持负数；直接扣
-      p.xp = Math.max(0, p.xp - Math.floor(p.xpMax * 0.05));
+      // addXp 不支持负数：直接扣除修为
+      const xpLoss = Math.floor(p.xpMax * 0.05);
+      p.xp = Math.max(0, p.xp - xpLoss);
       this.pushLog(`战败！损失 ${lostStones} 灵石与部分修为，被逐回安全之地。`, 'bad');
       this.toast('战败重伤……', 'bad');
     } else {
@@ -669,7 +672,7 @@ export class GameUI {
         h('h4', null, '装备中'),
         h('div', { class: 'row' },
           h('div', { class: 'grow' }, `${tr.emoji} ${tr.name}`, h('div', { class: 'muted' }, `${tr.stats.atk ? `攻+${tr.stats.atk} ` : ''}${tr.stats.def ? `防+${tr.stats.def} ` : ''}${elName(tr.stats.el)}${tr.stats.skill ? ` · ${TREASURE_SKILLS[tr.stats.skill].name}` : ''}`)),
-          h('button', { class: 'btn-ghost', onClick: () => { unequip(p); this.afterAction(); } }, '卸下'),
+          h('button', { class: 'btn-ghost', onClick: () => { if (!unequip(p)) this.toast('储物袋已满，无法卸下装备', 'bad'); this.afterAction(); } }, '卸下'),
         ),
       ));
     }
@@ -717,7 +720,7 @@ export class GameUI {
       else foot.push(h('div', { class: 'muted', style: { flex: 1, textAlign: 'center', alignSelf: 'center' } }, '此丹需在突破/渡劫时使用'));
     }
     if (d.type === 'treasure') {
-      foot.push(h('button', { class: 'btn-primary', onClick: () => { equip(p, id); this.closeModal(); this.afterAction(); } }, id === p.equipment ? '已装备' : '装备'));
+      foot.push(h('button', { class: 'btn-primary', onClick: () => { if (equip(p, id)) { this.closeModal(); this.afterAction(); } else { this.toast('储物袋已满，无法换装（会销毁旧装备）', 'bad'); } } }, id === p.equipment ? '已装备' : '装备'));
     }
     foot.push(h('button', { class: 'btn-ghost', onClick: () => { this.doSell(id); this.closeModal(); } }, '出售'));
     foot.push(h('button', { class: 'btn-ghost', onClick: () => this.closeModal() }, '关闭'));
@@ -931,7 +934,8 @@ export class GameUI {
 
   tick() {
     if (this.player.ascended) return;
-    passiveTick(this.player, 1);
+    // 渡劫/战斗弹窗期间不自动回血（保留压力），仅累积修为与恢复灵力
+    passiveTick(this.player, 1, { hp: !(this.battle || this.trial) });
     this.refreshStatus();
     // 进行中的战斗/渡劫不重建面板，只刷新状态
   }

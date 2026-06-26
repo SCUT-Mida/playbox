@@ -57,10 +57,16 @@ export function buyItem(player, entry, qty = 1) {
   const cost = entry.price * qty;
   if (!spendStones(player, cost)) return { ok: false, reason: '灵石不足' };
   entry.stock -= qty;
-  // 配方/功法直接学习（不占背包）
-  if (entry.isRecipe) { learnRecipe(player, entry.id); return { ok: true, learned: true, qty: 1, cost }; }
+  // 配方/功法直接学习（不占背包）；已掌握则退款并归还库存，避免“扣费却无收获”
+  if (entry.isRecipe) {
+    if (!learnRecipe(player, entry.id)) { addStones(player, cost); entry.stock += qty; return { ok: false, reason: '该配方已掌握' }; }
+    return { ok: true, learned: true, qty: 1, cost };
+  }
   const def = ITEMS[entry.id];
-  if (def && def.type === 'technique') { learnTechnique(player, entry.id); return { ok: true, learned: true, qty: 1, cost }; }
+  if (def && def.type === 'technique') {
+    if (!learnTechnique(player, entry.id)) { addStones(player, cost); entry.stock += qty; return { ok: false, reason: '该功法已习得' }; }
+    return { ok: true, learned: true, qty: 1, cost };
+  }
   if (bagFull(player) && !countItem(player, entry.id)) { addStones(player, cost); return { ok: false, reason: '背包已满' }; }
   addItem(player, entry.id, qty);
   return { ok: true, qty, cost };

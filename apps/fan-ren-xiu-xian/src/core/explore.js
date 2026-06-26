@@ -17,12 +17,14 @@ import { ITEMS } from '../data/items.js';
 export function rollExplore(player, rng) {
   if (player.mp < EXPLORE_MP_COST) return { error: '灵力不足，无法探索' };
   if (player.hp <= EXPLORE_HP_COST) return { error: '气血过低，不宜探索' };
-  player.mp -= EXPLORE_MP_COST;
-  player.hp = Math.max(1, player.hp - EXPLORE_HP_COST);
 
+  // 先校验事件池再扣消耗，避免“付费（扣 mp/hp）却无事件可遇”
   const scene = pick(rng, SCENES);
   const events = eligibleEvents(player.tier, scene);
   if (!events.length) return { error: '此处无可探索之事', scene };
+
+  player.mp -= EXPLORE_MP_COST;
+  player.hp = Math.max(1, player.hp - EXPLORE_HP_COST);
 
   // 构造权重表；保底机制：连续多次无稀有事件则提升稀有权重
   const pity = player.pity.explore;

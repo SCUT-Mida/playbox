@@ -149,6 +149,12 @@ export function equip(player, treasureId) {
   if (!ITEMS[treasureId] || ITEMS[treasureId].type !== 'treasure') return false;
   if (!hasItem(player, treasureId, 1)) return false;
   const prev = player.equipment;
+  // 换装时旧装备需回背包：若旧装备为新种类，且取下当前这件后仍腾不出空位（堆叠中），
+  // 则拒绝操作——否则 addItem 返回 0 会销毁旧装备。
+  if (prev && !player.bag[prev]) {
+    const freesSlot = (player.bag[treasureId] || 0) <= 1; // 当前件仅剩 1 个时，移除会腾出一个种类位
+    if (!freesSlot && bagFull(player)) return false;
+  }
   removeItem(player, treasureId, 1);
   player.equipment = treasureId;
   if (prev) addItem(player, prev, 1); // 旧装备回背包
@@ -158,6 +164,8 @@ export function equip(player, treasureId) {
 export function unequip(player) {
   if (!player.equipment) return false;
   const prev = player.equipment;
+  // 卸下前确认背包能装下（旧装备是新种类且背包已满时拒绝，避免装备被销毁）
+  if (!player.bag[prev] && bagFull(player)) return false;
   player.equipment = null;
   addItem(player, prev, 1);
   recompute(player);

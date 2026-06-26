@@ -13,7 +13,7 @@ const PILLS = {
   pill_tupo:     { id: 'pill_tupo',     name: '突破丹',   type: 'pill', emoji: '🌟', price: 60,  desc: '突破时服用，成功率 +20%。', role: 'break_boost' },
   pill_qingxin:  { id: 'pill_qingxin',  name: '清心丹',   type: 'pill', emoji: '🧿', price: 70,  desc: '渡心魔时服用，当轮必过。',  role: 'heart_pass' },
   pill_xisui:    { id: 'pill_xisui',    name: '洗髓丹',   type: 'pill', emoji: '🟢', price: 240, desc: '重塑灵根，随机提升一档资质。', effect: { kind: 'root_upgrade' } },
-  pill_fuhun:    { id: 'pill_fuhun',    name: '回魂丹',   type: 'pill', emoji: '非遗', price: 200, desc: '战败后服用，找回损失的修为。', effect: { kind: 'revive' } },
+  pill_fuhun:    { id: 'pill_fuhun',    name: '回魂丹',   type: 'pill', emoji: '💫', price: 200, desc: '战败后服用，找回损失的修为。', effect: { kind: 'revive' } },
   // 境界突破所需/推荐丹药（突破时消耗，提供成功率与渡劫助力）
   pill_zhuji:    { id: 'pill_zhuji',    name: '筑基丹',   type: 'pill', emoji: '🟣', price: 150, desc: '筑基所需，稳固根基。',   role: 'break_zhuji' },
   pill_jiedan:   { id: 'pill_jiedan',   name: '结丹丹',   type: 'pill', emoji: '🟣', price: 300, desc: '结丹所需，凝聚金丹。',   role: 'break_jiedan' },

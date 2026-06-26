@@ -15,12 +15,14 @@ jobs:
       issues: write
 
     steps:
-      - name: 🔄 Enable Auto-Merge (Squash)
+      - name: 📥 Checkout（gh pr merge --delete-branch 需要本地 .git 来删分支引用）
+        uses: actions/checkout@v4
+
+      - name: 🔄 Merge & Delete Branch
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          # 去掉 --auto，执行立刻合并并删除分支
           gh pr merge $PR_NUMBER --squash --delete-branch
 
       - name: 🏁 Close Related Issue

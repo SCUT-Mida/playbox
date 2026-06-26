@@ -156,7 +156,16 @@ function drawAccessory(g, bodyTop, bodyH, bodyW, s, opts) {
   const hx = bodyW / 2 + s * 0.03; // 右手外侧
   const hy = bodyTop + bodyH * 0.5;
 
-  if (opts.weapon === 'sword') {
+  if (opts.weapon === 'bow') {
+    // 弓：竖持木弧 + 弓弦（远程射手）
+    const r = s * 0.15;
+    g.lineStyle(Math.max(1, s * 0.035), 0x6b4a2a, 1);
+    g.beginPath();
+    g.arc(hx, hy, r, -Math.PI / 2, Math.PI / 2, false);
+    g.strokePath();
+    g.lineStyle(Math.max(1, s * 0.02), 0xeae0cc, 0.85);
+    g.lineBetween(hx, hy - r, hx, hy + r);
+  } else if (opts.weapon === 'sword') {
     g.lineStyle(Math.max(1, s * 0.05), 0x6b4a2a, 1);
     g.lineBetween(hx, hy + s * 0.04, hx, hy - s * 0.28);
     g.fillStyle(0xe6edf2, 1);
@@ -226,6 +235,30 @@ function drawFace(g, headY, headR, s, opts) {
 
 // ---------- 武将 / 敌军 风格预设 ----------
 
+// 每个武将的专属外观：覆盖阵营/职业默认配色，让 14 位武将一眼可辨
+// （关羽红脸长髯、张飞黑甲、赵云银甲、吕布双翎……）
+// 仅做外观覆盖，不触碰 generals.js 的纯数值数据。
+const APPEARANCE = {
+  // —— 蜀 ——
+  guanyu: { skin: 0xc97a5a, body: 0x2f7d4a, accent: 0xf0c040, hatStyle: 'plume', hat: 0x246a3c, plume: 0x2f7d4a, weapon: 'sword', mood: 'angry' },
+  zhangfei: { skin: 0xa97852, body: 0x3a3340, accent: 0x8a8a96, hatStyle: 'cap', hat: 0x2a2a30, plume: 0x2a2a30, weapon: 'sword', mood: 'angry' },
+  zhaoyun: { skin: 0xf0d2b4, body: 0xb9c4cf, accent: 0xc0392b, hatStyle: 'cap', hat: 0xaebcca, plume: 0xf0f0f0, weapon: 'sword', mood: 'happy' },
+  machao: { skin: 0xeec6a4, body: 0xa6b8c8, accent: 0x3f6f9a, hatStyle: 'plume', hat: 0x8aa0b4, plume: 0x4a7fa0, weapon: 'sword', mood: 'happy' },
+  huangzhong: { skin: 0xd8a878, body: 0x9a7430, accent: 0xf0c040, hatStyle: 'plume', hat: 0x7a5a24, plume: 0xf0c040, weapon: 'bow', mood: 'happy' },
+  zhuge: { skin: 0xeec8a4, body: 0x566070, accent: 0xb0b8c0, hatStyle: 'wizard', hat: 0x42424d, glow: 0x9ec4e6, weapon: 'staff', mood: 'glow' },
+  pangtong: { skin: 0xd8a878, body: 0x7a4636, accent: 0xd08a3a, hatStyle: 'wizard', hat: 0x5a3a2a, glow: 0xff9a3a, weapon: 'staff', mood: 'glow' },
+  // —— 魏 ——
+  caocao: { skin: 0xe8c0a0, body: 0x33415c, accent: 0xf0c040, hatStyle: 'plume', hat: 0x28344a, plume: 0xf0c040, mood: 'angry' },
+  sima: { skin: 0xd8b0a0, body: 0x473a5a, accent: 0x8a6aa0, hatStyle: 'wizard', hat: 0x362a45, glow: 0xa06fd0, weapon: 'staff', mood: 'glow' },
+  xiahou: { skin: 0xc89878, body: 0x3a4a6a, accent: 0xb0b8c0, hatStyle: 'cap', hat: 0x2a3850, plume: 0x8a3a2a, weapon: 'sword', mood: 'angry' },
+  // —— 吴 ——
+  zhouyu: { skin: 0xeec6a4, body: 0xb04030, accent: 0xf0c040, hatStyle: 'wizard', hat: 0x7a2a20, glow: 0xff7a3a, weapon: 'staff', mood: 'glow' },
+  sunce: { skin: 0xe0b080, body: 0xcc4f36, accent: 0xf0c040, hatStyle: 'cap', hat: 0x8a2f20, plume: 0xf0c040, weapon: 'sword', mood: 'angry' },
+  // —— 群雄 ——
+  lvbu: { skin: 0xb07a52, body: 0x8a6a3a, accent: 0xd0a040, hatStyle: 'plume', hat: 0x6a4f2a, plume: 0xf0e8d0, weapon: 'sword', mood: 'angry' },
+  diaochan: { skin: 0xf2d2c0, body: 0xc46a8a, accent: 0xf0d0e0, hatStyle: 'wizard', hat: 0xa04a66, glow: 0xff9ec4, weapon: 'staff', mood: 'happy' },
+};
+
 export function optsForGeneral(def) {
   const fac = COLORS.faction[def.faction] || 0x6b5a40;
   const base = {
@@ -246,7 +279,8 @@ export function optsForGeneral(def) {
     base.weapon = 'staff';
     base.glow = def.faction === '蜀' ? 0xb08bd6 : shade(fac, 1.25);
   }
-  return base;
+  const style = APPEARANCE[def.id];
+  return style ? { ...base, ...style } : base;
 }
 
 export function optsForEnemy(def) {

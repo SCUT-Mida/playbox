@@ -129,7 +129,7 @@ export default class GameScene extends Phaser.Scene {
     for (let i = 1; i < wp.length; i++) g.lineTo(wp[i].x, wp[i].y);
     g.strokePath();
 
-    // 高地（可部署远程/策士）
+    // 高地（可部署远程/策士）：绿地台 + 箭塔图标，醒目提示"远程/策士据点"
     for (const [key, type] of this.map.slots) {
       if (type !== SLOT.HIGH) continue;
       const [c, r] = key.split(',').map(Number);
@@ -139,18 +139,20 @@ export default class GameScene extends Phaser.Scene {
       g.fillRoundedRect(cx - TILE / 2 + 4, cy - TILE / 2 + 4, TILE - 8, TILE - 8, 8);
       g.lineStyle(2, COLORS.highlandEdge, 0.9);
       g.strokeRoundedRect(cx - TILE / 2 + 4, cy - TILE / 2 + 4, TILE - 8, TILE - 8, 8);
+      this._drawTowerIcon(g, cx, cy);
     }
 
-    // 路面部署位（近战）标记
+    // 路面部署位（近战）：暖色台座 + 剑形图标，醒目提示"近战阻挡点"
     for (const [key, type] of this.map.slots) {
       if (type !== SLOT.ROAD) continue;
       const [c, r] = key.split(',').map(Number);
       const cx = MAP_X + c * TILE + TILE / 2;
       const cy = MAP_Y + r * TILE + TILE / 2;
-      g.lineStyle(2, 0x8a5a2a, 0.8);
-      g.strokeCircle(cx, cy, TILE * 0.28);
-      g.fillStyle(0x8a5a2a, 0.18);
-      g.fillCircle(cx, cy, TILE * 0.28);
+      g.fillStyle(0xb07a3a, 0.5);
+      g.fillCircle(cx, cy, TILE * 0.32);
+      g.lineStyle(2.5, 0x8a3a2a, 0.9);
+      g.strokeCircle(cx, cy, TILE * 0.32);
+      this._drawMeleeIcon(g, cx, cy);
     }
 
     // 基地（主营营寨）—— 位于路径终点（底部）
@@ -187,6 +189,59 @@ export default class GameScene extends Phaser.Scene {
       color: '#c89238',
     }).setOrigin(0.5).setDepth(2);
     this.tweens.add({ targets: arrow, y: MAP_Y - 2, duration: 600, yoyo: true, repeat: -1 });
+
+    // 槽位图例：明确告诉玩家"哪种武将放哪里"，置于顶部 HUD 下方、棋盘上沿
+    this._legendPill(92, MAP_Y - 4, COLORS.road, COLORS.roadEdge, '剑', '近战 · 路面');
+    this._legendPill(GAME_WIDTH - 92, MAP_Y - 4, COLORS.highlandAlt, COLORS.highlandEdge, '塔', '远程/策士 · 高地');
+  }
+
+  // 槽位图例胶囊（色块 + 类型标签）
+  _legendPill(cx, cy, fill, edge, swatch, label) {
+    const w = 132;
+    const h = 24;
+    const g = this.add.graphics().setDepth(3);
+    g.fillStyle(0x1a1410, 0.78);
+    g.fillRoundedRect(cx - w / 2, cy - h / 2, w, h, 9);
+    g.lineStyle(1.5, edge, 0.95);
+    g.strokeRoundedRect(cx - w / 2, cy - h / 2, w, h, 9);
+    // 色块
+    g.fillStyle(fill, 1);
+    g.fillRoundedRect(cx - w / 2 + 5, cy - 7, 16, 14, 4);
+    g.lineStyle(1, edge, 1);
+    g.strokeRoundedRect(cx - w / 2 + 5, cy - 7, 16, 14, 4);
+    this.add.text(cx - w / 2 + 13, cy, swatch, {
+      fontFamily: 'serif', fontSize: '11px', color: '#1a1410', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(3);
+    this.add.text(cx - w / 2 + 28, cy, label, {
+      fontFamily: '"PingFang SC",sans-serif', fontSize: '12px', color: '#f0e0c0',
+    }).setOrigin(0, 0.5).setDepth(3);
+  }
+
+  // 近战槽位图标：向上的短剑
+  _drawMeleeIcon(g, cx, cy) {
+    // 剑身
+    g.fillStyle(0xf0e8d8, 0.95);
+    g.fillTriangle(cx, cy - 12, cx - 3.6, cy + 2, cx + 3.6, cy + 2);
+    // 护手
+    g.lineStyle(2.4, 0x6a4a2a, 1);
+    g.lineBetween(cx - 5.5, cy + 3, cx + 5.5, cy + 3);
+    // 握柄
+    g.lineStyle(2.8, 0x5a4028, 1);
+    g.lineBetween(cx, cy + 3, cx, cy + 11);
+  }
+
+  // 高地槽位图标：带城堞与箭窗的小箭塔（远程/策士据点）
+  _drawTowerIcon(g, cx, cy) {
+    // 塔身
+    g.fillStyle(0xeef0e2, 0.9);
+    g.fillRect(cx - 6, cy - 1, 12, 11);
+    // 城堞
+    g.fillRect(cx - 6, cy - 7, 3, 6);
+    g.fillRect(cx - 1.5, cy - 7, 3, 6);
+    g.fillRect(cx + 3, cy - 7, 3, 6);
+    // 箭窗
+    g.fillStyle(0x2a2018, 0.85);
+    g.fillRect(cx - 1, cy + 2, 2, 4);
   }
 
   // ---------------- 主循环 ----------------

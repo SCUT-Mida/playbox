@@ -4,6 +4,7 @@ import {
 } from '../config.js';
 import { upgradeCost, retreatRefund, MAX_LEVEL } from '../data/generals.js';
 import { unlockedGenerals, generalStar, starAtkMult, starHpMult, MAX_STAR } from '../data/meta.js';
+import { bondsForGeneral, bondPartners } from '../data/bonds.js';
 import { drawChibi, optsForGeneral } from '../utils/Chibi.js';
 import audio from '../audio/Audio.js';
 
@@ -478,6 +479,26 @@ export default class UIScene extends Phaser.Scene {
     panel.add(this.add.text(0, -ph / 2 + 308, this._skillDesc(def), {
       fontFamily: '"PingFang SC",sans-serif', fontSize: '14px', color: '#e6d4ac', align: 'center',
     }).setOrigin(0.5, 0).setWordWrapWidth(pw - 60));
+
+    // 羁绊搭档（与图鉴详情一致，长按即可完整查看该武将的"图鉴信息"）
+    const bonds = bondsForGeneral(def);
+    const bondsY = -ph / 2 + 372;
+    panel.add(this.add.text(0, bondsY, '— 羁 搭 档 —', {
+      fontFamily: 'serif', fontSize: '18px', color: '#f0c040',
+    }).setOrigin(0.5, 0));
+    if (bonds.length === 0) {
+      panel.add(this.add.text(0, bondsY + 30, '暂无专属羁绊', {
+        fontFamily: '"PingFang SC",sans-serif', fontSize: '14px', color: '#9a8a6a',
+      }).setOrigin(0.5, 0));
+    } else {
+      bonds.forEach((b, i) => {
+        const partners = bondPartners(b, def);
+        const partnerTxt = partners.length ? `　搭档：${partners.join('、')}` : '';
+        panel.add(this.add.text(0, bondsY + 30 + i * 30, `${b.name}${partnerTxt}`, {
+          fontFamily: '"PingFang SC",sans-serif', fontSize: '14px', color: '#e6d4ac',
+        }).setOrigin(0.5, 0).setWordWrapWidth(pw - 60));
+      });
+    }
 
     // 操作提示
     panel.add(this.add.text(0, ph / 2 - 64, '长按查看 · 拖拽部署 · 点此关闭', {

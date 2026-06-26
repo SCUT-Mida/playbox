@@ -118,6 +118,13 @@ header {
   padding: 1.5rem;
 }
 
+/* 多展品纵向堆叠 */
+.exhibit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
 .card-head {
   display: flex;
   align-items: center;

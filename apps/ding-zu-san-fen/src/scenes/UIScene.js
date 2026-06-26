@@ -3,7 +3,8 @@ import {
   GAME_WIDTH, GAME_HEIGHT, TILE, slotTypeForClass, COLORS,
 } from '../config.js';
 import { upgradeCost, retreatRefund, MAX_LEVEL } from '../data/generals.js';
-import { unlockedGenerals, generalStar, MAX_STAR } from '../data/meta.js';
+import { unlockedGenerals, generalStar, starAtkMult, starHpMult, MAX_STAR } from '../data/meta.js';
+import { bondsForGeneral, bondPartners } from '../data/bonds.js';
 import { drawChibi, optsForGeneral } from '../utils/Chibi.js';
 import audio from '../audio/Audio.js';
 
@@ -35,6 +36,9 @@ export default class UIScene extends Phaser.Scene {
     this.gameScene = this.scene.get('GameScene');
     this.drag = null;
     this.cards = []; // { def, container, dim, rect:{x,y,w,h} }
+    this._press = null; // 长按等待中的卡牌按下：{ def, px, py, longFired }
+    this._pressTimer = null;
+    this._codex = null; // 长按弹出的武将图鉴浮层
     this._topButtons = [];
     this._menuButtons = [];
     this._menu = null;
@@ -274,6 +278,13 @@ export default class UIScene extends Phaser.Scene {
     const py = p.y;
     const gs = this.gameScene;
 
+    // 0) 图鉴浮层打开时，任意点击关闭
+    if (this._codex) {
+      audio.play('click');
+      this._closeCodex();
+      return;
+    }
+
     // 1) 菜单按钮
     if (this._menu && this._menu.visible) {
       const btn = this._hitRects(this._menuButtons, px, py);
@@ -300,12 +311,12 @@ export default class UIScene extends Phaser.Scene {
       return;
     }
 
-    // 4) 拖拽武将卡
+    // 4) 武将卡：长按打开图鉴，移动则转为拖拽（不立即拖拽，留出长按判定窗口）
     const card = this._hitRects(this.cards.map((c) => ({ rect: c.rect, ref: c })), px, py);
     if (card && card.ref) {
       audio.play('click');
       this._closeMenu();
-      this._startDrag(card.ref.def, px, py);
+      this._beginPress(card.ref.def, px, py);
       return;
     }
 
@@ -314,6 +325,18 @@ export default class UIScene extends Phaser.Scene {
   }
 
   _onMove(p) {
+    // 卡牌按下等待长按：位移超过阈值则判定为拖拽，取消长按计时
+    if (this._press && !this._press.longFired && !this.drag) {
+      const dx = p.x - this._press.px;
+      const dy = p.y - this._press.py;
+      if (dx * dx + dy * dy > 144) { // 12px 起拖阈值
+        const def = this._press.def;
+        this._cancelPress();
+        this._startDrag(def, p.x, p.y);
+      } else {
+        return; // 微小抖动：既不长按也不拖拽
+      }
+    }
     if (!this.drag) return;
     const px = p.x;
     const py = p.y;
@@ -333,6 +356,8 @@ export default class UIScene extends Phaser.Scene {
   }
 
   _onUp(p) {
+    // 松手即取消长按等待（无论是否已转拖拽）
+    this._cancelPress();
     if (!this.drag) return;
     const d = this.drag;
     if (d.valid && d.col != null) {
@@ -357,6 +382,149 @@ export default class UIScene extends Phaser.Scene {
     ghost.setAlpha(0.85);
     ghost.setScale(1.05);
     this.drag = { def, ghost, valid: false, col: null, row: null };
+  }
+
+  // —— 长按图鉴：按下后等待 ~450ms，期间未移动则弹出图鉴浮层 ——
+  _beginPress(def, px, py) {
+    this._cancelPress();
+    this._press = { def, px, py, longFired: false };
+    this._pressTimer = this.time.delayedCall(450, () => {
+      if (this._press && !this._press.longFired && !this.drag) {
+        const d = this._press.def;
+        this._press = null;
+        this._openCodex(d);
+      }
+    });
+  }
+
+  _cancelPress() {
+    if (this._pressTimer) {
+      this._pressTimer.remove(false);
+      this._pressTimer = null;
+    }
+    this._press = null;
+  }
+
+  // 武将图鉴浮层（对阵中长按底部武将卡唤出）：头像 / 属性 / 战法
+  _openCodex(def) {
+    this._closeCodex();
+    const fac = COLORS.faction[def.faction] || COLORS.ink;
+    const star = generalStar(def.id);
+    const owned = star > 0;
+    const clsLabel = def.cls === 'MELEE' ? '近战' : def.cls === 'RANGE' ? '远程' : '策士';
+    const pw = 480;
+    const ph = 560;
+    const cx = GAME_WIDTH / 2;
+    const cy = GAME_HEIGHT / 2;
+
+    const overlay = this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.55)
+      .setDepth(90).setInteractive();
+
+    const panel = this.add.container(cx, cy).setDepth(91);
+    const g = this.add.graphics();
+    g.fillStyle(0x000000, 0.35);
+    g.fillRoundedRect(-pw / 2 + 3, -ph / 2 + 4, pw, ph, 16);
+    g.fillStyle(0x4a3a28, 0.99);
+    g.fillRoundedRect(-pw / 2, -ph / 2, pw, ph, 16);
+    g.fillStyle(fac, 1);
+    g.fillRoundedRect(-pw / 2, -ph / 2, pw, 44, 16);
+    g.fillRect(-pw / 2, -ph / 2 + 28, pw, 18);
+    g.lineStyle(3, COLORS.gold, 0.9);
+    g.strokeRoundedRect(-pw / 2, -ph / 2, pw, ph, 16);
+    panel.add(g);
+
+    // 头像
+    const portrait = this.add.graphics();
+    drawChibi(portrait, { ...optsForGeneral(def), size: 96 });
+    portrait.setPosition(-pw / 2 + 80, -ph / 2 + 116);
+    panel.add(portrait);
+
+    panel.add(this.add.text(-pw / 2 + 150, -ph / 2 + 58, def.name, {
+      fontFamily: 'serif', fontSize: '36px', color: '#ffe9b8', fontStyle: 'bold',
+    }).setOrigin(0, 0.5));
+    panel.add(this.add.text(-pw / 2 + 152, -ph / 2 + 98, `${def.faction} · ${clsLabel} · 费 ${def.cost}`, {
+      fontFamily: '"PingFang SC",sans-serif', fontSize: '15px', color: '#cdb888',
+    }).setOrigin(0, 0.5));
+
+    // 星级
+    if (owned) {
+      panel.add(this.add.text(pw / 2 - 24, -ph / 2 + 64, '★'.repeat(Math.min(star, MAX_STAR)), {
+        fontFamily: 'serif', fontSize: '18px', color: star >= MAX_STAR ? '#ffd27a' : '#ffe08a',
+        stroke: '#3a2a10', strokeThickness: 3,
+      }).setOrigin(1, 0.5));
+    }
+
+    // 描述
+    panel.add(this.add.text(0, -ph / 2 + 176, def.desc, {
+      fontFamily: '"PingFang SC",sans-serif', fontSize: '15px', color: '#cbb888',
+    }).setOrigin(0.5, 0));
+
+    // 关键属性（已收录时显示星级加成后数值）
+    const atkShow = owned ? Math.round(def.atk * starAtkMult(star)) : def.atk;
+    const hpShow = owned ? Math.round(def.hp * starHpMult(star)) : def.hp;
+    const statLine = def.cls === 'MELEE'
+      ? `攻击 ${atkShow}　血量 ${hpShow}　阻挡 ${def.block}`
+      : `攻击 ${atkShow}　血量 ${hpShow}　射程 ${def.range.toFixed(1)}`;
+    panel.add(this.add.text(0, -ph / 2 + 206, statLine, {
+      fontFamily: '"PingFang SC",sans-serif', fontSize: '15px', color: '#e6d4ac',
+    }).setOrigin(0.5, 0));
+
+    // 战法
+    panel.add(this.add.text(0, -ph / 2 + 248, '— 战 法 —', {
+      fontFamily: 'serif', fontSize: '18px', color: '#f0c040',
+    }).setOrigin(0.5, 0));
+    panel.add(this.add.text(0, -ph / 2 + 278, `${def.skill.name}（冷却 ${def.skill.cd}s）`, {
+      fontFamily: '"PingFang SC",sans-serif', fontSize: '17px', color: '#ffe9b8', fontStyle: 'bold',
+    }).setOrigin(0.5, 0));
+    panel.add(this.add.text(0, -ph / 2 + 308, this._skillDesc(def), {
+      fontFamily: '"PingFang SC",sans-serif', fontSize: '14px', color: '#e6d4ac', align: 'center',
+    }).setOrigin(0.5, 0).setWordWrapWidth(pw - 60));
+
+    // 羁绊搭档（与图鉴详情一致，长按即可完整查看该武将的"图鉴信息"）
+    const bonds = bondsForGeneral(def);
+    const bondsY = -ph / 2 + 372;
+    panel.add(this.add.text(0, bondsY, '— 羁 搭 档 —', {
+      fontFamily: 'serif', fontSize: '18px', color: '#f0c040',
+    }).setOrigin(0.5, 0));
+    if (bonds.length === 0) {
+      panel.add(this.add.text(0, bondsY + 30, '暂无专属羁绊', {
+        fontFamily: '"PingFang SC",sans-serif', fontSize: '14px', color: '#9a8a6a',
+      }).setOrigin(0.5, 0));
+    } else {
+      bonds.forEach((b, i) => {
+        const partners = bondPartners(b, def);
+        const partnerTxt = partners.length ? `　搭档：${partners.join('、')}` : '';
+        panel.add(this.add.text(0, bondsY + 30 + i * 30, `${b.name}${partnerTxt}`, {
+          fontFamily: '"PingFang SC",sans-serif', fontSize: '14px', color: '#e6d4ac',
+        }).setOrigin(0.5, 0).setWordWrapWidth(pw - 60));
+      });
+    }
+
+    // 操作提示
+    panel.add(this.add.text(0, ph / 2 - 64, '长按查看 · 拖拽部署 · 点此关闭', {
+      fontFamily: '"PingFang SC",sans-serif', fontSize: '13px', color: '#9a8a6a',
+    }).setOrigin(0.5, 0));
+
+    this._codex = { overlay, panel };
+    panel.setScale(0.85).setAlpha(0);
+    this.tweens.add({ targets: panel, scale: 1, alpha: 1, duration: 180, ease: 'Back.Out' });
+  }
+
+  _closeCodex() {
+    if (!this._codex) return;
+    this._codex.overlay.destroy();
+    this._codex.panel.destroy(true);
+    this._codex = null;
+  }
+
+  _skillDesc(def) {
+    const s = def.skill;
+    if (s.type === 'AOE') return `范围斩击：半径 ${s.radius} 格内造成攻击×${s.mult} 伤害`;
+    if (s.type === 'SNIPE') return `单体爆发：对最远目标造成攻击×${s.mult} 伤害`;
+    let txt = `法术轰击：目标半径 ${s.radius} 格内造成攻击×${s.mult} 法术伤害`;
+    if (s.slow) txt += `；减速 ${Math.round((1 - s.slow.factor) * 100)}% 持续 ${s.slow.dur}s`;
+    if (s.burn) txt += `；灼烧 ${s.burn.dps}/s 持续 ${s.burn.dur}s`;
+    return txt;
   }
 
   _hitRects(list, px, py) {

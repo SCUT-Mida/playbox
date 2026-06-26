@@ -25,20 +25,95 @@ export default class RosterScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(COLORS.bg);
     this._bgTexture(width, height);
     this._detail = null;
+    this._mode = 'all'; // 'all' 图鉴全部 | 'owned' 武将栏（已收录）
+    this._cards = [];
+    this._tabEls = [];
 
     // 顶部栏
     this._buildHeader(width);
+    this._buildTabs(width);
+    this._buildHint(width);
+    this._buildGrid();
+  }
 
-    // 14 张卡 2 列 7 行
-    this._cards = [];
+  _buildTabs(width) {
+    // 切换"图鉴(全部) / 武将栏(已收录)"：武将栏只展示已抽到的武将，强化"收集→合并"体感
+    if (this._tabEls.length) {
+      this._tabEls.forEach((e) => { e.cont.destroy(); e.zone.destroy(); });
+      this._tabEls = [];
+    }
+    const unlocked = unlockedGenerals().length;
+    const tabs = [
+      { mode: 'all', label: `图 鉴 · 全部 ${GENERALS.length}`, cx: width / 2 - 150 },
+      { mode: 'owned', label: `武 将 栏 · 已收录 ${unlocked}`, cx: width / 2 + 150 },
+    ];
+    tabs.forEach((t) => {
+      const active = this._mode === t.mode;
+      this._tabEls.push(this._mkTab(t.cx, 98, t.label, () => this._setMode(t.mode), active));
+    });
+  }
+
+  _mkTab(cx, cy, label, onClick, active) {
+    const w = 252;
+    const h = 38;
+    const cont = this.add.container(cx, cy).setDepth(6);
+    const g = this.add.graphics();
+    g.fillStyle(0x000000, 0.3);
+    g.fillRoundedRect(-w / 2 + 2, -h / 2 + 2, w, h, 10);
+    g.fillStyle(active ? 0x6a4f8a : 0x36301f, 1);
+    g.fillRoundedRect(-w / 2, -h / 2, w, h, 10);
+    g.lineStyle(2, active ? COLORS.gold : COLORS.ink, active ? 0.95 : 0.5);
+    g.strokeRoundedRect(-w / 2, -h / 2, w, h, 10);
+    cont.add(g);
+    cont.add(this.add.text(0, 0, label, {
+      fontFamily: '"PingFang SC",sans-serif', fontSize: '17px',
+      color: active ? '#ffe9b8' : '#b9a47e', fontStyle: 'bold',
+    }).setOrigin(0.5));
+    const zone = this.add.zone(cx, cy, w, h).setInteractive({ useHandCursor: true });
+    zone.on('pointerover', () => cont.setScale(1.04));
+    zone.on('pointerout', () => cont.setScale(1));
+    zone.on('pointerdown', () => {
+      audio.play('click');
+      this.tweens.add({ targets: cont, scale: 0.96, duration: 60, yoyo: true });
+      this.time.delayedCall(70, onClick);
+    });
+    return { cont, zone };
+  }
+
+  _buildHint(width) {
+    this.add.text(width / 2, 132, '💡 同名武将自动合并：2 张 → ★+1；满星后再抽则溢出返还金币', {
+      fontFamily: '"PingFang SC",sans-serif', fontSize: '13px', color: '#b9a47e',
+    }).setOrigin(0.5).setDepth(6);
+  }
+
+  _buildGrid() {
+    const { width } = this.scale;
+    // 武将栏按星级倒序，把练度最高的武将顶到最前
+    const list = this._mode === 'owned'
+      ? unlockedGenerals().sort((a, b) => generalStar(b.id) - generalStar(a.id))
+      : GENERALS;
     const startX = (width - (2 * CARD_W + CARD_GAP_X)) / 2 + CARD_W / 2;
-    GENERALS.forEach((def, i) => {
+    list.forEach((def, i) => {
       const col = i % 2;
       const row = Math.floor(i / 2);
       const cx = startX + col * (CARD_W + CARD_GAP_X);
       const cy = GRID_TOP + CARD_H / 2 + row * (CARD_H + CARD_GAP_Y);
       this._cards.push(this._buildCard(cx, cy, def));
     });
+  }
+
+  _clearGrid() {
+    for (const c of this._cards) c.container.destroy(true);
+    this._cards = [];
+  }
+
+  _setMode(m) {
+    if (this._mode === m) return;
+    if (this._detail) this._closeDetail();
+    this._mode = m;
+    this._clearGrid();
+    this._buildGrid();
+    this._buildTabs(this.scale.width);
   }
 
   _bgTexture(width, height) {
@@ -60,16 +135,11 @@ export default class RosterScene extends Phaser.Scene {
     g.lineStyle(2, COLORS.gold, 0.5);
     g.lineBetween(0, 120, width, 120);
 
-    this.add.text(width / 2, 52, '武 将 图 鉴', {
+    this.add.text(width / 2, 50, '武 将 图 鉴', {
       fontFamily: 'serif', fontSize: '42px', color: '#ead9b6', stroke: '#1a1410', strokeThickness: 6,
     }).setOrigin(0.5).setDepth(6);
 
-    const unlocked = unlockedGenerals().length;
-    this._countText = this.add.text(width / 2, 96, `已收录 ${unlocked} / ${GENERALS.length}`, {
-      fontFamily: '"PingFang SC",sans-serif', fontSize: '16px', color: '#c9a35a',
-    }).setOrigin(0.5).setDepth(6);
-
-    this._mkButton(96, 60, 140, 56, '◀ 返回', 0x6b5a40, () => {
+    this._mkButton(96, 50, 140, 56, '◀ 返回', 0x6b5a40, () => {
       audio.play('click');
       this.scene.start('MenuScene');
     });

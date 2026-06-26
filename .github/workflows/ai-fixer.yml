@@ -109,8 +109,8 @@ jobs:
 
             echo "⚠️ 第 $ATTEMPT 次失败 (exit $CLAUDE_EXIT)"
             if [ $ATTEMPT -lt $MAX_RETRIES ]; then
-              echo "⏳ 等待 60 秒后重试..."
-              sleep 60
+              echo "⏳ 等待 120 秒后重试..."
+              sleep 120
             fi
           done
 

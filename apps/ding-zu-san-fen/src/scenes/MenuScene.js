@@ -3,6 +3,7 @@ import { COLORS, GAME_WIDTH, GAME_HEIGHT } from '../config.js';
 import { LEVELS, LEVEL_LIST } from '../data/levels.js';
 import { GENERAL_BY_ID } from '../data/generals.js';
 import { getMeta, isMuted, setMuted } from '../data/meta.js';
+import { loadBattle } from '../data/save.js';
 import { drawChibi, optsForGeneral } from '../utils/Chibi.js';
 import audio from '../audio/Audio.js';
 
@@ -55,8 +56,18 @@ export default class MenuScene extends Phaser.Scene {
     // 武将图鉴 / 点将台入口
     this._navRow(width, 388);
 
+    // 存档续战：若有未结束的战斗存档，在最上方提供"继续上次出征"入口
+    const snap = loadBattle();
+    let startY = 484;
+    if (snap) {
+      const lv = LEVELS[snap.levelKey];
+      if (lv) {
+        this._continueCard(width / 2, 470, lv, snap);
+        startY = 560;
+      }
+    }
+
     // 关卡按钮
-    const startY = 484;
     LEVEL_LIST.forEach((key, i) => {
       const lv = LEVELS[key];
       const y = startY + i * 124;
@@ -68,7 +79,7 @@ export default class MenuScene extends Phaser.Scene {
     const tips = [
       '🪙 拖拽底部武将卡部署：近战放路面、远程/策士放高地',
       '⚔️ 相邻武将触发【羁绊阵法】；击杀积累气势，释放【火烧连营】大招',
-      '🏆 通关获金币 → 点将台抽将；图鉴查看属性与羁绊搭档',
+      '🏆 开局金币可十连抽将；抽到重复卡合并升星，战力永久成长',
     ];
     tips.forEach((t, i) => {
       this.add.text(width / 2, tipY + i * 28, t, {
@@ -107,8 +118,9 @@ export default class MenuScene extends Phaser.Scene {
     }).setOrigin(0.5);
     this._goldCont.add(this._goldText);
 
-    // 静音按钮
-    this._muteCont = this.add.container(width - 44, 48).setDepth(6);
+    // 静音按钮（置于左上角：右上角被落地页的"关闭✕"悬浮按钮占用，
+    // 若放右上角会被其遮挡而无法点击）
+    this._muteCont = this.add.container(44, 48).setDepth(6);
     this._muteBg = this.add.graphics();
     this._muteBg.fillStyle(0x3a2e20, 0.96);
     this._muteBg.fillRoundedRect(-20, -20, 40, 40, 10);
@@ -119,7 +131,7 @@ export default class MenuScene extends Phaser.Scene {
       fontSize: '22px',
     }).setOrigin(0.5);
     this._muteCont.add(this._muteIcon);
-    const muteZone = this.add.zone(width - 44, 48, 48, 48).setInteractive({ useHandCursor: true });
+    const muteZone = this.add.zone(44, 48, 48, 48).setInteractive({ useHandCursor: true });
     muteZone.on('pointerover', () => this._muteCont.setScale(1.06));
     muteZone.on('pointerout', () => this._muteCont.setScale(1));
     muteZone.on('pointerdown', () => {
@@ -193,6 +205,44 @@ export default class MenuScene extends Phaser.Scene {
     zone.on('pointerdown', () => {
       this.tweens.add({ targets: cont, scale: 0.96, duration: 80, yoyo: true });
       this.time.delayedCall(90, onClick);
+    });
+  }
+
+  // 存档续战入口：醒目的绿色卡片，点击以 resume:true 进入对应关卡恢复存档
+  _continueCard(cx, cy, lv, snap) {
+    const w = 520;
+    const h = 64;
+    const cont = this.add.container(cx, cy);
+    const g = this.add.graphics();
+    g.fillStyle(0x000000, 0.3);
+    g.fillRoundedRect(-w / 2 + 3, -h / 2 + 4, w, h, 14);
+    g.fillStyle(0x2f5d3a, 1);
+    g.fillRoundedRect(-w / 2, -h / 2, w, h, 14);
+    g.lineStyle(3, 0x6fd08a, 0.9);
+    g.strokeRoundedRect(-w / 2, -h / 2, w, h, 14);
+    cont.add(g);
+    cont.add(this.add.text(-w / 2 + 28, -8, '↻ 继续上次出征', {
+      fontFamily: 'serif', fontSize: '26px', color: '#eafff0',
+    }).setOrigin(0, 0.5));
+    const waveNum = Math.max(1, (snap.waveIndex | 0) + 1);
+    cont.add(this.add.text(-w / 2 + 30, 16,
+      `${lv.name} · 已推进至第 ${waveNum} / ${lv.waves.length} 波`, {
+        fontFamily: '"PingFang SC",sans-serif', fontSize: '14px', color: '#bfe6c8',
+      }).setOrigin(0, 0.5));
+    cont.add(this.add.text(w / 2 - 24, 0, '▶ 续战', {
+      fontFamily: '"PingFang SC",sans-serif', fontSize: '20px', color: '#9affb8',
+    }).setOrigin(1, 0.5));
+    const zone = this.add.zone(cx, cy, w, h).setInteractive({ useHandCursor: true });
+    zone.on('pointerover', () => cont.setAlpha(0.92));
+    zone.on('pointerout', () => cont.setAlpha(1));
+    zone.on('pointerdown', () => {
+      audio.unlock();
+      audio.play('click');
+      this.tweens.add({ targets: cont, scale: 0.96, duration: 80, yoyo: true });
+      this.time.delayedCall(90, () => {
+        this.registry.set('levelKey', lv.key);
+        this.scene.start('GameScene', { levelKey: lv.key, resume: true });
+      });
     });
   }
 

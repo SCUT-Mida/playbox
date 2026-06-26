@@ -5,6 +5,8 @@ import {
 } from '../config.js';
 import { LEVELS } from '../data/levels.js';
 import { GENERAL_BY_ID, upgradeCost, retreatRefund, MAX_LEVEL } from '../data/generals.js';
+import { starOf } from '../data/meta.js';
+import { saveBattle, loadBattle, clearBattle } from '../data/save.js';
 import MapManager from '../managers/MapManager.js';
 import WaveManager from '../managers/WaveManager.js';
 import BondManager from '../managers/BondManager.js';
@@ -27,6 +29,8 @@ export default class GameScene extends Phaser.Scene {
   init(data) {
     this.levelKey = (data && data.levelKey) || this.registry.get('levelKey') || 'huangjin';
     this.registry.set('levelKey', this.levelKey);
+    // resume=true 时尝试从存档恢复该关卡的最近一次安全检查点
+    this._resume = !!(data && data.resume);
   }
 
   create() {
@@ -44,6 +48,8 @@ export default class GameScene extends Phaser.Scene {
     this.morale = 0;
     this.ended = false;
     this.result = null;
+    this._lastWaveState = null;
+    this._suppressEarlyBonus = false;
 
     // 管理器 / 集合
     this.map = new MapManager(level);
@@ -62,6 +68,12 @@ export default class GameScene extends Phaser.Scene {
     // 高亮与提示图层（动态）
     this.hoverGfx = this.add.graphics().setDepth(70);
     this.selectionGfx = this.add.graphics().setDepth(69);
+
+    // 存档恢复：若有匹配的快照，回到最近一次"波间空档/开局布阵"检查点
+    this._resume && this._restoreFromSave();
+    this._resume = false;
+    // 存档在部署/波间等"有意义动作"时才写入，避免刚进关卡尚未操作
+    // 就出现无意义的"继续上次出征"。
 
     this._stateAcc = 0;
     this._emitState();
@@ -187,6 +199,13 @@ export default class GameScene extends Phaser.Scene {
     this.waveManager.update(dt, aliveCount);
     if (this.waveManager.state === 'between') {
       this.waveManager.tickBetween(dt);
+    }
+
+    // 波次进入"波间空档"（无存活敌军的干净检查点）→ 更新存档快照
+    const ws = this.waveManager.state;
+    if (ws !== this._lastWaveState) {
+      this._lastWaveState = ws;
+      if (ws === 'between') this._saveBattle();
     }
 
     // 阻挡分配
@@ -330,12 +349,14 @@ export default class GameScene extends Phaser.Scene {
     if (!this.canPlace(id, col, row)) return false;
     const def = GENERAL_BY_ID[id];
     this.gold -= def.cost;
-    const g = new General(this, def, col, row);
+    const g = new General(this, def, col, row, starOf(id));
     this.generals.set(cellKey(col, row), g);
     this._bondsDirty = true;
     this.fx.impact(g.x, g.y, TILE * 0.8, COLORS.faction[def.faction] || COLORS.gold);
     audio.play('place');
     this._emitState();
+    // 非战斗中（布阵/波间）部署会改变可恢复状态 → 更新存档快照
+    if (this.waveManager.state !== 'running') this._saveBattle();
     return true;
   }
 
@@ -349,6 +370,7 @@ export default class GameScene extends Phaser.Scene {
     this.fx.impact(g.x, g.y, TILE * 0.9, COLORS.gold);
     audio.play('coin');
     this._emitState();
+    if (this.waveManager.state !== 'running') this._saveBattle();
     return true;
   }
 
@@ -362,7 +384,21 @@ export default class GameScene extends Phaser.Scene {
     this._bondsDirty = true;
     audio.play('click');
     this._emitState();
+    if (this.waveManager.state !== 'running') this._saveBattle();
     return refund;
+  }
+
+  // 恢复存档时重建武将（不扣费、不触发部署动画），并恢复其战场等级
+  _placeRestored(id, col, row, level) {
+    const def = GENERAL_BY_ID[id];
+    if (!def) return null;
+    const key = cellKey(col, row);
+    if (this.generals.has(key)) return null;
+    if (this.map.getSlot(col, row) !== slotTypeForClass(def.cls)) return null;
+    const g = new General(this, def, col, row, starOf(id));
+    if (level && level > 1) g.applySavedLevel(level);
+    this.generals.set(key, g);
+    return g;
   }
 
   useUltimate() {
@@ -385,9 +421,12 @@ export default class GameScene extends Phaser.Scene {
     const started = this.waveManager.startNextWave();
     if (started) {
       audio.play('wave');
-      if (wasBetween) {
+      // 续战后首次开波不再发放"提前迎战"奖励：该奖励属于本局推进，
+      // 避免反复"续战→开波→退出"刷取 EARLY_BONUS 金币
+      if (wasBetween && !this._suppressEarlyBonus) {
         this.gold += EARLY_BONUS;
       }
+      this._suppressEarlyBonus = false;
       this._emitState();
     }
     return started;
@@ -452,6 +491,8 @@ export default class GameScene extends Phaser.Scene {
     this.result = result;
     this.registry.set('result', result);
     this.registry.set('levelKey', this.levelKey);
+    // 战局已结束 → 清除存档，避免菜单出现无意义的"继续"
+    clearBattle();
     audio.play(result === 'win' ? 'win' : 'lose');
     this.scene.launch('GameOverScene');
     this.scene.pause();
@@ -475,6 +516,62 @@ export default class GameScene extends Phaser.Scene {
       bonds: this.bondManager.active.map((b) => ({ id: b.id, name: b.name, desc: b.desc })),
       deployedCount: this.generals.size,
     });
+  }
+
+  // ---------------- 存档 / 恢复 ----------------
+  // 快照当前可恢复状态（仅在无存活敌军的检查点调用）
+  _saveBattle() {
+    if (this.ended) return;
+    try {
+      const deployed = [];
+      for (const g of this.generals.values()) {
+        if (g.alive) deployed.push({ id: g.def.id, col: g.col, row: g.row, level: g.level });
+      }
+      saveBattle({
+        levelKey: this.levelKey,
+        waveIndex: this.waveManager.waveIndex,
+        lives: this.lives,
+        gold: Math.floor(this.gold),
+        morale: Math.floor(this.morale),
+        deployed,
+      });
+    } catch {
+      /* 存档失败不影响游玩 */
+    }
+  }
+
+  // 从存档恢复：回到最近一次"波间空档/开局布阵"检查点，重建武将与状态
+  // 返回是否成功恢复（失败则按全新对局处理）
+  _restoreFromSave() {
+    const snap = loadBattle();
+    if (!snap || snap.levelKey !== this.levelKey) return false;
+    try {
+      this.gold = Math.max(0, Math.floor(snap.gold));
+      this.lives = Math.max(0, Math.min(this.maxLives, Math.floor(snap.lives)));
+      this.morale = Math.max(0, Math.floor(snap.morale));
+      // 回到检查点：waveIndex 为"已结束"的波，state 置为 between 以待下一波
+      // 限制在 [-1, 总波数-2]：保证 between 之后总有下一波可开，避免无波可出的软锁
+      const wi = Math.max(-1, Math.min(this.waveManager.totalWaves - 2, Math.floor(snap.waveIndex)));
+      this.waveManager.waveIndex = wi;
+      if (wi < 0) {
+        this.waveManager.state = 'idle';
+      } else {
+        this.waveManager.state = 'between';
+        this.waveManager.betweenDelay = 4.0;
+      }
+      this._lastWaveState = this.waveManager.state;
+      // 续战后首次开波抑制 EARLY_BONUS，防止刷金币
+      this._suppressEarlyBonus = true;
+      // 重建已部署武将
+      for (const d of snap.deployed) {
+        this._placeRestored(d.id, d.col, d.row, d.level);
+      }
+      this._bondsDirty = true;
+      this._recomputeBonds();
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   _cleanup() {

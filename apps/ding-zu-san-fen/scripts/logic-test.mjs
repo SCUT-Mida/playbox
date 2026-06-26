@@ -9,11 +9,14 @@ import { LEVELS, LEVEL_LIST } from '../src/data/levels.js';
 import { GENERALS, GENERAL_BY_ID, LEVEL_MULT, upgradeCost, retreatRefund } from '../src/data/generals.js';
 import { ENEMIES } from '../src/data/enemies.js';
 import {
-  STARTER_GENERALS, DRAW_COST, LEVEL_REWARD, FIRST_CLEAR_BONUS,
-  resetMeta, getMeta, isUnlocked, unlockGeneral,
-  unlockedGenerals, lockedPool, drawWeights, addGold, performDraw, grantLevelClear,
+  STARTER_GENERALS, START_GOLD, DRAW_COST, DRAW_COST_TEN, LEVEL_REWARD, FIRST_CLEAR_BONUS,
+  MAX_STAR, STAR_BONUS, DUPE_GOLD_REFUND, LOCK_FAVOR,
+  resetMeta, getMeta, isUnlocked, unlockGeneral, unlockedGenerals, lockedPool, drawPool,
+  drawWeights, addGold, spendGold, performDraw, performDrawTen, grantLevelClear,
+  generalStar, upgradeStar, starAtkMult, starHpMult,
 } from '../src/data/meta.js';
 import { BONDS, bondsForGeneral, bondPartners } from '../src/data/bonds.js';
+import { saveBattle, loadBattle, hasBattle, clearBattle } from '../src/data/save.js';
 
 let pass = 0;
 let fail = 0;
@@ -131,10 +134,17 @@ ok([...new Set(STARTER_GENERALS)].length === STARTER_GENERALS.length, 'starter r
 // 默认阵容需覆盖三类职业，保证开局可玩
 const starterClasses = new Set(STARTER_GENERALS.map((id) => GENERAL_BY_ID[id].cls));
 ok(starterClasses.size === 3, 'starter covers all 3 classes');
+// 默认阵容跨多国，不再是清一色同国
+const starterFactions = new Set(STARTER_GENERALS.map((id) => GENERAL_BY_ID[id].faction));
+ok(starterFactions.size >= 2, 'starter spans multiple factions');
+// 开局金币足以支持一次十连（初始阵容来自抽卡）
+ok(START_GOLD >= DRAW_COST_TEN, 'start gold covers a 10-pull');
 
 resetMeta();
+ok(getMeta().gold === START_GOLD, 'default gold = START_GOLD');
 ok(unlockedGenerals().length === STARTER_GENERALS.length, 'default unlocked = starter count');
-ok(isUnlocked('guanyu') && isUnlocked('zhuge'), 'starter members unlocked');
+ok(STARTER_GENERALS.every((id) => isUnlocked(id)), 'starter members unlocked');
+ok(STARTER_GENERALS.every((id) => generalStar(id) === 1), 'starter members at 1 star');
 ok(!isUnlocked('lvbu'), 'lvbu locked initially');
 ok(lockedPool().length === GENERALS.length - STARTER_GENERALS.length, 'locked pool size');
 
@@ -145,46 +155,91 @@ ok(r1.first === true, 'huangjin first clear flag');
 ok(r1.bonus === FIRST_CLEAR_BONUS, 'first clear bonus amount');
 ok(r1.total === LEVEL_REWARD.huangjin + FIRST_CLEAR_BONUS, 'first clear total = base + bonus');
 ok(getMeta().cleared.includes('huangjin'), 'cleared recorded');
-ok(getMeta().gold === r1.total, 'gold credited');
+ok(getMeta().gold === START_GOLD + r1.total, 'gold credited on top of start gold');
 const r2 = grantLevelClear('huangjin');
 ok(r2.first === false && r2.bonus === 0, 'repeat clear: no bonus');
 ok(r2.total === LEVEL_REWARD.huangjin, 'repeat clear: base only');
 
-// 抽卡：扣费 + 解锁 + 不重复
+// —— 抽卡：新解锁（rng=0 命中池首项 guanyu，未解锁 → new）——
 resetMeta();
 addGold(10000);
-const before = unlockedGenerals().length;
-const d = performDraw(() => 0); // rng=0 命中池首项
-ok(d && d.id, 'draw returns an id');
-ok(unlockedGenerals().length === before + 1, 'draw unlocks exactly one');
-ok(isUnlocked(d.id), 'drawn general becomes unlocked');
-ok(getMeta().gold === 10000 - DRAW_COST, 'draw deducts DRAW_COST');
+const goldBefore = getMeta().gold;
+const d = performDraw(() => 0);
+ok(d && d.id === 'guanyu', 'draw hits pool[0] = guanyu');
+ok(d.kind === 'new', 'first draw of a locked general is new');
+ok(d.star === 1, 'new unlock star = 1');
+ok(isUnlocked('guanyu') && generalStar('guanyu') === 1, 'drawn general unlocked at 1 star');
+ok(getMeta().gold === goldBefore - DRAW_COST, 'draw deducts DRAW_COST');
 
-// 已集齐：抽卡返回 allCollected 且不扣费
+// —— 抽卡：重复合并升星（已解锁的 guanyu 再抽 → dup → 升星）——
 resetMeta();
-GENERALS.forEach((g) => unlockGeneral(g.id));
-const goldBeforeFull = getMeta().gold;
-const d2 = performDraw(() => 0);
-ok(d2 && d2.allCollected === true, 'draw allCollected when roster complete');
-ok(getMeta().gold === goldBeforeFull, 'no charge when allCollected');
+unlockGeneral('guanyu');
+addGold(10000);
+const dup = performDraw(() => 0);
+ok(dup.id === 'guanyu' && dup.kind === 'dup', 'drawing unlocked guanyu merges (dup)');
+ok(dup.star === 2 && generalStar('guanyu') === 2, 'merge raises star to 2');
+
+// 连续合并至满星，再抽应溢出返金
+let guard = 0;
+while (generalStar('guanyu') < MAX_STAR && guard++ < 50) performDraw(() => 0);
+ok(generalStar('guanyu') === MAX_STAR, 'guanyu reaches MAX_STAR via merges');
+const goldAtMax = getMeta().gold;
+const over = performDraw(() => 0);
+ok(over.kind === 'max', 'drawing max-star general overflows');
+ok(over.refunded === DUPE_GOLD_REFUND, 'overflow refunds DUPE_GOLD_REFUND');
+// 抽卡本身仍扣费，满星溢出仅部分返还：gold = 上次 - 抽卡费 + 返金
+ok(getMeta().gold === goldAtMax - DRAW_COST + DUPE_GOLD_REFUND, 'overflow: cost minus refund');
+
+// 升星 API 边界
+resetMeta();
+ok(upgradeStar(STARTER_GENERALS[0]) === true, 'upgradeStar on unlocked starter = true');
+ok(generalStar(STARTER_GENERALS[0]) === 2, 'upgradeStar incremented to 2');
+ok(upgradeStar('nonsense') === false, 'upgradeStar on unknown id = false');
+
+// 星级属性加成
+ok(starAtkMult(1) === 1 && starHpMult(1) === 1, 'star 1 = baseline 1.0');
+ok(near(starAtkMult(2), 1 + STAR_BONUS.atk), 'star 2 atk mult');
+ok(near(starAtkMult(MAX_STAR), 1 + STAR_BONUS.atk * (MAX_STAR - 1)), 'max star atk mult');
+ok(starAtkMult(0) === 1, 'star 0 treated as baseline');
 
 // 金币不足：返回 null，状态不变
 resetMeta();
-const d3 = performDraw(() => 0);
-ok(d3 === null, 'draw returns null when broke');
+spendGold(getMeta().gold);
+ok(getMeta().gold === 0, 'gold drained to 0');
+ok(performDraw(() => 0) === null, 'draw returns null when broke');
 
-// 权重恒正
+// 抽卡池 = 全部武将；权重恒正且未解锁 ×LOCK_FAVOR
 resetMeta();
-const weights = drawWeights(lockedPool());
-ok(weights.length === lockedPool().length && weights.every((w) => w >= 1), 'weights all >= 1');
+const pool = drawPool();
+ok(pool.length === GENERALS.length, 'draw pool = all generals');
+const weights = drawWeights(pool);
+ok(weights.length === pool.length && weights.every((w) => w >= 1), 'weights all >= 1');
+pool.forEach((g, i) => {
+  const base = Math.max(1, Math.round(260 / g.cost));
+  const expected = STARTER_GENERALS.includes(g.id) ? base : base * LOCK_FAVOR;
+  ok(weights[i] === expected, `weight ${g.id} = ${expected} (got ${weights[i]})`);
+});
 
-// 足够金币下，反复抽可集齐全部（无重复解锁）
+// 十连：扣费、返回 10 条结果
 resetMeta();
 addGold(100000);
-let guard = 0;
-while (lockedPool().length > 0 && guard++ < 100) performDraw(() => 0);
+const tenGoldBefore = getMeta().gold;
+const ten = performDrawTen(() => 0);
+ok(ten && Array.isArray(ten.got) && ten.got.length === 10, 'ten-pull returns 10 results');
+ok(ten.got[0].kind === 'new', 'ten-pull first hit is new (pool[0] locked)');
+// rng=0 全部命中 guanyu：1 new + 4 dup(至满星) + 5 max(返金) → 返金 5×DUPE_GOLD_REFUND
+ok(ten.refunded === 5 * DUPE_GOLD_REFUND, 'ten-pull overflow refunds aggregated');
+ok(getMeta().gold === tenGoldBefore - DRAW_COST_TEN + ten.refunded, 'ten-pull: cost minus total refund');
+
+// 足够金币 + 多样随机：可集齐全部武将
+resetMeta();
+addGold(100000);
+let seed = 12345;
+const variedRng = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+let guard2 = 0;
+while (lockedPool().length > 0 && guard2++ < 5000) performDraw(variedRng);
 ok(lockedPool().length === 0, 'can collect all generals via draws');
-ok(unlockedGenerals().length === GENERALS.length, 'all unlocked after full draws');
+ok(unlockedGenerals().length === GENERALS.length, 'all unlocked after enough draws');
 
 // ---------- 羁绊 match / pool（图鉴搭档） ----------
 console.log('— bonds match/pool —');
@@ -200,6 +255,30 @@ ok(zhugeBonds.includes('wolong'), 'zhuge participates in wolong');
 ok(!zhugeBonds.includes('wuhu'), 'zhuge NOT in wuhu');
 // 每条羁绊都应能 match 到至少一个武将
 ok(BONDS.every((b) => GENERALS.some((g) => b.match(g))), 'every bond matches at least one general');
+
+// ---------- 对局存档 save ----------
+console.log('— save —');
+// save.js 通过 typeof 探测 localStorage；这里注入内存版以做完整往返测试
+const store = {};
+global.localStorage = {
+  getItem: (k) => (Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null),
+  setItem: (k, v) => { store[k] = String(v); },
+  removeItem: (k) => { delete store[k]; },
+};
+ok(hasBattle() === false, 'no battle initially');
+ok(loadBattle() === null, 'loadBattle null when empty');
+saveBattle({ levelKey: 'huangjin', waveIndex: 2, lives: 9, gold: 120, morale: 30, deployed: [{ id: 'guanyu', col: 2, row: 1, level: 2 }] });
+ok(hasBattle() === true, 'has battle after save');
+const snap = loadBattle();
+ok(snap && snap.levelKey === 'huangjin' && snap.waveIndex === 2, 'loadBattle round-trips snapshot');
+ok(snap.lives === 9 && snap.gold === 120 && snap.morale === 30, 'snapshot fields preserved');
+ok(Array.isArray(snap.deployed) && snap.deployed.length === 1 && snap.deployed[0].id === 'guanyu', 'deployed restored');
+clearBattle();
+ok(hasBattle() === false && loadBattle() === null, 'clearBattle removes save');
+// 损坏数据应安全降级（不抛异常，返回 null）
+store['dzsf_battle_v1'] = '{not valid json';
+ok(loadBattle() === null, 'corrupt save → null (no throw)');
+delete global.localStorage;
 
 console.log(`\n结果: ${pass} 通过, ${fail} 失败`);
 process.exit(fail ? 1 : 0);

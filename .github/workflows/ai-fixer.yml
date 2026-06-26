@@ -93,29 +93,36 @@ jobs:
             exit 1
           fi
 
-          # 带重试的 claude 调用（GLM API 偶发 529 过载时自动等 60s 重试）
-          MAX_RETRIES=3
-          for ATTEMPT in $(seq 1 $MAX_RETRIES); do
-            echo "🔄 第 $ATTEMPT/$MAX_RETRIES 次尝试..."
-            set +e
-            claude -p "$(cat "$PROMPT_FILE")" --dangerously-skip-permissions
-            CLAUDE_EXIT=$?
-            set -e
+          # 带模型 fallback 的重试：先 GLM-5.2，529 过载时降级 GLM-5-Turbo
+          CLAUDE_EXIT=1
+          for MODEL in "glm-5.2[1m]" "glm-5-turbo"; do
+            export ANTHROPIC_DEFAULT_SONNET_MODEL="$MODEL"
+            export ANTHROPIC_DEFAULT_OPUS_MODEL="$MODEL"
+            echo "📌 使用模型: $MODEL"
 
-            if [ $CLAUDE_EXIT -eq 0 ]; then
-              echo "✅ Claude 修复完成"
-              break
-            fi
+            for ATTEMPT in 1 2; do
+              echo "🔄 第 $ATTEMPT/2 次尝试..."
+              set +e
+              claude -p "$(cat "$PROMPT_FILE")" --dangerously-skip-permissions
+              CLAUDE_EXIT=$?
+              set -e
 
-            echo "⚠️ 第 $ATTEMPT 次失败 (exit $CLAUDE_EXIT)"
-            if [ $ATTEMPT -lt $MAX_RETRIES ]; then
-              echo "⏳ 等待 120 秒后重试..."
+              if [ $CLAUDE_EXIT -eq 0 ]; then
+                echo "✅ Claude 修复完成 (model: $MODEL)"
+                break 2
+              fi
+
+              echo "⚠️ 第 $ATTEMPT 次失败 (exit $CLAUDE_EXIT)"
+              echo "⏳ 等待 120 秒..."
               sleep 120
-            fi
+            done
+
+            [ $CLAUDE_EXIT -eq 0 ] && break
+            echo "🔄 $MODEL 不可用，切换下一个模型..."
           done
 
           if [ $CLAUDE_EXIT -ne 0 ]; then
-            echo "❌ $MAX_RETRIES 次重试均失败，放弃。"
+            echo "❌ 所有模型和重试均失败，放弃。"
             exit 1
           fi
 

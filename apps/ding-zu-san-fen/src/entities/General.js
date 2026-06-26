@@ -1,6 +1,6 @@
 // General: 武将塔 —— 近战(阻挡)/远程(射击)/策士(法术)，含技能与羁绊 buff
 import { TILE, COLORS, gridToPixel } from '../config.js';
-import { LEVEL_MULT } from '../data/generals.js';
+import { LEVEL_MULT, MAX_LEVEL } from '../data/generals.js';
 
 export default class General {
   constructor(scene, def, col, row) {
@@ -154,7 +154,7 @@ export default class General {
   }
 
   upgrade() {
-    if (this.level >= 3) return false;
+    if (this.level >= MAX_LEVEL) return false;
     this.level++;
     this.maxHp = this._computeMaxHp();
     this.hp = this.maxHp; // 升级回满

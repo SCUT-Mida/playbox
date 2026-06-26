@@ -33,6 +33,9 @@ export default class GameScene extends Phaser.Scene {
     this.level = level;
     this.cameras.main.setBackgroundColor(level.bgTone);
 
+    // 场景（重开）时重置敌人 UID 计数
+    Enemy.resetUid();
+
     // 状态
     this.gold = level.startGold;
     this.maxLives = level.startLives;
@@ -275,6 +278,12 @@ export default class GameScene extends Phaser.Scene {
     this._emitState();
   }
 
+  // 敌人抵达基地（漏怪）：标记漏怪并移出存活集合，交由主循环结算扣血
+  onLeak(e) {
+    e.leaked = true;
+    e.alive = false;
+  }
+
   // ---------------- 部署 / 操作 ----------------
   getSlotInfoAt(px, py) {
     const { col, row } = pixelToGrid(px, py);
@@ -295,6 +304,10 @@ export default class GameScene extends Phaser.Scene {
     if (slotTypeForClass(def.cls) !== slot.type) return false;
     if (slot.occupied) return false;
     if (this.gold < def.cost) return false;
+    // 同名武将唯一：每局每种武将仅可部署一个，避免 BondManager.byId 覆盖
+    for (const g of this.generals.values()) {
+      if (g.def.id === id) return false;
+    }
     return true;
   }
 
@@ -348,9 +361,10 @@ export default class GameScene extends Phaser.Scene {
   }
 
   startNextWave() {
+    // 仅波间空档"提前迎战"才发放奖励，第一波（idle）正常开始不计
+    const wasBetween = this.waveManager.state === 'between';
     const started = this.waveManager.startNextWave();
-    if (started && this.waveManager.state === 'running') {
-      // 提前召唤奖励
+    if (started && wasBetween) {
       this.gold += EARLY_BONUS;
       this._emitState();
     }

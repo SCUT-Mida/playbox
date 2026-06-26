@@ -30,12 +30,18 @@ export default class Enemy {
 
     this.alive = true;
     this.dying = false;
+    this.leaked = false;
     this.id = Enemy._uid++;
 
     this._build();
   }
 
   static _uid = 0;
+
+  // 场景重开时重置 UID 计数，避免无限增长
+  static resetUid() {
+    Enemy._uid = 0;
+  }
 
   _build() {
     const s = this.scene;
@@ -52,7 +58,6 @@ export default class Enemy {
     // 本体
     const body = s.add.graphics();
     const r = (TILE * 0.32) * scale;
-    this._drawShape(body, r);
     body.fillStyle(this.def.color, 1);
     body.lineStyle(2.5, COLORS.ink, 1);
     this._drawShape(body, r);

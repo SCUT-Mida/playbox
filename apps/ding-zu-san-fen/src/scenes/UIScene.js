@@ -315,10 +315,8 @@ export default class UIScene extends Phaser.Scene {
 
   _placementValid(def, slot) {
     if (!slot) return false;
-    if (slotTypeForClass(def.cls) !== slot.type) return false;
-    if (slot.occupied) return false;
-    if (this.gameScene.gold < def.cost) return false;
-    return true;
+    // 统一复用 GameScene.canPlace，保持悬停判定与实际部署一致（含同名唯一性）
+    return this.gameScene.canPlace(def.id, slot.col, slot.row);
   }
 
   _startDrag(def, px, py) {

@@ -135,10 +135,42 @@ function closeGame() {
   loadingEl.hidden = true
   overlay.hidden = true
   playLabel.textContent = '开始游戏'
+  // 重置关闭按钮的二次确认态
+  closeArmed = false
+  closeBtn.classList.remove('is-armed')
+  closeBtn.textContent = '✕'
+  closeBtn.setAttribute('aria-label', '退出游戏')
+}
+
+// 关闭按钮防误触：游戏内右上角悬浮 ✕ 与 HUD 操作区贴近，单点即退容易误触。
+// 改为二次确认——首次点击进入"再按一次退出" armed 态并限时；限时内再次点击才真正退出。
+let closeArmed = false
+let closeArmTimer = null
+function armClose() {
+  closeArmed = true
+  closeBtn.classList.add('is-armed')
+  closeBtn.textContent = '再按退出'
+  closeBtn.setAttribute('aria-label', '再按一次确认退出')
+  if (closeArmTimer) clearTimeout(closeArmTimer)
+  // 1.6s 内未二次确认则自动撤销，回到普通态
+  closeArmTimer = setTimeout(() => {
+    closeArmed = false
+    closeBtn.classList.remove('is-armed')
+    closeBtn.textContent = '✕'
+    closeBtn.setAttribute('aria-label', '退出游戏')
+  }, 1600)
+}
+function handleCloseClick() {
+  if (closeArmed) {
+    if (closeArmTimer) { clearTimeout(closeArmTimer); closeArmTimer = null }
+    closeGame()
+  } else {
+    armClose()
+  }
 }
 
 playBtn.addEventListener('click', openGame)
-closeBtn.addEventListener('click', closeGame)
+closeBtn.addEventListener('click', handleCloseClick)
 // ESC 退出
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !overlay.hidden) closeGame()

@@ -82,9 +82,14 @@ export default class GameOverScene extends Phaser.Scene {
 
     this._button(panel, -130, 90, 220, 64, '再 战 一 局', COLORS.gold, () => {
       audio.play('click');
+      const levelKey = this.registry.get('levelKey');
       this.scene.stop('GameOverScene');
       this.scene.stop('UIScene');
-      this.scene.restart('GameScene');
+      // GameScene 此时处于 pause 态：直接 restart 暂停中的场景在某些情况下不会恢复 update，
+      // 故显式 stop（彻底关闭、清掉 pause 标记）后再以全新对局 start，
+      // 其 create() 会重新 launch UIScene。
+      this.scene.stop('GameScene');
+      this.scene.start('GameScene', { levelKey });
     });
 
     this._button(panel, 130, 90, 220, 64, '返回主菜单', 0x6b5a40, () => {
@@ -122,7 +127,10 @@ export default class GameOverScene extends Phaser.Scene {
       color: '#2c2418',
       fontStyle: 'bold',
     }).setOrigin(0.5));
-    const zone = this.add.zone(x, y, w, h);
+    // 命中区必须落在按钮实际绘制位置：按钮容器 cont 被挂到 panel（屏幕中心）下，
+    // 其视觉中心为 (panel.x + x, panel.y + y)。早期版本把 zone 直接放在 (x,y)，
+    // 即画布左上角附近，导致两个结算按钮都无法点击。这里对齐到面板绝对坐标。
+    const zone = this.add.zone(parent.x + x, parent.y + y, w, h).setDepth(92);
     zone.setInteractive({ useHandCursor: true });
     zone.on('pointerover', () => cont.setScale(1.04));
     zone.on('pointerout', () => cont.setScale(1));
@@ -131,6 +139,5 @@ export default class GameOverScene extends Phaser.Scene {
       this.time.delayedCall(80, onClick);
     });
     parent.add(cont);
-    // zone 不加入容器（独立定位），保持可交互
   }
 }

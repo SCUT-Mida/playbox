@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import {
-  GAME_WIDTH, GAME_HEIGHT, TILE, slotTypeForClass, COLORS,
+  GAME_WIDTH, GAME_HEIGHT, TILE, MAP_Y, slotTypeForClass, COLORS,
 } from '../config.js';
 import { upgradeCost, retreatRefund, MAX_LEVEL } from '../data/generals.js';
 import { unlockedGenerals, generalStar, starAtkMult, starHpMult, MAX_STAR } from '../data/meta.js';
@@ -48,6 +48,7 @@ export default class UIScene extends Phaser.Scene {
     this._menuGen = null; // 当前菜单绑定的武将实例
     this._menuSig = ''; // 触发重建的签名：selection|level|upMax|affordable
     this._menuStat = null; // 就地更新的数值文本引用
+    this._early = null; // 波间"提前迎战"倒计时横幅（场景重启时重置引用，避免悬空）
 
     this._buildTopHud();
     this._buildCardBar();
@@ -72,10 +73,13 @@ export default class UIScene extends Phaser.Scene {
       morale: Math.floor(g.morale),
       ultCost: g.ULT_COST,
       ultReady: g.morale >= g.ULT_COST,
+      earlyBonus: g.EARLY_BONUS,
       wave: g.waveManager.currentWaveNumber,
       totalWaves: g.waveManager.totalWaves,
       waveState: g.waveManager.state,
       betweenRemaining: g.waveManager.betweenRemaining,
+      betweenDelay: g.waveManager.betweenDelay,
+      betweenMax: g.waveManager.betweenMax,
       enemiesAlive: g.enemies.reduce((n, e) => n + (e.alive ? 1 : 0), 0),
       bonds: g.bondManager.active.map((b) => ({ id: b.id, name: b.name, desc: b.desc })),
       deployedCount: g.generals.size,
@@ -282,6 +286,14 @@ export default class UIScene extends Phaser.Scene {
     if (this._codex) {
       audio.play('click');
       this._closeCodex();
+      return;
+    }
+
+    // 0.5) 波间"提前迎战"倒计时横幅：命中即提前开波（+金币奖励）
+    if (this._early && this._hitRects([this._early], px, py)) {
+      audio.play('click');
+      this.tweens.add({ targets: this._early.cont, scale: 0.96, duration: 60, yoyo: true });
+      this.gameScene.startNextWave();
       return;
     }
 
@@ -546,6 +558,7 @@ export default class UIScene extends Phaser.Scene {
 
   // ---------------- 武将操作菜单 ----------------
   _openMenu(general) {
+    audio.play('select');
     this._selected = general;
     this.gameScene.selectGeneral(general);
     this._buildMenu();
@@ -744,25 +757,25 @@ export default class UIScene extends Phaser.Scene {
     this.waveText.setText(main);
     this.waveSubText.setText(sub);
 
-    // 召唤按钮
+    // 召唤按钮：仅 idle 时显示在 HUD；between 时改用更醒目的"提前迎战"倒计时横幅（见 _updateEarlyBanner）
     let ctaLabel = '';
     let ctaEnabled = false;
     if (ws === 'idle') {
       ctaLabel = '开始第一波';
       ctaEnabled = true;
-    } else if (ws === 'between') {
-      ctaLabel = `提前迎战 (+25金)`;
-      ctaEnabled = true;
     }
     this._setBtnLabel(this.ctaContainer, ctaLabel || '——');
     this.ctaContainer.setAlpha(ctaEnabled ? 1 : 0.4);
-    this.ctaContainer.setVisible(ws === 'idle' || ws === 'between');
+    this.ctaContainer.setVisible(ws === 'idle');
     this._topButtons.push({
       rect: { x: this.ctaContainer.x - this.ctaContainer._bw / 2, y: this.ctaContainer.y - this.ctaContainer._bh / 2, w: this.ctaContainer._bw, h: this.ctaContainer._bh },
       action: () => this.gameScene.startNextWave(),
       enabled: ctaEnabled,
       visible: this.ctaContainer.visible,
     });
+
+    // 波间空档：在棋盘空白处呈现可点击的"提前迎战"倒计时横幅（圆环 + 秒数）
+    this._updateEarlyBanner(s);
 
     // 武将卡可负担状态
     for (const card of this.cards) {
@@ -811,6 +824,109 @@ export default class UIScene extends Phaser.Scene {
       this.bondsContainer.add(c);
       x += c._w + gap;
     }
+  }
+
+  // 波间空档的"提前迎战"倒计时横幅：放在棋盘上方的空白处，
+  // 带可点击的圆环倒计时（如 5s），比顶部 HUD 小按钮更易点中、也更醒目。
+  _updateEarlyBanner(s) {
+    if (s.waveState !== 'between') {
+      this._hideEarlyBanner();
+      return;
+    }
+    if (!this._early) this._showEarlyBanner(s);
+    this._refreshEarlyBanner(s);
+  }
+
+  _showEarlyBanner(s) {
+    const cx = GAME_WIDTH / 2;
+    const cy = MAP_Y + 52; // 棋盘上沿内侧的空白区（HUD 下方、敌军入场点附近，波间无怪）
+    const w = 408;
+    const h = 76;
+    const cont = this.add.container(cx, cy).setDepth(72);
+
+    const bg = this.add.graphics();
+    bg.fillStyle(0x000000, 0.35);
+    bg.fillRoundedRect(-w / 2 + 3, -h / 2 + 4, w, h, 14);
+    bg.fillStyle(0x2f5d3a, 0.97);
+    bg.fillRoundedRect(-w / 2, -h / 2, w, h, 14);
+    bg.lineStyle(3, 0x6fd08a, 0.95);
+    bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 14);
+    cont.add(bg);
+
+    // 倒计时圆环（左侧）
+    const ringX = -w / 2 + 40;
+    const ringBg = this.add.graphics();
+    ringBg.lineStyle(5, 0x10301a, 0.9);
+    ringBg.strokeCircle(ringX, 0, 22);
+    cont.add(ringBg);
+    const ring = this.add.graphics();
+    cont.add(ring);
+
+    const numTxt = this.add.text(ringX, 0, '5', {
+      fontFamily: 'serif', fontSize: '26px', color: '#eafff0', fontStyle: 'bold',
+    }).setOrigin(0.5);
+    cont.add(numTxt);
+
+    cont.add(this.add.text(-w / 2 + 76, -16, '提 前 迎 战', {
+      fontFamily: 'serif', fontSize: '24px', color: '#eafff0', fontStyle: 'bold',
+    }).setOrigin(0, 0.5));
+    const bonusTxt = this.add.text(-w / 2 + 76, 14, '', {
+      fontFamily: '"PingFang SC",sans-serif', fontSize: '14px', color: '#9affb8',
+    }).setOrigin(0, 0.5);
+    cont.add(bonusTxt);
+
+    cont.add(this.add.text(w / 2 - 20, 0, '▶', {
+      fontFamily: 'serif', fontSize: '24px', color: '#9affb8',
+    }).setOrigin(0.5));
+
+    // 入场动画
+    cont.setScale(0.85).setAlpha(0);
+    this.tweens.add({ targets: cont, scale: 1, alpha: 1, duration: 180, ease: 'Back.Out' });
+
+    // 悬停反馈区（命中与点击交由 _onDown 统一处理，与其它按钮一致，避免重复触发）
+    const zone = this.add.zone(cx, cy, w, h).setInteractive({ useHandCursor: true }).setDepth(73);
+    zone.on('pointerover', () => cont.setScale(1.03));
+    zone.on('pointerout', () => cont.setScale(1));
+
+    this._early = {
+      cont, ring, ringX, numTxt, bonusTxt, zone,
+      rect: { x: cx - w / 2, y: cy - h / 2, w, h },
+      lastSec: -1,
+    };
+    this._refreshEarlyBanner(s);
+  }
+
+  _refreshEarlyBanner(s) {
+    if (!this._early) return;
+    const { ring, ringX, numTxt, bonusTxt, lastSec } = this._early;
+    const max = s.betweenMax || 5;
+    const ratio = Math.max(0, Math.min(1, (s.betweenDelay ?? 0) / max));
+    // 圆环从满到空顺时针消减
+    ring.clear();
+    ring.lineStyle(5, 0x9affb8, 1);
+    ring.beginPath();
+    ring.arc(ringX, 0, 22, -Math.PI / 2, -Math.PI / 2 + ratio * Math.PI * 2, false);
+    ring.strokePath();
+    const sec = Math.max(0, s.betweenRemaining);
+    numTxt.setText(String(sec));
+    bonusTxt.setText(`立即开波 · 奖 +${s.earlyBonus ?? 25} 金`);
+    // 每秒滴答，最后 3 秒更急促的视觉
+    if (sec !== lastSec) {
+      this._early.lastSec = sec;
+      if (sec > 0 && sec <= 3) {
+        audio.play('countdown');
+        numTxt.setColor(sec <= 3 ? '#ffd27a' : '#eafff0');
+      } else {
+        numTxt.setColor('#eafff0');
+      }
+    }
+  }
+
+  _hideEarlyBanner() {
+    if (!this._early) return;
+    this._early.zone.destroy();
+    this._early.cont.destroy(true);
+    this._early = null;
   }
 
   update() {

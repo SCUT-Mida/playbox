@@ -46,21 +46,19 @@
 
 ## `.ai-tasks/` 交互文档系统
 
-流水线各角色之间不直接传参，而是通过 `.ai-tasks/issue-N/` 目录下的 **Markdown 文档** 交换信息。一个核心脚本 [`generate-ai-task.sh`](.ai-tasks/scripts/generate-ai-task.sh) 负责按角色和轮次生成提示词文件。
+流水线各角色之间不直接传参，而是通过 `.ai-tasks/issue-N/` 目录下的 **Markdown 文档** 交换信息。每条 workflow 各自内联生成自己的提示词文件（曾经有一个共享脚本 `generate-ai-task.sh`，但因为 workflow 从 main 运行而脚本从 PR 分支 checkout，版本容易不一致，已删除改为内联）。
 
 ```
 .ai-tasks/
-  scripts/
-    generate-ai-task.sh          # 提示词生成脚本（coder / reviewer / fixer 三种角色）
   issue-3/                       # 每个 Issue 运行时自动建一个目录
     context.md                   #   coder 写入：Issue 原文
-    ai-coder-prompt.md           #   coder 的提示词
+    ai-coder-prompt.md           #   coder 的提示词（workflow 内联生成）
     pr_diff_r1.md                #   reviewer 第 1 轮：git diff origin/main...HEAD
-    ai-reviewer-prompt_r1.md     #   reviewer 第 1 轮的提示词
+    ai-reviewer-prompt_r1.md     #   reviewer 第 1 轮的提示词（workflow 内联生成）
     review_result_r1.md          #   reviewer 第 1 轮输出（含 DECISION + COMMENT）
-    review_feedback_round-1.md   #   fixer 第 1 轮：从 PR 评论提取的审查意见
-    fixer-round-1.md             #   fixer 第 1 轮的提示词
-    ...                          #   多轮修复时文件名带递增轮次号 _r2 / round-2 ...
+    fixer-feedback_r1.md         #   fixer 第 1 轮：从 PR 评论提取的审查意见
+    fixer-prompt_r1.md           #   fixer 第 1 轮的提示词（workflow 内联生成）
+    ...                          #   多轮修复时文件名带递增轮次号 _r2 ...
 ```
 
 **轮次计算**：Reviewer 和 Fixer 各自通过 `find` 统计已有文件数量来推算当前是第几轮，文件名带 `_r${N}` 或 `-round-${N}` 后缀，天然支持无限轮次循环。
@@ -135,9 +133,7 @@ playbox/
 │   ├── ai-fixer.yml          /claude-fix → 修复
 │   ├── auto-merge.yml        # approve → 合并
 │   └── deploy-pages.yml      # main → Pages 部署
-├── .ai-tasks/
-│   └── scripts/
-│       └── generate-ai-task.sh   # 提示词生成核心脚本
+├── .ai-tasks/                     # 运行时生成的提示词/审查文档（每 Issue 一个子目录）
 ├── .gitattributes            # 强制 YAML/sh 用 LF（防 CRLF 泄漏）
 ├── index.html                # 主框架入口
 ├── src/                      # 主框架源码（落地页）

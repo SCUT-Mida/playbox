@@ -33,14 +33,28 @@ jobs:
               body: `🚀 **Claude Code 已接管任务**！\n\n开始分析Issue并准备实现代码，请耐心等候...`
             });
 
-      - name: 📝 Generate Prompt via Local Script
+      - name: 📝 Generate Coder Prompt (inline, 不依赖脚本)
         env:
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_BODY: ${{ github.event.issue.body }}
         run: |
-          # 赋予脚本执行权限并调用
-          chmod +x ./.ai-tasks/scripts/generate-ai-task.sh
-          ./.ai-tasks/scripts/generate-ai-task.sh ".ai-tasks/issue-${{ github.event.issue.number }}" "coder"
+          TASK_DIR=".ai-tasks/issue-${{ github.event.issue.number }}"
+          mkdir -p "$TASK_DIR"
+
+          printf '%s\n' "$ISSUE_BODY" > "$TASK_DIR/context.md"
+
+          {
+            echo "你是一个资深开发者。请解决以下 GitHub Issue："
+            echo "【任务标题】: $ISSUE_TITLE"
+            echo "【详细需求】: 请直接阅读当前目录下的 ${TASK_DIR}/context.md 文件获取。"
+            echo ""
+            echo "【⚠️ 严格红线规则】："
+            echo "请绝对不要修改、重命名或生成 .github/ 目录下的任何文件 (特别是 workflows 等 CI/CD 配置)，这会破坏项目的自动化流程！如果觉得有必要修改，请在回复中用文字建议人类去改，绝不要自己动手改。"
+            echo ""
+            echo "请直接分析并修改项目中的代码文件来解决这个问题，不要做过多的文字解释。"
+          } > "$TASK_DIR/ai-coder-prompt.md"
+
+          echo "📁 提示词已生成，大小：$(wc -c < "$TASK_DIR/ai-coder-prompt.md") bytes"
 
       - name: 🛠️ Execute Claude Code Agent
         env:
@@ -61,9 +75,37 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "ai-fix/issue-${{ github.event.issue.number }}"
           
-          # 直接读取生成好的 MD 文件传给 Claude
-          claude -p "$(cat $TASK_DIR/ai-coder-prompt.md)" --dangerously-skip-permissions
-          
+          PROMPT_FILE="$TASK_DIR/ai-coder-prompt.md"
+          if [ ! -f "$PROMPT_FILE" ]; then
+            echo "❌ 致命错误：提示词文件 $PROMPT_FILE 不存在。"
+            exit 1
+          fi
+
+          # 带重试的 claude 调用（GLM API 偶发 529 过载时自动等 60s 重试）
+          MAX_RETRIES=3
+          for ATTEMPT in $(seq 1 $MAX_RETRIES); do
+            echo "🔄 第 $ATTEMPT/$MAX_RETRIES 次尝试..."
+            set +e
+            claude -p "$(cat "$PROMPT_FILE")" --dangerously-skip-permissions
+            CLAUDE_EXIT=$?
+            set -e
+
+            if [ $CLAUDE_EXIT -eq 0 ]; then
+              echo "✅ Claude 实现完成"
+              break
+            fi
+            echo "⚠️ 第 $ATTEMPT 次失败 (exit $CLAUDE_EXIT)"
+            if [ $ATTEMPT -lt $MAX_RETRIES ]; then
+              echo "⏳ 等待 60 秒后重试..."
+              sleep 60
+            fi
+          done
+
+          if [ $CLAUDE_EXIT -ne 0 ]; then
+            echo "❌ $MAX_RETRIES 次重试均失败，放弃。"
+            exit 1
+          fi
+
           if [ -z "$(git status --porcelain)" ]; then
             echo "⚠️ 警告: AI 没有修改任何代码文件！"
           else

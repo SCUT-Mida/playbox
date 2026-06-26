@@ -5,6 +5,11 @@ TASK_DIR=$1
 ROLE=$2
 ROUND=${3:-0}
 
+# 防御性剥离 \r：即使上游调用方传入了带 \r 的参数（Windows CRLF 泄漏），也能安全处理
+TASK_DIR="${TASK_DIR%$'\r'}"
+ROLE="${ROLE%$'\r'}"
+ROUND="${ROUND%$'\r'}"
+
 mkdir -p "$TASK_DIR"
 
 if [ "$ROLE" == "coder" ]; then

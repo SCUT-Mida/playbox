@@ -28,11 +28,13 @@ jobs:
         run: |
           ISSUE_NUMBER=$(echo "$HEAD_REF" | grep -oiE 'issue-[0-9]+' | grep -oiE '[0-9]+' | head -n 1)
           if [ -z "$ISSUE_NUMBER" ]; then ISSUE_NUMBER=${{ github.event.pull_request.number }}; fi
-          
+          ISSUE_NUMBER="${ISSUE_NUMBER%$'\r'}"
+
           TASK_DIR=".ai-tasks/issue-${ISSUE_NUMBER}"
           echo "TASK_DIR=$TASK_DIR" >> $GITHUB_ENV
-          
-          EXISTING_REVIEWS=$(ls -1 "$TASK_DIR"/review_result_r*.md 2>/dev/null | wc -l)
+
+          # find 即使无匹配也 exit 0，在 set -eo pipefail 下安全（ls 无匹配会 exit 2 导致整步崩溃）
+          EXISTING_REVIEWS=$(find "$TASK_DIR" -maxdepth 1 -name 'review_result_r*.md' 2>/dev/null | wc -l)
           CURRENT_ROUND=$((EXISTING_REVIEWS + 1))
           echo "CURRENT_ROUND=$CURRENT_ROUND" >> $GITHUB_ENV
           
@@ -59,7 +61,11 @@ jobs:
           OUTPUT_FILE="$TASK_DIR/review_result_r${ROUND}.md"
           
           echo "正在读取 $PROMPT_FILE 并执行审查..."
-          claude -p "$(cat $PROMPT_FILE)" --dangerously-skip-permissions > "$OUTPUT_FILE"
+          if [ ! -f "$PROMPT_FILE" ]; then
+            echo "❌ 致命错误：提示词文件 $PROMPT_FILE 不存在，生成步骤可能失败。"
+            exit 1
+          fi
+          claude -p "$(cat "$PROMPT_FILE")" --dangerously-skip-permissions > "$OUTPUT_FILE"
 
       - name: ⚙️ Parse Review & Action
         env:

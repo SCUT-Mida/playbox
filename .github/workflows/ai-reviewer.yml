@@ -22,7 +22,7 @@ jobs:
         with:
           node-version: '24'
 
-      - name: 📝 Generate Prompt via Local Script
+      - name: 📝 Generate Reviewer Prompt (inline, 不依赖 PR 分支脚本)
         env:
           HEAD_REF: ${{ github.head_ref }}
         run: |
@@ -31,16 +31,31 @@ jobs:
           ISSUE_NUMBER="${ISSUE_NUMBER%$'\r'}"
 
           TASK_DIR=".ai-tasks/issue-${ISSUE_NUMBER}"
+          mkdir -p "$TASK_DIR"
           echo "TASK_DIR=$TASK_DIR" >> $GITHUB_ENV
 
-          # find 即使无匹配也 exit 0，在 set -eo pipefail 下安全（ls 无匹配会 exit 2 导致整步崩溃）
           EXISTING_REVIEWS=$(find "$TASK_DIR" -maxdepth 1 -name 'review_result_r*.md' 2>/dev/null | wc -l)
           CURRENT_ROUND=$((EXISTING_REVIEWS + 1))
           echo "CURRENT_ROUND=$CURRENT_ROUND" >> $GITHUB_ENV
-          
-          sed -i 's/\r$//' ./.ai-tasks/scripts/generate-ai-task.sh
-          chmod +x ./.ai-tasks/scripts/generate-ai-task.sh
-          ./.ai-tasks/scripts/generate-ai-task.sh "$TASK_DIR" "reviewer" "$CURRENT_ROUND"
+
+          # 生成 diff 文件
+          git fetch origin main
+          git diff origin/main...HEAD > "$TASK_DIR/pr_diff_r${CURRENT_ROUND}.md"
+
+          # 内联生成提示词（不再调用 PR 分支上的脚本）
+          {
+            echo "你是一个极其严格、甚至有些刁钻的资深代码审查员。"
+            echo "这是代码提交后的【第 ${CURRENT_ROUND} 轮】审查。"
+            echo "请阅读当前目录下的 ${TASK_DIR}/pr_diff_r${CURRENT_ROUND}.md 文件，这是本次 PR 的代码变更。"
+            echo ""
+            echo "请检查是否有 Bug、逻辑错误、安全问题或性能瓶颈。"
+            echo "请严格按照以下纯文本格式输出你的审查结果，不要输出其他任何内容："
+            echo "DECISION: APPROVE 或 REQUEST_CHANGES"
+            echo "COMMENT: 你的详细审查意见 (如果你的意见中涉及需要修改 CI/CD 或 workflows，请告知人类手动处理)"
+          } > "$TASK_DIR/ai-reviewer-prompt_r${CURRENT_ROUND}.md"
+
+          echo "📁 提示词已生成，文件大小：$(wc -c < "$TASK_DIR/ai-reviewer-prompt_r${CURRENT_ROUND}.md") bytes"
+          echo "📁 diff 文件大小：$(wc -c < "$TASK_DIR/pr_diff_r${CURRENT_ROUND}.md") bytes"
 
       - name: 🤖 Execute Claude Code Agent (Reviewer)
         env:
@@ -56,16 +71,31 @@ jobs:
           ROUND: ${{ env.CURRENT_ROUND }}
         run: |
           npm install -g @anthropic-ai/claude-code
-          
+
           PROMPT_FILE="$TASK_DIR/ai-reviewer-prompt_r${ROUND}.md"
           OUTPUT_FILE="$TASK_DIR/review_result_r${ROUND}.md"
-          
+
           echo "正在读取 $PROMPT_FILE 并执行审查..."
           if [ ! -f "$PROMPT_FILE" ]; then
-            echo "❌ 致命错误：提示词文件 $PROMPT_FILE 不存在，生成步骤可能失败。"
+            echo "❌ 致命错误：提示词文件 $PROMPT_FILE 不存在。"
             exit 1
           fi
-          claude -p "$(cat "$PROMPT_FILE")" --dangerously-skip-permissions > "$OUTPUT_FILE"
+
+          # 暂时关 set -e，捕获 claude 的退出码和错误输出
+          set +e
+          claude -p "$(cat "$PROMPT_FILE")" --dangerously-skip-permissions > "$OUTPUT_FILE" 2>&1
+          CLAUDE_EXIT=$?
+          set -e
+
+          if [ $CLAUDE_EXIT -ne 0 ]; then
+            echo "❌ Claude 审查失败 (exit code: $CLAUDE_EXIT)"
+            echo "=== Claude 输出/错误信息 ==="
+            cat "$OUTPUT_FILE"
+            echo "=== end ==="
+            exit 1
+          fi
+
+          echo "✅ Claude 审查完成"
 
       - name: ⚙️ Parse Review & Action
         env:

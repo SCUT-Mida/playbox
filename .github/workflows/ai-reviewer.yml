@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
+      contents: write
+      issues: write
 
     steps:
       - name: 📥 Checkout code
@@ -117,11 +119,12 @@ jobs:
             exit 1
           fi
 
-      - name: ⚙️ Parse Review & Action
+      - name: ⚙️ Parse Review & Action (approve→merge→close→deploy 一体)
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
           BOT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.head_ref }}
           TASK_DIR: ${{ env.TASK_DIR }}
           ROUND: ${{ env.CURRENT_ROUND }}
         run: |
@@ -131,11 +134,23 @@ jobs:
           COMMENT=$(sed -n '/^COMMENT:/,$p' "$RESULT_FILE" | sed 's/^COMMENT://' | tr -d '\r')
 
           if [ "$DECISION" = "APPROVE" ]; then
-            echo "✅ 代码审查通过，批准合并..."
-            # 用 BOT_TOKEN (Actions bot) 批准，避免 PAT_TOKEN 与 PR 作者相同导致 "can not approve your own PR"
+            echo "✅ 代码审查通过！"
+            # 1. bot 批准（避免 PAT 用户 approve 自己的 PR）
             GH_TOKEN="$BOT_TOKEN" gh pr review $PR_NUMBER --approve --body "🕵️ AI 审查通过！代码质量优秀。\n\n$COMMENT"
+
+            # 2. 立即合并（用 PAT_TOKEN，GITHUB_TOKEN 合并不触发 deploy）
+            echo "🔄 合并 PR..."
+            gh pr merge $PR_NUMBER --squash --delete-branch
+
+            # 3. 关闭关联 Issue
+            ISSUE_NUMBER=$(echo "$HEAD_REF" | grep -oiE 'issue-[0-9]+' | grep -oiE '[0-9]+' | head -n 1)
+            if [ -n "$ISSUE_NUMBER" ]; then
+              echo "🏁 关闭 Issue #$ISSUE_NUMBER..."
+              gh issue close $ISSUE_NUMBER --comment "🤖 本问题已通过自动化流水线解决并合并。"
+            fi
+            echo "✅ 全流程完成：审查通过 → 已合并 → Issue 已关闭 → deploy 已触发"
           else
             echo "❌ 代码审查不通过，触发 AI-Fixer..."
-            # 用 PAT_TOKEN 评论，因为 issue_comment 事件不触发 GITHUB_TOKEN 的评论
+            # 用 PAT_TOKEN 评论（GITHUB_TOKEN 评论不触发 issue_comment 事件）
             gh pr comment $PR_NUMBER --body "/claude-fix 🛠️ **请立即根据以下审查意见修改代码：** \n\n> 以下是第 $ROUND 轮审查未通过的意见：\n\n$COMMENT"
           fi

@@ -123,6 +123,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
           ROUND: ${{ env.CURRENT_ROUND }}
+          BRANCH: ${{ steps.pr_data.outputs.branch }}
         run: |
           if [ -z "$(git status --porcelain)" ]; then
             echo "⚠️ 警告: AI 没有修改任何代码文件！"
@@ -130,5 +131,7 @@ jobs:
             echo "✅ 发现代码修改，准备提交第 ${ROUND} 轮修复"
             git add .
             git commit -m "🛠️ fix: 根据审查员意见完成第 ${ROUND} 轮代码重构 (归档交互文档)"
-            git push
+            # 先拉远端最新再推（处理并发推送冲突，如 main 合入导致远端更新）
+            git pull --rebase origin "$BRANCH" || { echo "❌ Rebase 冲突，需人工介入"; git rebase --abort 2>/dev/null; exit 1; }
+            git push origin "$BRANCH" || { echo "❌ Push 失败"; exit 1; }
           fi

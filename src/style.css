@@ -229,6 +229,38 @@ header {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
 }
 
+/* 竖屏旋转提示：游戏为横屏设计，竖屏游玩时遮罩提示用户旋转设备。
+   仅在 overlay 打开（游戏进行中）且竖屏时显示，不影响落地页本身。 */
+.orientation-hint {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: #1a1410;
+  color: #e8d9b5;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+}
+
+.orientation-hint__title {
+  font-size: 1.5rem;
+  margin: 0 0 0.75rem;
+}
+
+.orientation-hint__desc {
+  font-size: 0.9rem;
+  opacity: 0.85;
+  line-height: 1.6;
+}
+
+@media (orientation: portrait) {
+  .orientation-hint {
+    display: flex;
+  }
+}
+
 .game-mount {
   position: absolute;
   inset: 0;

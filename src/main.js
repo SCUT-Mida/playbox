@@ -42,6 +42,12 @@ app.innerHTML = `
   </main>
 
   <div class="game-overlay" id="game-overlay" hidden>
+    <div class="orientation-hint">
+      <div>
+        <p class="orientation-hint__title">📱 请横屏游玩</p>
+        <p class="orientation-hint__desc">《鼎足三分》为横屏设计，请旋转设备以获得最佳体验。</p>
+      </div>
+    </div>
     <div class="game-stage">
       <button class="game-close" id="game-close" type="button" aria-label="退出游戏">✕</button>
       <div class="game-loading" id="game-loading">
@@ -66,7 +72,8 @@ let loading = false
 let loadSeq = 0 // 取消令牌：每次 closeGame / 重新 openGame 递增，使飞行中的加载作废
 
 async function openGame() {
-  // 若游戏已存在，仅恢复 overlay 显示（不重复创建）
+  // 防御性守卫：当前状态机下 game 在 closeGame 后恒为 null，此分支不可达；
+  // 保留以兜底未来可能的「后台保活」改动——若 game 仍存活则仅恢复显示、不重复创建。
   if (game) {
     overlay.hidden = false
     return
@@ -113,6 +120,11 @@ async function openGame() {
 function closeGame() {
   // 递增取消令牌，使飞行中的 openGame import 作废
   loadSeq++
+  // 入口状态唯一收口：取消后立即释放按钮，不依赖飞行中的 import() 何时 settle
+  // （避免慢网/请求挂起时 playBtn 长时间或永久 disabled 的死锁）
+  loading = false
+  playBtn.disabled = false
+  playBtn.classList.remove('is-loading')
 
   if (game) {
     game.destroy(true)

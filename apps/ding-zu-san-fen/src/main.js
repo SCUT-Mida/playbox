@@ -32,10 +32,8 @@ export function createGame(parent) {
 
 // 独立运行时自动挂载到 #game-container（仅在元素存在时触发，
 // 避免被主框架动态 import 时误启动游戏）。
-if (typeof document !== 'undefined' && document.getElementById('game-container')) {
+if (document.getElementById('game-container')) {
   const game = createGame('game-container');
   // 暴露实例便于调试 / 自动化冒烟测试
-  if (typeof window !== 'undefined') {
-    window.__GAME = game;
-  }
+  window.__GAME = game;
 }

@@ -2,6 +2,7 @@
 import { TILE, COLORS, gridToPixel } from '../config.js';
 import { LEVEL_MULT, MAX_LEVEL } from '../data/generals.js';
 import { drawChibi, optsForGeneral } from '../utils/Chibi.js';
+import audio from '../audio/Audio.js';
 
 export default class General {
   constructor(scene, def, col, row) {
@@ -180,6 +181,7 @@ export default class General {
   takeDamageFromEnemy(dmg) {
     if (!this.alive) return;
     this.hp -= dmg;
+    audio.play('hurt');
     // 受击闪白（小人整体瞬时变暗再恢复）
     if (this.body) {
       this.body.setAlpha(0.45);
@@ -276,6 +278,7 @@ export default class General {
     if (this.def.cls === 'MELEE') {
       target.takeDamage(dmg, this.def.dmgType);
       scene.fx.slash(target.x, target.y, 0xffe9a8);
+      audio.play('slash');
       this.pulse(1.12);
       return;
     }
@@ -286,12 +289,14 @@ export default class General {
       kind,
       color: this.def.cls === 'MAGE' ? 0xb08bd6 : 0xfff0c0,
     });
+    audio.play(this.def.cls === 'MAGE' ? 'magic' : 'shoot');
     this.pulse(1.1);
   }
 
   triggerSkill(target, scene) {
     const skill = this.def.skill;
     this.pulse(1.25);
+    audio.play('skill');
 
     if (skill.type === 'AOE') {
       // 围绕自身的范围物理/法术伤害

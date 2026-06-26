@@ -6,8 +6,14 @@ import MapManager from '../src/managers/MapManager.js';
 import WaveManager from '../src/managers/WaveManager.js';
 import BondManager from '../src/managers/BondManager.js';
 import { LEVELS, LEVEL_LIST } from '../src/data/levels.js';
-import { GENERAL_BY_ID, LEVEL_MULT, upgradeCost, retreatRefund } from '../src/data/generals.js';
+import { GENERALS, GENERAL_BY_ID, LEVEL_MULT, upgradeCost, retreatRefund } from '../src/data/generals.js';
 import { ENEMIES } from '../src/data/enemies.js';
+import {
+  STARTER_GENERALS, DRAW_COST, LEVEL_REWARD, FIRST_CLEAR_BONUS,
+  resetMeta, getMeta, isUnlocked, unlockGeneral,
+  unlockedGenerals, lockedPool, drawWeights, addGold, performDraw, grantLevelClear,
+} from '../src/data/meta.js';
+import { BONDS, bondsForGeneral, bondPartners } from '../src/data/bonds.js';
 
 let pass = 0;
 let fail = 0;
@@ -117,6 +123,83 @@ for (const [k, e] of Object.entries(ENEMIES)) {
   ok(e.hp > 0 && e.speed > 0 && e.gold > 0, `enemy ${k} valid`);
   ok(['NONE', 'PHYSICAL', 'HEAVY', 'MAGIC'].includes(e.armor), `enemy ${k} armor type valid`);
 }
+
+// ---------- 元进度 meta ----------
+console.log('— meta —');
+ok(STARTER_GENERALS.length >= 3, 'starter roster size >= 3');
+ok([...new Set(STARTER_GENERALS)].length === STARTER_GENERALS.length, 'starter roster no dup');
+// 默认阵容需覆盖三类职业，保证开局可玩
+const starterClasses = new Set(STARTER_GENERALS.map((id) => GENERAL_BY_ID[id].cls));
+ok(starterClasses.size === 3, 'starter covers all 3 classes');
+
+resetMeta();
+ok(unlockedGenerals().length === STARTER_GENERALS.length, 'default unlocked = starter count');
+ok(isUnlocked('guanyu') && isUnlocked('zhuge'), 'starter members unlocked');
+ok(!isUnlocked('lvbu'), 'lvbu locked initially');
+ok(lockedPool().length === GENERALS.length - STARTER_GENERALS.length, 'locked pool size');
+
+// 通关奖励：首通含额外奖励，重复通关仅基础
+resetMeta();
+const r1 = grantLevelClear('huangjin');
+ok(r1.first === true, 'huangjin first clear flag');
+ok(r1.bonus === FIRST_CLEAR_BONUS, 'first clear bonus amount');
+ok(r1.total === LEVEL_REWARD.huangjin + FIRST_CLEAR_BONUS, 'first clear total = base + bonus');
+ok(getMeta().cleared.includes('huangjin'), 'cleared recorded');
+ok(getMeta().gold === r1.total, 'gold credited');
+const r2 = grantLevelClear('huangjin');
+ok(r2.first === false && r2.bonus === 0, 'repeat clear: no bonus');
+ok(r2.total === LEVEL_REWARD.huangjin, 'repeat clear: base only');
+
+// 抽卡：扣费 + 解锁 + 不重复
+resetMeta();
+addGold(10000);
+const before = unlockedGenerals().length;
+const d = performDraw(() => 0); // rng=0 命中池首项
+ok(d && d.id, 'draw returns an id');
+ok(unlockedGenerals().length === before + 1, 'draw unlocks exactly one');
+ok(isUnlocked(d.id), 'drawn general becomes unlocked');
+ok(getMeta().gold === 10000 - DRAW_COST, 'draw deducts DRAW_COST');
+
+// 已集齐：抽卡返回 allCollected 且不扣费
+resetMeta();
+GENERALS.forEach((g) => unlockGeneral(g.id));
+const goldBeforeFull = getMeta().gold;
+const d2 = performDraw(() => 0);
+ok(d2 && d2.allCollected === true, 'draw allCollected when roster complete');
+ok(getMeta().gold === goldBeforeFull, 'no charge when allCollected');
+
+// 金币不足：返回 null，状态不变
+resetMeta();
+const d3 = performDraw(() => 0);
+ok(d3 === null, 'draw returns null when broke');
+
+// 权重恒正
+resetMeta();
+const weights = drawWeights(lockedPool());
+ok(weights.length === lockedPool().length && weights.every((w) => w >= 1), 'weights all >= 1');
+
+// 足够金币下，反复抽可集齐全部（无重复解锁）
+resetMeta();
+addGold(100000);
+let guard = 0;
+while (lockedPool().length > 0 && guard++ < 100) performDraw(() => 0);
+ok(lockedPool().length === 0, 'can collect all generals via draws');
+ok(unlockedGenerals().length === GENERALS.length, 'all unlocked after full draws');
+
+// ---------- 羁绊 match / pool（图鉴搭档） ----------
+console.log('— bonds match/pool —');
+const guanyuBonds = bondsForGeneral(GENERAL_BY_ID.guanyu).map((b) => b.id);
+ok(guanyuBonds.includes('wuhu'), 'guanyu participates in wuhu');
+ok(guanyuBonds.includes('taoyuan'), 'guanyu participates in taoyuan');
+const taoyuan = BONDS.find((b) => b.id === 'taoyuan');
+const partners = bondPartners(taoyuan, GENERAL_BY_ID.guanyu);
+ok(partners.includes('张飞') && partners.includes('赵云'), 'taoyuan partners for guanyu');
+ok(!partners.includes('关羽'), 'partners excludes self');
+const zhugeBonds = bondsForGeneral(GENERAL_BY_ID.zhuge).map((b) => b.id);
+ok(zhugeBonds.includes('wolong'), 'zhuge participates in wolong');
+ok(!zhugeBonds.includes('wuhu'), 'zhuge NOT in wuhu');
+// 每条羁绊都应能 match 到至少一个武将
+ok(BONDS.every((b) => GENERALS.some((g) => b.match(g))), 'every bond matches at least one general');
 
 console.log(`\n结果: ${pass} 通过, ${fail} 失败`);
 process.exit(fail ? 1 : 0);

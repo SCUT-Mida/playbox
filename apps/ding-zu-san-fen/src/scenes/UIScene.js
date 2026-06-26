@@ -2,9 +2,10 @@ import Phaser from 'phaser';
 import {
   GAME_WIDTH, GAME_HEIGHT, TILE, slotTypeForClass, COLORS,
 } from '../config.js';
-import { GENERALS } from '../data/generals.js';
 import { upgradeCost, retreatRefund, MAX_LEVEL } from '../data/generals.js';
+import { unlockedGenerals } from '../data/meta.js';
 import { drawChibi, optsForGeneral } from '../utils/Chibi.js';
+import audio from '../audio/Audio.js';
 
 // 布局常量（竖屏 720×1280）
 const HUD_TOP = 8;
@@ -47,6 +48,8 @@ export default class UIScene extends Phaser.Scene {
     this._buildTopHud();
     this._buildCardBar();
 
+    // 浏览器策略：首次点击解锁 AudioContext
+    this.input.once('pointerdown', () => audio.unlock());
     this.input.on('pointerdown', (p) => this._onDown(p));
     this.input.on('pointermove', (p) => this._onMove(p));
     this.input.on('pointerup', (p) => this._onUp(p));
@@ -186,17 +189,20 @@ export default class UIScene extends Phaser.Scene {
       fontFamily: 'serif', fontSize: '20px', color: '#c9a35a',
     }).setOrigin(0, 0.5).setDepth(6).setAlpha(0.7);
 
-    // 14 张武将卡分两行（每行 7 张），水平居中排布
-    const perRow = CARDS_PER_ROW;
-    const totalW = perRow * CARD_W + (perRow - 1) * CARD_GAP;
-    const startX = (GAME_WIDTH - totalW) / 2 + CARD_W / 2;
-    GENERALS.forEach((def, i) => {
-      const row = Math.floor(i / perRow);
-      const colm = i % perRow;
-      const cx = startX + colm * (CARD_W + CARD_GAP);
-      const cy = row === 0 ? CARD_ROW1_CY : CARD_ROW2_CY;
-      this.cards.push(this._buildCard(cx, cy, def));
-    });
+    // 仅展示已解锁武将，按行（每行至多 7 张）居中排布；解锁越多行数越多
+    const list = unlockedGenerals();
+    for (let i = 0; i < list.length; i += CARDS_PER_ROW) {
+      const rowList = list.slice(i, i + CARDS_PER_ROW);
+      const n = rowList.length;
+      const totalW = n * CARD_W + (n - 1) * CARD_GAP;
+      const startX = (GAME_WIDTH - totalW) / 2 + CARD_W / 2;
+      const r = Math.floor(i / CARDS_PER_ROW);
+      const cy = CARD_ROW1_CY + r * (CARD_ROW2_CY - CARD_ROW1_CY);
+      rowList.forEach((def, c) => {
+        const cx = startX + c * (CARD_W + CARD_GAP);
+        this.cards.push(this._buildCard(cx, cy, def));
+      });
+    }
   }
 
   _buildCard(cx, cy, def) {
@@ -264,6 +270,7 @@ export default class UIScene extends Phaser.Scene {
     if (this._menu && this._menu.visible) {
       const btn = this._hitRects(this._menuButtons, px, py);
       if (btn) {
+        audio.play('click');
         btn.action();
         this._refreshMenu();
         return;
@@ -273,6 +280,7 @@ export default class UIScene extends Phaser.Scene {
     // 2) 顶部按钮（大招 / 召唤波次）
     const tb = this._hitTopButtons(px, py);
     if (tb) {
+      audio.play('click');
       tb.action();
       return;
     }
@@ -287,6 +295,7 @@ export default class UIScene extends Phaser.Scene {
     // 4) 拖拽武将卡
     const card = this._hitRects(this.cards.map((c) => ({ rect: c.rect, ref: c })), px, py);
     if (card && card.ref) {
+      audio.play('click');
       this._closeMenu();
       this._startDrag(card.ref.def, px, py);
       return;

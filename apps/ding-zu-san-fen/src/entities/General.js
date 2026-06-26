@@ -1,6 +1,7 @@
 // General: 武将塔 —— 近战(阻挡)/远程(射击)/策士(法术)，含技能与羁绊 buff
 import { TILE, COLORS, gridToPixel } from '../config.js';
 import { LEVEL_MULT, MAX_LEVEL } from '../data/generals.js';
+import { drawChibi, optsForGeneral } from '../utils/Chibi.js';
 
 export default class General {
   constructor(scene, def, col, row) {
@@ -60,39 +61,51 @@ export default class General {
     this.container.setDepth(50);
 
     const fac = COLORS.faction[this.def.faction] || COLORS.ink;
-    const r = TILE * 0.34;
+    const size = TILE * 0.82;
+    const feetY = size * 0.42;
+    this.size = size;
+    this.feetY = feetY;
 
-    // 阵营底盘
+    // 阵营底盘（脚下椭圆平台 + 投影）
     const base = s.add.graphics();
-    base.fillStyle(0x000000, 0.25);
-    base.fillCircle(2, 4, r + 3);
+    base.fillStyle(0x000000, 0.28);
+    base.fillEllipse(2, feetY + 3, size * 0.64, size * 0.27);
     base.fillStyle(fac, 0.95);
-    base.fillCircle(0, 0, r + 3);
-    base.lineStyle(2.5, COLORS.ink, 1);
-    base.strokeCircle(0, 0, r + 3);
+    base.fillEllipse(0, feetY, size * 0.64, size * 0.27);
+    base.lineStyle(2.5, COLORS.ink, 0.9);
+    base.strokeEllipse(0, feetY, size * 0.64, size * 0.27);
     this.container.add(base);
-    this.baseGfx = base;
 
-    // 内圈
-    const inner = s.add.graphics();
-    inner.fillStyle(0xf5ecd6, 0.96);
-    inner.fillCircle(0, 0, r - 1);
-    this.container.add(inner);
+    // Q版武将小人（开罗风格）
+    this.body = s.add.graphics();
+    drawChibi(this.body, { ...optsForGeneral(this.def), size });
+    this.container.add(this.body);
 
-    // 武将名（单字）
-    this.nameText = s.add.text(0, -1, this.def.char, {
+    // 名字小旗（头顶单字铭牌）
+    const pillW = 22;
+    const pillH = 18;
+    const pillY = -size * 0.5 - 14;
+    const pill = s.add.graphics();
+    pill.fillStyle(0x000000, 0.35);
+    pill.fillRoundedRect(-pillW / 2 + 1, pillY - pillH / 2 + 1, pillW, pillH, 5);
+    pill.fillStyle(0xf5ecd6, 0.96);
+    pill.fillRoundedRect(-pillW / 2, pillY - pillH / 2, pillW, pillH, 5);
+    pill.lineStyle(1.5, fac, 1);
+    pill.strokeRoundedRect(-pillW / 2, pillY - pillH / 2, pillW, pillH, 5);
+    this.container.add(pill);
+    this.nameText = s.add.text(0, pillY, this.def.char, {
       fontFamily: '"PingFang SC","Microsoft YaHei",sans-serif',
-      fontSize: '22px',
+      fontSize: '14px',
       color: '#2c2418',
       fontStyle: 'bold',
     }).setOrigin(0.5);
     this.container.add(this.nameText);
 
-    // 职业色环（细圈）区分近战/远程/策士
+    // 职业色环（底盘外圈）区分近战/远程/策士
     const ringCol = this.def.cls === 'MELEE' ? 0xd24d3a : this.def.cls === 'RANGE' ? 0x3f8f6a : 0x7a57c4;
     const ring = s.add.graphics();
     ring.lineStyle(3, ringCol, 1);
-    ring.strokeCircle(0, 0, r + 6.5);
+    ring.strokeEllipse(0, feetY, size * 0.72, size * 0.31);
     this.container.add(ring);
     this.ring = ring;
 
@@ -117,9 +130,10 @@ export default class General {
   _drawLevel() {
     this.levelFx.clear();
     if (this.level <= 1) return;
+    const y = this.feetY + 13;
     for (let i = 0; i < this.level - 1; i++) {
       this.levelFx.fillStyle(COLORS.gold, 1);
-      this.levelFx.fillCircle(-10 + i * 9, 20, 3);
+      this.levelFx.fillCircle(-10 + i * 9, y, 3);
     }
   }
 
@@ -166,8 +180,11 @@ export default class General {
   takeDamageFromEnemy(dmg) {
     if (!this.alive) return;
     this.hp -= dmg;
-    this.nameText.setAlpha(0.5);
-    this.scene.time.delayedCall(70, () => this.nameText && this.nameText.setAlpha(1));
+    // 受击闪白（小人整体瞬时变暗再恢复）
+    if (this.body) {
+      this.body.setAlpha(0.45);
+      this.scene.time.delayedCall(70, () => this.body && this.body.setAlpha(1));
+    }
     if (this.hp <= 0) {
       this.hp = 0;
       this.alive = false;
@@ -179,7 +196,7 @@ export default class General {
     this.hpFx.clear();
     if (this.hp >= this.maxHp) return;
     const w = TILE * 0.7;
-    const y = 28;
+    const y = this.feetY + 22;
     const ratio = Math.max(0, this.hp / this.maxHp);
     this.hpFx.fillStyle(0x000000, 0.5);
     this.hpFx.fillRect(-w / 2 - 1, y - 1, w + 2, 6);
@@ -311,6 +328,7 @@ export default class General {
     this.alive = false;
     this.container.destroy();
     // 置空受击闪白引用，避免延迟回调对已销毁对象调用 setAlpha 触发 Phaser 警告
+    this.body = null;
     this.nameText = null;
   }
 }

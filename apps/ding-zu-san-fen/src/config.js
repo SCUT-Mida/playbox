@@ -1,19 +1,19 @@
 // 全局常量与工具函数 —— 画布尺寸、网格、配色、伤害公式
 
-// 画布逻辑分辨率（移动端优先，Scale.FIT 自动缩放到任意屏幕）
-export const GAME_WIDTH = 1334;
-export const GAME_HEIGHT = 750;
+// 画布逻辑分辨率（竖屏优先，Scale.FIT 自动缩放到任意屏幕）
+export const GAME_WIDTH = 720;
+export const GAME_HEIGHT = 1280;
 
-// 网格战场：20 列 x 9 行，单元格 60px
-export const TILE = 60;
-export const MAP_COLS = 20;
-export const MAP_ROWS = 9;
-export const MAP_WIDTH = MAP_COLS * TILE; // 1200
-export const MAP_HEIGHT = MAP_ROWS * TILE; // 540
+// 网格战场：9 列 x 14 行，单元格 64px（竖向更长，适配竖屏蛇形路径）
+export const TILE = 64;
+export const MAP_COLS = 9;
+export const MAP_ROWS = 14;
+export const MAP_WIDTH = MAP_COLS * TILE; // 576
+export const MAP_HEIGHT = MAP_ROWS * TILE; // 896
 
-// 战场在画布中的偏移（居中，上方留 HUD，下方留武将栏）
-export const MAP_X = Math.floor((GAME_WIDTH - MAP_WIDTH) / 2); // 67
-export const MAP_Y = 110;
+// 战场在画布中的偏移（水平居中，上方留顶部 HUD，下方留武将卡栏）
+export const MAP_X = Math.floor((GAME_WIDTH - MAP_WIDTH) / 2); // 72
+export const MAP_Y = 176;
 
 // 高地（远程/策士）与路面（近战阻挡）槽位类型
 export const SLOT = {

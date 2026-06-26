@@ -34,7 +34,7 @@
       touch-action: none;
     }
 
-    /* 强制横屏：竖屏时给出旋转提示遮罩 */
+    /* 推荐竖屏：横屏时给出旋转提示遮罩 */
     #orientation-hint {
       display: none;
       position: fixed;
@@ -48,7 +48,7 @@
       padding: 24px;
     }
 
-    @media (orientation: portrait) {
+    @media (orientation: landscape) {
       #orientation-hint {
         display: flex;
       }
@@ -60,8 +60,8 @@
   <div id="game-container"></div>
   <div id="orientation-hint">
     <div>
-      <h1 style="font-size: 30px; margin: 0 0 12px;">📱 请横屏游玩</h1>
-      <p style="font-size: 16px; opacity: 0.85;">《鼎足三分》为横屏设计，请旋转设备以获得最佳体验。</p>
+      <h1 style="font-size: 30px; margin: 0 0 12px;">📱 请竖屏游玩</h1>
+      <p style="font-size: 16px; opacity: 0.85;">《鼎足三分》为竖屏设计，请旋转设备以获得最佳体验。</p>
     </div>
   </div>
   <script type="module" src="/src/main.js"></script>

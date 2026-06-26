@@ -44,8 +44,8 @@ app.innerHTML = `
   <div class="game-overlay" id="game-overlay" hidden>
     <div class="orientation-hint">
       <div>
-        <p class="orientation-hint__title">📱 请横屏游玩</p>
-        <p class="orientation-hint__desc">《鼎足三分》为横屏设计，请旋转设备以获得最佳体验。</p>
+        <p class="orientation-hint__title">📱 请竖屏游玩</p>
+        <p class="orientation-hint__desc">《鼎足三分》为竖屏设计，请旋转设备以获得最佳体验。</p>
       </div>
     </div>
     <div class="game-stage">

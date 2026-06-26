@@ -4,18 +4,25 @@ import {
 } from '../config.js';
 import { GENERALS } from '../data/generals.js';
 import { upgradeCost, retreatRefund, MAX_LEVEL } from '../data/generals.js';
+import { drawChibi, optsForGeneral } from '../utils/Chibi.js';
 
-// 布局常量
+// 布局常量（竖屏 720×1280）
 const HUD_TOP = 8;
-const HUD_H = 96; // 8 .. 104
-const CARD_BAR_TOP = 656;
-const CARD_BAR_H = 92; // 656 .. 748
-const CARD_W = 82;
-const CARD_GAP = 6;
-const CARD_CY = CARD_BAR_TOP + CARD_BAR_H / 2;
+const HUD_H = 152; // 8 .. 160（两行 HUD）
+const HUD_ROW1 = 44; // 桃 / 金 / 气势
+const HUD_ROW2 = 100; // 波次 / 大招 / 召唤
+const CARD_BAR_TOP = 1084;
+const CARD_BAR_H = 160; // 1084 .. 1244（两行武将卡）
+const CARD_W = 84;
+const CARD_H = 72;
+const CARD_GAP = 8;
+const CARDS_PER_ROW = 7;
+const CARD_ROW1_CY = CARD_BAR_TOP + 42;
+const CARD_ROW2_CY = CARD_BAR_TOP + 118;
 
-const MORALE_BAR_X = 300;
-const MORALE_BAR_W = 240;
+const MORALE_BAR_X = 236;
+const MORALE_BAR_Y = 36;
+const MORALE_BAR_W = 380;
 
 // UIScene: 顶部 HUD + 底部武将卡（拖拽部署）+ 武将操作菜单 + 大招/波次控制
 export default class UIScene extends Phaser.Scene {
@@ -78,58 +85,53 @@ export default class UIScene extends Phaser.Scene {
     g.lineStyle(2, COLORS.gold, 0.5);
     g.strokeRoundedRect(6, HUD_TOP, GAME_WIDTH - 12, HUD_H, 14);
 
-    const cy = HUD_TOP + 30;
-
-    // 生命（桃）
-    this._pill(60, cy, 0xf08a78, '桃', '#3a1410');
-    this.livesText = this.add.text(96, cy, '12', {
-      fontFamily: 'serif', fontSize: '26px', color: '#ffd9cf', fontStyle: 'bold',
+    // —— 第一行：桃 / 金 / 气势条 ——
+    const cy1 = HUD_ROW1;
+    this._pill(40, cy1, 0xf08a78, '桃', '#3a1410');
+    this.livesText = this.add.text(72, cy1, '12', {
+      fontFamily: 'serif', fontSize: '24px', color: '#ffd9cf', fontStyle: 'bold',
     }).setOrigin(0, 0.5).setDepth(6);
 
-    // 金币（金）
-    this._pill(168, cy, COLORS.gold, '金', '#2c2418');
-    this.goldText = this.add.text(204, cy, '0', {
-      fontFamily: 'serif', fontSize: '26px', color: '#ffe9a8', fontStyle: 'bold',
+    this._pill(150, cy1, COLORS.gold, '金', '#2c2418');
+    this.goldText = this.add.text(182, cy1, '0', {
+      fontFamily: 'serif', fontSize: '24px', color: '#ffe9a8', fontStyle: 'bold',
     }).setOrigin(0, 0.5).setDepth(6);
 
     // 气势条
-    const bx = MORALE_BAR_X;
-    const by = cy;
-    this.add.text(bx, by - 16, '气势', {
-      fontFamily: '"PingFang SC",sans-serif', fontSize: '14px', color: '#bcd6e6',
+    this.add.text(MORALE_BAR_X, MORALE_BAR_Y - 8, '气势', {
+      fontFamily: '"PingFang SC",sans-serif', fontSize: '13px', color: '#bcd6e6',
     }).setOrigin(0, 1).setDepth(6);
     const barBg = this.add.graphics().setDepth(6);
     barBg.fillStyle(0x10100c, 0.8);
-    barBg.fillRoundedRect(bx, by - 8, MORALE_BAR_W, 16, 8);
+    barBg.fillRoundedRect(MORALE_BAR_X, MORALE_BAR_Y, MORALE_BAR_W, 16, 8);
     this.moraleBarBg = barBg;
     this.moraleFill = this.add.graphics().setDepth(6);
-    this.moraleText = this.add.text(bx + MORALE_BAR_W - 4, by, '0/100', {
+    this.moraleText = this.add.text(MORALE_BAR_X + MORALE_BAR_W + 6, cy1, '0/100', {
       fontFamily: '"PingFang SC",sans-serif', fontSize: '13px', color: '#dff3ff',
-    }).setOrigin(1, 0.5).setDepth(7);
+    }).setOrigin(0, 0.5).setDepth(7);
 
-    // 火烧连营 大招按钮
-    this.ultContainer = this.add.container(620, cy).setDepth(6);
-    this._buildButton(this.ultContainer, 150, 40, '火烧连营', 0xb23a1e, '#ffe6d8');
-    this.ultContainer.add(this.add.text(0, 0, '', {
-      fontFamily: '"PingFang SC",sans-serif', fontSize: '11px', color: '#ffd9c8',
-    }).setOrigin(0.5).setName('cost'));
-    // 调整文字位置：主标题上、cost 下
-    this.ultContainer.getByName('cost') && this.ultContainer.getByName('cost').setPosition(0, 13);
-
-    // 波次信息
-    this.waveText = this.add.text(740, cy - 10, '准备出征', {
+    // —— 第二行：波次 / 大招 / 召唤 ——
+    const cy2 = HUD_ROW2;
+    this.waveText = this.add.text(24, cy2 - 10, '准备出征', {
       fontFamily: '"PingFang SC",serif', fontSize: '22px', color: '#ffe9b8', fontStyle: 'bold',
     }).setOrigin(0, 0.5).setDepth(6);
-    this.waveSubText = this.add.text(740, cy + 14, '', {
+    this.waveSubText = this.add.text(24, cy2 + 14, '', {
       fontFamily: '"PingFang SC",sans-serif', fontSize: '14px', color: '#cbb888',
     }).setOrigin(0, 0.5).setDepth(6);
 
+    // 火烧连营 大招按钮
+    this.ultContainer = this.add.container(360, cy2).setDepth(6);
+    this._buildButton(this.ultContainer, 160, 42, '火烧连营', 0xb23a1e, '#ffe6d8');
+    this.ultContainer.add(this.add.text(0, 13, '', {
+      fontFamily: '"PingFang SC",sans-serif', fontSize: '11px', color: '#ffd9c8',
+    }).setOrigin(0.5).setName('cost'));
+
     // 召唤下一波按钮
-    this.ctaContainer = this.add.container(1200, cy).setDepth(6);
-    this._buildButton(this.ctaContainer, 180, 44, '开始第一波', 0x2f7d4a, '#eafff0');
+    this.ctaContainer = this.add.container(600, cy2).setDepth(6);
+    this._buildButton(this.ctaContainer, 190, 44, '开始第一波', 0x2f7d4a, '#eafff0');
 
     // 羁绊行
-    this.bondsContainer = this.add.container(GAME_WIDTH / 2, HUD_TOP + 80).setDepth(6);
+    this.bondsContainer = this.add.container(GAME_WIDTH / 2, HUD_TOP + 132).setDepth(6);
   }
 
   _pill(cx, cy, color, label, textColor) {
@@ -184,12 +186,16 @@ export default class UIScene extends Phaser.Scene {
       fontFamily: 'serif', fontSize: '20px', color: '#c9a35a',
     }).setOrigin(0, 0.5).setDepth(6).setAlpha(0.7);
 
-    const count = GENERALS.length;
-    const totalW = count * CARD_W + (count - 1) * CARD_GAP;
+    // 14 张武将卡分两行（每行 7 张），水平居中排布
+    const perRow = CARDS_PER_ROW;
+    const totalW = perRow * CARD_W + (perRow - 1) * CARD_GAP;
     const startX = (GAME_WIDTH - totalW) / 2 + CARD_W / 2;
     GENERALS.forEach((def, i) => {
-      const cx = startX + i * (CARD_W + CARD_GAP);
-      this.cards.push(this._buildCard(cx, CARD_CY, def));
+      const row = Math.floor(i / perRow);
+      const colm = i % perRow;
+      const cx = startX + colm * (CARD_W + CARD_GAP);
+      const cy = row === 0 ? CARD_ROW1_CY : CARD_ROW2_CY;
+      this.cards.push(this._buildCard(cx, cy, def));
     });
   }
 
@@ -197,7 +203,7 @@ export default class UIScene extends Phaser.Scene {
     const cont = this.add.container(cx, cy).setDepth(6);
     const fac = COLORS.faction[def.faction] || COLORS.ink;
     const w = CARD_W;
-    const h = 80;
+    const h = CARD_H;
 
     const g = this.add.graphics();
     g.fillStyle(0x000000, 0.35);
@@ -205,18 +211,21 @@ export default class UIScene extends Phaser.Scene {
     g.fillStyle(0x4a3a28, 1);
     g.fillRoundedRect(-w / 2, -h / 2, w, h, 8);
     g.fillStyle(fac, 1);
-    g.fillRoundedRect(-w / 2, -h / 2, w, 26, 8);
-    g.fillRect(-w / 2, -h / 2 + 16, w, 12);
+    g.fillRoundedRect(-w / 2, -h / 2, w, 24, 8);
+    g.fillRect(-w / 2, -h / 2 + 14, w, 12);
     g.lineStyle(2, 0x1a1410, 0.6);
     g.strokeRoundedRect(-w / 2, -h / 2, w, h, 8);
     cont.add(g);
 
-    cont.add(this.add.text(0, -h / 2 + 13, def.char, {
-      fontFamily: 'serif', fontSize: '18px', color: '#ffffff', fontStyle: 'bold',
-    }).setOrigin(0.5));
+    // 头部 Q版小人头像（开罗风格）
+    const portrait = this.add.graphics();
+    drawChibi(portrait, { ...optsForGeneral(def), size: 26 });
+    portrait.setPosition(0, -h / 2 + 15);
+    cont.add(portrait);
 
-    cont.add(this.add.text(0, 6, def.name, {
-      fontFamily: '"PingFang SC",sans-serif', fontSize: '15px', color: '#f0dcae',
+    // 名字
+    cont.add(this.add.text(0, 7, def.name, {
+      fontFamily: '"PingFang SC",sans-serif', fontSize: '13px', color: '#f0dcae', fontStyle: 'bold',
     }).setOrigin(0.5));
 
     const clsLabel = def.cls === 'MELEE' ? '近战' : def.cls === 'RANGE' ? '远程' : '策士';
@@ -325,21 +334,9 @@ export default class UIScene extends Phaser.Scene {
 
   _startDrag(def, px, py) {
     const ghost = this.add.container(px, py).setDepth(80);
-    const fac = COLORS.faction[def.faction] || COLORS.ink;
-    const r = TILE * 0.34;
     const g = this.add.graphics();
-    g.fillStyle(0x000000, 0.3);
-    g.fillCircle(2, 4, r + 3);
-    g.fillStyle(fac, 0.92);
-    g.fillCircle(0, 0, r + 3);
-    g.lineStyle(2.5, COLORS.ink, 1);
-    g.strokeCircle(0, 0, r + 3);
-    g.fillStyle(0xf5ecd6, 0.95);
-    g.fillCircle(0, 0, r - 1);
+    drawChibi(g, { ...optsForGeneral(def), size: TILE * 0.82 });
     ghost.add(g);
-    ghost.add(this.add.text(0, -1, def.char, {
-      fontFamily: 'serif', fontSize: '22px', color: '#2c2418', fontStyle: 'bold',
-    }).setOrigin(0.5));
     ghost.setAlpha(0.85);
     ghost.setScale(1.05);
     this.drag = { def, ghost, valid: false, col: null, row: null };
@@ -420,13 +417,13 @@ export default class UIScene extends Phaser.Scene {
       return;
     }
 
-    // 面板位置（贴在武将上方，超界则下移/夹紧）
+    // 面板位置（贴在武将上方，超界则夹紧在顶部 HUD 与底部武将卡之间）
     const w = 196;
     const h = 168;
     let cx = g.x;
     let cy = g.y - h / 2 - TILE * 0.6;
     cx = Phaser.Math.Clamp(cx, w / 2 + 12, GAME_WIDTH - w / 2 - 12);
-    cy = Phaser.Math.Clamp(cy, h / 2 + 12, GAME_HEIGHT - CARD_BAR_TOP - h / 2 - 6);
+    cy = Phaser.Math.Clamp(cy, HUD_TOP + HUD_H + h / 2 + 8, CARD_BAR_TOP - h / 2 - 8);
 
     const cont = this.add.container(cx, cy).setDepth(85);
     const bg = this.add.graphics();
@@ -524,7 +521,7 @@ export default class UIScene extends Phaser.Scene {
     const ratio = Math.max(0, Math.min(1, s.morale / s.ultCost));
     this.moraleFill.clear();
     this.moraleFill.fillStyle(s.ultReady ? 0xff8a3a : COLORS.morale, 1);
-    this.moraleFill.fillRoundedRect(MORALE_BAR_X, HUD_TOP + 22, MORALE_BAR_W * ratio, 16, 8);
+    this.moraleFill.fillRoundedRect(MORALE_BAR_X, MORALE_BAR_Y, MORALE_BAR_W * ratio, 16, 8);
     this.moraleText.setText(`${s.morale}/${s.ultCost}`);
 
     // 大招按钮

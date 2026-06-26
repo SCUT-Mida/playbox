@@ -220,17 +220,17 @@ header {
 .game-stage {
   position: relative;
   width: 100%;
-  /* 保持 1334×750 画布比例，并随视口自适应 */
-  max-width: min(96vw, calc((100vh - 48px) * 1334 / 750));
-  aspect-ratio: 1334 / 750;
+  /* 保持 720×1280 竖屏画布比例，并随视口自适应 */
+  max-width: min(96vw, calc((100vh - 48px) * 720 / 1280));
+  aspect-ratio: 720 / 1280;
   background: #1f1812;
   border-radius: 10px;
   overflow: hidden;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
 }
 
-/* 竖屏旋转提示：游戏为横屏设计，竖屏游玩时遮罩提示用户旋转设备。
-   仅在 overlay 打开（游戏进行中）且竖屏时显示，不影响落地页本身。 */
+/* 横屏旋转提示：游戏为竖屏设计，横屏游玩时遮罩提示用户旋转设备。
+   仅在 overlay 打开（游戏进行中）且横屏时显示，不影响落地页本身。 */
 .orientation-hint {
   display: none;
   position: absolute;
@@ -255,7 +255,7 @@ header {
   line-height: 1.6;
 }
 
-@media (orientation: portrait) {
+@media (orientation: landscape) {
   .orientation-hint {
     display: flex;
   }

@@ -140,15 +140,26 @@ export default class GameScene extends Phaser.Scene {
       g.fillCircle(cx, cy, TILE * 0.28);
     }
 
-    // 基地（营寨）
+    // 基地（主营营寨）—— 位于路径终点（底部）
     const base = this.map.getBase();
-    g.fillStyle(0x000000, 0.3);
-    g.fillRoundedRect(base.x - 4, base.y - 30, 56, 60, 8);
+    const bw = 58;
+    const bh = 46;
+    g.fillStyle(0x000000, 0.32);
+    g.fillRoundedRect(base.x - bw / 2 + 2, base.y - bh / 2 + 4, bw, bh, 8);
     g.fillStyle(COLORS.base, 1);
-    g.fillRoundedRect(base.x - 6, base.y - 32, 52, 60, 8);
+    g.fillRoundedRect(base.x - bw / 2, base.y - bh / 2, bw, bh, 8);
     g.lineStyle(3, COLORS.baseEdge, 1);
-    g.strokeRoundedRect(base.x - 6, base.y - 32, 52, 60, 8);
-    this.add.text(base.x + 20, base.y - 2, '主营', {
+    g.strokeRoundedRect(base.x - bw / 2, base.y - bh / 2, bw, bh, 8);
+    // 旗杆 + 旗帜
+    g.lineStyle(3, 0xeae0cc, 1);
+    g.lineBetween(base.x - 12, base.y - bh / 2 + 4, base.x - 12, base.y - bh / 2 - 22);
+    g.fillStyle(COLORS.gold, 1);
+    g.fillTriangle(
+      base.x - 12, base.y - bh / 2 - 22,
+      base.x - 12, base.y - bh / 2 - 8,
+      base.x + 8, base.y - bh / 2 - 15,
+    );
+    this.add.text(base.x, base.y, '主营', {
       fontFamily: '"PingFang SC",serif',
       fontSize: '20px',
       color: '#ffe6d8',
@@ -156,13 +167,13 @@ export default class GameScene extends Phaser.Scene {
       strokeThickness: 3,
     }).setOrigin(0.5).setDepth(2);
 
-    // 入口标记
+    // 入口标记（顶部，敌军自上而下入场）
     const start = this.map.getStart();
-    const arrow = this.add.text(start.x + 14, start.y, '⇉', {
+    const arrow = this.add.text(start.x, MAP_Y - 14, '▼', {
       fontSize: '28px',
-      color: '#9a6a32',
+      color: '#c89238',
     }).setOrigin(0.5).setDepth(2);
-    this.tweens.add({ targets: arrow, x: start.x + 26, duration: 600, yoyo: true, repeat: -1 });
+    this.tweens.add({ targets: arrow, y: MAP_Y - 2, duration: 600, yoyo: true, repeat: -1 });
   }
 
   // ---------------- 主循环 ----------------

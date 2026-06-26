@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { COLORS, GAME_WIDTH, GAME_HEIGHT } from '../config.js';
 import { LEVELS, LEVEL_LIST } from '../data/levels.js';
-import { GENERALS } from '../data/generals.js';
+import { GENERAL_BY_ID } from '../data/generals.js';
+import { drawChibi, optsForGeneral } from '../utils/Chibi.js';
 
 // MenuScene: 标题、关卡选择、玩法说明
 export default class MenuScene extends Phaser.Scene {
@@ -26,40 +27,65 @@ export default class MenuScene extends Phaser.Scene {
     bg.fillRect(0, 0, width, height);
 
     // 标题
-    this.add.text(width / 2, 110, '鼎足三分', {
+    this.add.text(width / 2, 150, '鼎足三分', {
       fontFamily: 'serif',
-      fontSize: '86px',
+      fontSize: '76px',
       color: '#ead9b6',
       stroke: '#1a1410',
       strokeThickness: 10,
     }).setOrigin(0.5).setAlpha(0.96);
 
-    this.add.text(width / 2, 178, '三 国 · 战 略 塔 防', {
+    this.add.text(width / 2, 216, '三 国 · 战 略 塔 防', {
       fontFamily: '"PingFang SC",sans-serif',
-      fontSize: '24px',
+      fontSize: '22px',
       color: '#c9a35a',
     }).setOrigin(0.5);
 
+    // Q版武将预览（开罗风格小人）
+    this._chibiPreview(width / 2, 308);
+
     // 关卡按钮
-    const startY = 280;
+    const startY = 430;
     LEVEL_LIST.forEach((key, i) => {
       const lv = LEVELS[key];
-      const y = startY + i * 120;
+      const y = startY + i * 130;
       this._levelCard(width / 2, y, lv);
     });
 
     // 玩法说明
-    const tipY = height - 132;
+    const tipY = height - 168;
     const tips = [
       '🪙 拖拽底部武将卡部署：近战放路面、远程/策士放高地',
       '⚔️ 相邻武将触发【羁绊阵法】；击杀积累气势，释放【火烧连营】大招',
       '🛡️ 重甲惧法、魔抗惧物 —— 合理搭配职业与羁绊方能鼎足三分',
     ];
     tips.forEach((t, i) => {
-      this.add.text(width / 2, tipY + i * 26, t, {
+      this.add.text(width / 2, tipY + i * 28, t, {
         fontFamily: '"PingFang SC",sans-serif',
-        fontSize: '16px',
+        fontSize: '15px',
         color: '#b9a47e',
+      }).setOrigin(0.5);
+    });
+  }
+
+  // 一排 Q版武将小人预览，展示开罗风格人物
+  _chibiPreview(cx, cy) {
+    const ids = ['guanyu', 'lvbu', 'zhuge', 'zhouyu', 'caocao'];
+    const n = ids.length;
+    const gap = 96;
+    const startX = cx - ((n - 1) * gap) / 2;
+    const ground = this.add.graphics();
+    ground.lineStyle(2, COLORS.gold, 0.22);
+    ground.lineBetween(cx - (n * gap) / 2, cy + 28, cx + (n * gap) / 2, cy + 28);
+    ids.forEach((id, i) => {
+      const def = GENERAL_BY_ID[id];
+      if (!def) return;
+      const x = startX + i * gap;
+      const g = this.add.graphics();
+      drawChibi(g, { ...optsForGeneral(def), size: 52 });
+      g.setPosition(x, cy);
+      this.add.text(x, cy + 48, def.name, {
+        fontFamily: '"PingFang SC",sans-serif', fontSize: '13px', color: '#cdb888',
       }).setOrigin(0.5);
     });
   }

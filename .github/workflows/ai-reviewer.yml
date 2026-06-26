@@ -25,6 +25,7 @@ jobs:
       - name: 📝 Generate Reviewer Prompt (inline, 不依赖 PR 分支脚本)
         env:
           HEAD_REF: ${{ github.head_ref }}
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           ISSUE_NUMBER=$(echo "$HEAD_REF" | grep -oiE 'issue-[0-9]+' | grep -oiE '[0-9]+' | head -n 1)
           if [ -z "$ISSUE_NUMBER" ]; then ISSUE_NUMBER=${{ github.event.pull_request.number }}; fi
@@ -34,8 +35,9 @@ jobs:
           mkdir -p "$TASK_DIR"
           echo "TASK_DIR=$TASK_DIR" >> $GITHUB_ENV
 
-          EXISTING_REVIEWS=$(find "$TASK_DIR" -maxdepth 1 -name 'review_result_r*.md' 2>/dev/null | wc -l)
-          CURRENT_ROUND=$((EXISTING_REVIEWS + 1))
+          # 通过 PR 上 /claude-fix 评论数推算审查轮次（reviewer 不提交文件，find 计数永远是 0）
+          CLAUDE_FIX_COUNT=$(gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json comments --jq '[.comments[] | select(.body | contains("/claude-fix"))] | length' 2>/dev/null || echo "0")
+          CURRENT_ROUND=$((CLAUDE_FIX_COUNT + 1))
           echo "CURRENT_ROUND=$CURRENT_ROUND" >> $GITHUB_ENV
 
           # 生成 diff 文件

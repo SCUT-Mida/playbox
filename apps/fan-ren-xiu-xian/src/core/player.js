@@ -4,22 +4,76 @@
 import {
   REALMS, SPIRIT_ROOTS, globalLevel, xpNeeded,
   baseMaxHp, baseMaxMp, baseAtk, baseDef, baseSpirit,
+  MAX_VITALITY, vitalityMax, dayKey, nowSec, clamp,
 } from '../config.js';
 import { ITEMS } from '../data/items.js';
-import { weighted } from './rng.js';
+import { TALENTS, TALENT_LIST, BACKGROUNDS, BACKGROUND_LIST, pickPortrait } from '../data/characters.js';
+import { weighted, pick } from './rng.js';
 
 export const START_BAG_CAPACITY = 15; // 初始储物袋容量（物品种类数）
 
-// 新建存档：随机灵根 + 少量初始资源（重玩性）
-export function newPlayer(rng) {
-  const root = weighted(rng, SPIRIT_ROOTS.map((r) => ({ item: r, weight: r.weight })));
+// 创角随机：天赋数量（多数 1，运气好 2，罕有 3）
+export function rollTalents(rng) {
+  const r = rng || Math.random;
+  const roll = r();
+  const count = roll > 0.95 ? 3 : roll > 0.7 ? 2 : 1;
+  const pool = TALENT_LIST.slice();
+  const out = [];
+  for (let i = 0; i < count && pool.length; i++) {
+    const idx = Math.floor(r() * pool.length);
+    out.push(pool.splice(idx, 1)[0].id);
+  }
+  return out;
+}
+
+// 创角模板：性别 + 灵根 + 天赋 + 气运 + 出身 + 形象（不含名字，名字由 UI 单独设定）
+export function rollCharacter(rng) {
+  const r = rng || Math.random;
+  const gender = r() < 0.5 ? 'male' : 'female';
+  const root = weighted(r, SPIRIT_ROOTS.map((x) => ({ item: x, weight: x.weight })));
+  const talentIds = rollTalents(r);
+  const qiyun = 30 + Math.floor(r() * 71); // 30~100
+  const bg = pick(r, BACKGROUND_LIST);
+  const portrait = pickPortrait(gender, talentIds);
+  return { gender, rootId: root.id, talentIds, qiyun, bgId: bg.id, portraitId: portrait.id };
+}
+
+// 读取某项天赋加成的累加值（加算字段）
+export function talentField(player, field, dflt = 0) {
+  let s = dflt;
+  for (const id of (player && player.talentIds) || []) {
+    const t = TALENTS[id];
+    if (t && typeof t[field] === 'number') s += t[field];
+  }
+  return s;
+}
+// 炼丹/炼器成率加成
+export function talentAlchemyBonus(player) { return talentField(player, 'alchemyBonus'); }
+// 生效气运（基础 + 天赋），钳制 0~100
+export function effectiveQiyun(player) {
+  return clamp((player.qiyun || 50) + talentField(player, 'qiyunBonus'), 0, 100);
+}
+
+// 新建存档：可选 template（来自创角 UI）；缺省则全随机（保持 newPlayer(rng) 旧行为）
+export function newPlayer(rng, template) {
+  const r = rng || Math.random;
+  const t = template || rollCharacter(r);
+  const root = rootDef(t.rootId);
+  const bg = BACKGROUNDS[t.bgId] || BACKGROUND_LIST[0];
   const player = {
-    v: 1,
-    tier: 0, sub: 0,
+    v: 2,
+    slot: t.slot || 1,
+    gender: t.gender || 'male',
+    name: t.name || '',
     rootId: root.id,
+    talentIds: (t.talentIds || []).slice(),
+    qiyun: t.qiyun != null ? t.qiyun : 50,
+    bgId: bg.id,
+    portraitId: t.portraitId || pickPortrait(t.gender || 'male', t.talentIds || []).id,
+    tier: 0, sub: 0,
     xp: 0,
     hp: 0, mp: 0,
-    stones: 50 + Math.floor((rng || Math.random)() * 51), // 50~100
+    stones: 50 + Math.floor(r() * 51), // 50~100
     bag: { pill_huitian: 2, herb_qingmu: 3 }, // 新手礼包
     equipment: null,       // 装备的法宝 id
     techniques: [],
@@ -29,15 +83,30 @@ export function newPlayer(rng) {
     pity: { explore: 0 },
     chaos: null,
     bagCapacity: START_BAG_CAPACITY,
+    vitality: 0,            // 每日活力（recompute 后置满）
+    maxVitality: MAX_VITALITY,
+    lastVitalityDate: '',
     stats: { battlesWon: 0, breakthroughs: 0, alchemyFails: 0, alchemyOk: 0, lowHpWins: 0, breakthroughStreak: 0, exploreCount: 0, deaths: 0 },
-    createdAt: 0,
+    createdAt: nowSec(),
     lastSeen: 0,
     ascended: false,
   };
+  applyBackgroundBonus(player, bg);
   recompute(player);
+  player.maxVitality = vitalityMax(player);
+  player.vitality = player.maxVitality;
+  player.lastVitalityDate = dayKey();
   player.hp = player.maxHp;
   player.mp = player.maxMp;
   return player;
+}
+
+// 出身奖励：灵石 / 物品
+function applyBackgroundBonus(player, bg) {
+  const b = bg && bg.bonus;
+  if (!b) return;
+  if (b.stones) player.stones += b.stones;
+  if (b.items) for (const it of b.items) addItem(player, it.id, it.qty);
 }
 
 // 重算所有衍生属性（境界/装备/功法/称号 → maxHp/maxMp/atk/def/spirit/lv/xpMax）
@@ -56,6 +125,11 @@ export function recompute(player) {
   let def = baseDef(lv);
   let spirit = baseSpirit(lv);
 
+  // 天赋：固定值加成（攻/防/神识）
+  atk += talentField(player, 'atkFlat');
+  def += talentField(player, 'defFlat');
+  spirit += talentField(player, 'spiritFlat');
+
   // 功法加成
   for (const id of player.techniques) {
     const t = ITEMS[id];
@@ -72,11 +146,19 @@ export function recompute(player) {
     player.element = tr.stats.el || null;
   }
 
+  // 天赋：百分比加成（气血/灵力上限，叠加在基底之上）
+  maxHp *= 1 + talentField(player, 'hpPct');
+  maxMp *= 1 + talentField(player, 'mpPct');
+
   player.maxHp = Math.round(maxHp);
   player.maxMp = Math.round(maxMp);
   player.atk = Math.round(atk);
   player.def = Math.round(def);
   player.spirit = Math.round(spirit);
+
+  // 每日活力上限随天赋变化
+  player.maxVitality = vitalityMax(player);
+  if ((player.vitality || 0) > player.maxVitality) player.vitality = player.maxVitality;
 
   // 上限随境界变化时，收口当前值
   player.hp = Math.min(player.hp || 0, player.maxHp);
@@ -233,4 +315,23 @@ export function bagExpandCost(player) {
 export function realmInfo(player) {
   const realm = REALMS[player.tier];
   return { realm, subName: realm.subs[player.sub], majorName: realm.name };
+}
+
+// —— 每日活力（活力周期：跨自然日时回满）——
+// 返回是否发生了「新一天」刷新（供 UI 弹提示）
+export function rolloverVitality(player) {
+  const today = dayKey();
+  if (player.lastVitalityDate !== today) {
+    player.lastVitalityDate = today;
+    player.maxVitality = vitalityMax(player);
+    player.vitality = player.maxVitality;
+    return true;
+  }
+  return false;
+}
+export function canAffordVitality(player, cost) { return (player.vitality || 0) >= cost; }
+export function spendVitality(player, cost) {
+  if ((player.vitality || 0) < cost) return false;
+  player.vitality -= cost;
+  return true;
 }

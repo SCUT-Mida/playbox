@@ -1,13 +1,20 @@
 // ============================================================================
-// 存档：localStorage 持久化 + 导入导出（base64）+ 离线修炼收益结算
+// 存档：localStorage 持久化 + 导入导出（base64）+ 离线修炼收益结算 + 多存档槽。
 // 通过 storage 访问器隔离 localStorage，便于在 Node 单测中注入内存版。
+// 槽位 key：frxx_slot_<n>（1..NUM_SLOTS）；当前活跃槽记录于 frxx_activeslot。
+// 旧的 frxx_save_v1 单存档会在首启时迁移到槽 1。
 // ============================================================================
 import { recompute } from './player.js';
 import {
   OFFLINE_CAP_HOURS, OFFLINE_EFFICIENCY, passiveXpPerSec, cultivateSpeedMult, nowSec,
+  vitalityMax,
 } from '../config.js';
 
-const KEY = 'frxx_save_v1';
+const NUM_SLOTS = 5;
+const SLOT_PREFIX = 'frxx_slot_';
+const ACTIVE_KEY = 'frxx_activeslot';
+const LEGACY_KEY = 'frxx_save_v1';
+
 let storage = null;
 try {
   if (typeof localStorage !== 'undefined') storage = localStorage;
@@ -15,32 +22,140 @@ try {
 
 // 测试 / 注入用
 export function _setStorage(s) { storage = s; }
+export function _NUM_SLOTS() { return NUM_SLOTS; }
 
-export function hasSave() {
-  try { return !!(storage && storage.getItem(KEY)); } catch (_) { return false; }
+function slotKey(n) { return `${SLOT_PREFIX}${n}`; }
+
+// 当前活跃槽（1..NUM_SLOTS），无记录默认 1
+export function getActiveSlot() {
+  const raw = storage ? storage.getItem(ACTIVE_KEY) : null;
+  const n = parseInt(raw, 10);
+  return (n >= 1 && n <= NUM_SLOTS) ? n : 1;
+}
+export function setActiveSlot(n) {
+  try { if (storage) storage.setItem(ACTIVE_KEY, String(n)); } catch (_) {}
+}
+
+// 旧版单存档迁移到槽 1（仅首启一次）
+export function migrateLegacy() {
+  if (!storage) return;
+  try {
+    const old = storage.getItem(LEGACY_KEY);
+    if (old && !storage.getItem(slotKey(1))) {
+      storage.setItem(slotKey(1), old);
+    }
+    if (old) storage.removeItem(LEGACY_KEY);
+  } catch (_) {}
+}
+
+// —— 兼容旧 API（操作「活跃槽」，默认槽 1），供单测与历史调用方使用 ——
+export function hasSave(slot) {
+  const n = slot || getActiveSlot();
+  try { return !!(storage && storage.getItem(slotKey(n))); } catch (_) { return false; }
 }
 
 export function saveGame(player) {
   try {
+    const slot = (player && player.slot) || getActiveSlot();
+    if (player) player.slot = slot;
+    setActiveSlot(slot);
     player.lastSeen = nowSec();
-    if (storage) storage.setItem(KEY, JSON.stringify(player));
+    if (storage) storage.setItem(slotKey(slot), JSON.stringify(player));
     return true;
   } catch (_) { return false; }
 }
 
-export function loadGame() {
+export function loadGame(slot) {
   try {
-    const raw = storage ? storage.getItem(KEY) : null;
+    const n = slot || getActiveSlot();
+    const raw = storage ? storage.getItem(slotKey(n)) : null;
     if (!raw) return null;
     const player = JSON.parse(raw);
     migrate(player);
     recompute(player);
+    player.slot = n;
     return player;
   } catch (_) { return null; }
 }
 
-export function clearSave() {
-  try { if (storage) storage.removeItem(KEY); return true; } catch (_) { return false; }
+export function clearSave(slot) {
+  try {
+    const n = slot || getActiveSlot();
+    if (storage) storage.removeItem(slotKey(n));
+    return true;
+  } catch (_) { return false; }
+}
+
+// —— 多槽 API ——
+// 列出所有槽位的元信息（空槽返回 { slot, empty:true }）
+export function listSlots() {
+  const out = [];
+  for (let n = 1; n <= NUM_SLOTS; n++) {
+    let raw = null;
+    try { raw = storage ? storage.getItem(slotKey(n)) : null; } catch (_) {}
+    if (!raw) { out.push({ slot: n, empty: true }); continue; }
+    try {
+      const p = JSON.parse(raw);
+      out.push(slotMeta(p, n));
+    } catch (_) {
+      out.push({ slot: n, empty: false, corrupt: true });
+    }
+  }
+  return out;
+}
+export function loadSlot(n) {
+  setActiveSlot(n);
+  return loadGame(n);
+}
+export function saveSlot(n, player) {
+  if (player) player.slot = n;
+  setActiveSlot(n);
+  return saveGame(player);
+}
+export function deleteSlot(n) {
+  try { if (storage) storage.removeItem(slotKey(n)); return true; } catch (_) { return false; }
+}
+
+// 由存档玩家派生展示用元信息（避免整份解析进 UI）
+function slotMeta(p, n) {
+  const tier = p.tier || 0;
+  const sub = p.sub || 0;
+  const realmName = realmMajor(tier);
+  return {
+    slot: n,
+    empty: false,
+    name: p.name || '无名修士',
+    gender: p.gender || 'male',
+    portraitId: p.portraitId,
+    realm: `${realmName}${realmSub(tier, sub)}`,
+    tier,
+    lv: p.lv || 0,
+    stones: Math.floor(p.stones || 0),
+    ascended: !!p.ascended,
+    lastSeen: p.lastSeen || 0,
+    createdAt: p.createdAt || 0,
+  };
+}
+function realmMajor(tier) {
+  // 避免与 player.realmName 产生循环依赖：内联一份极简查表
+  const names = ['凡人', '炼气期', '筑基期', '结丹期', '元婴期', '化神期', '炼虚期', '合体期', '大乘期', '飞升'];
+  return names[tier] || '凡人';
+}
+function realmSub(tier, sub) {
+  const subsByTier = [
+    ['凡人'],
+    ['一层','二层','三层','四层','五层','六层','七层','八层','九层','十层','十一层','十二层','十三层'],
+    ['初期','中期','后期','圆满'],
+    ['初期','中期','后期','圆满'],
+    ['初期','中期','后期','圆满'],
+    ['初期','中期','后期','圆满'],
+    ['初期','中期','后期','圆满'],
+    ['初期','中期','后期'],
+    ['初期','中期','后期'],
+    ['飞升成仙'],
+  ];
+  const arr = subsByTier[tier];
+  return arr && arr[sub] != null ? arr[sub] : '';
 }
 
 // 导出为可分享的 base64 字符串（UTF-8 安全）
@@ -70,6 +185,17 @@ function migrate(player) {
   if (!player.achievements) player.achievements = [];
   if (player.bagCapacity == null) player.bagCapacity = 15;
   if (!player.bag) player.bag = {};
+  // v2：人物设定 + 每日活力
+  if (!player.gender) player.gender = 'male';
+  if (!player.name) player.name = '';
+  if (!player.talentIds) player.talentIds = [];
+  if (player.qiyun == null) player.qiyun = 50;
+  if (!player.bgId) player.bgId = 'bg_liumin';
+  if (!player.portraitId) player.portraitId = 'pt_m_default';
+  if (player.vitality == null) player.vitality = 0;
+  if (player.maxVitality == null) player.maxVitality = vitalityMax(player);
+  if (!player.lastVitalityDate) player.lastVitalityDate = '';
+  if (player.slot == null) player.slot = 1;
   return player;
 }
 

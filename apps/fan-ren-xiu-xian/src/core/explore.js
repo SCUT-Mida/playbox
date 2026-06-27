@@ -6,10 +6,11 @@ import { eligibleEvents, SCENES, SCENE_NAMES } from '../data/events.js';
 import { makeEnemy } from '../data/enemies.js';
 import {
   EXPLORE_MP_COST, EXPLORE_HP_COST, PITTY_THRESHOLD, PITTY_BOOST, nowSec,
+  pityThresholdForQiyun, rareBoostForQiyun,
 } from '../config.js';
 import {
   addStones, addXp, addItem, addItemOrLog, learnTechnique, learnRecipe, grantTitle,
-  upgradeRoot, bagFull, removeItem, hasItem,
+  upgradeRoot, bagFull, removeItem, hasItem, effectiveQiyun,
 } from './player.js';
 import { ITEMS } from '../data/items.js';
 
@@ -27,10 +28,14 @@ export function rollExplore(player, rng) {
   player.hp = Math.max(1, player.hp - EXPLORE_HP_COST);
 
   // 构造权重表；保底机制：连续多次无稀有事件则提升稀有权重
+  // 气运影响：气运越高 → 保底阈值越低（更早触发奇遇加成）、稀有事件权重越高
   const pity = player.pity.explore;
+  const qy = effectiveQiyun(player);
+  const threshold = pityThresholdForQiyun(qy);
+  const rareBoost = rareBoostForQiyun(qy);
   const entries = events.map((e) => ({
     item: e,
-    weight: e.rare ? e.weight * (pity >= PITTY_THRESHOLD ? 1 + PITTY_BOOST : 1) : e.weight,
+    weight: e.rare ? e.weight * (pity >= threshold ? 1 + PITTY_BOOST : 1) * rareBoost : e.weight,
   }));
   const event = weighted(rng, entries);
 

@@ -17,7 +17,7 @@ import {
   equip, unequip, expandBag, bagExpandCost, countItem, hasItem, removeItem, addItemOrLog,
   distinctItems, learnTechnique, upgradeRoot,
   rollCharacter, effectiveQiyun,
-  rolloverVitality, canAffordVitality, spendVitality, restToNextDay,
+  rolloverVitality, canAffordVitality, spendVitality, restToNextDay, vitalityDepleted,
 } from '../core/player.js';
 import { activeCultivate, passiveTick } from '../core/cultivate.js';
 import { rollExplore, applyReward, chaosActive } from '../core/explore.js';
@@ -1202,31 +1202,32 @@ export class GameUI {
     this.renderPanel();
   }
 
-  // 活力是否已耗尽到「连最省力的修炼都付不起」——此时除挂机外无可消耗活力的行动，
-  // 视为卡死态，需提供「进入次日」兜底。
+  // 活力是否已耗尽到「连最省力的修炼都付不起」——此时无可消耗活力的修行可做，
+  // 视为卡死态，需提供「闭关静修」兜底（坊市买卖、装备穿脱、扩容等不耗活力的操作仍可进行）。
   isVitalityDepleted() {
-    const p = this.player;
-    if (!p) return false;
-    const cheapest = Math.min(VITALITY_COSTS.cultivate, VITALITY_COSTS.explore, VITALITY_COSTS.craft);
-    return (p.vitality || 0) < cheapest;
+    return this.player ? vitalityDepleted(this.player) : false;
   }
 
   renderRestBanner() {
     return h('div', { class: 'card rest-banner' },
       h('div', { class: 'row' },
         h('div', { class: 'grow' },
-          h('h4', null, '⚡ 活力耗尽'),
-          h('div', { class: 'muted', style: { marginTop: '0.2rem' } }, '今日行动力已尽。可闭关静候，次日活力回满，再续修行。'),
+          h('h4', null, '⚡ 活力不足'),
+          h('div', { class: 'muted', style: { marginTop: '0.2rem' } }, '消耗活力的修行暂不可继续。可「闭关静修」即刻恢复一次活力（每日限一次）；坊市买卖、装备穿脱等仍可进行，亦可静候次日自然回满。'),
         ),
-        h('button', { class: 'btn-jade rest-btn', onClick: () => this.doRestToNextDay() }, '🌌 进入次日'),
+        h('button', { class: 'btn-jade rest-btn', onClick: () => this.doRestToNextDay() }, '🧘 闭关静修'),
       ),
     );
   }
 
   doRestToNextDay() {
-    restToNextDay(this.player);
-    this.pushLog('🌌 你闭关静修，斗转星移，新的一日到来，活力回满。', 'good');
-    this.toast('新的一天，活力回满', 'good');
+    // restToNextDay 含「每日仅一次 + 须活力耗尽」守卫；被拒（今日已用过）时给出提示而非静默
+    if (!restToNextDay(this.player)) {
+      this.toast('今日已闭关静修，明日方可再来', 'bad');
+      return;
+    }
+    this.pushLog('🧘 你闭关静修，吐纳天地灵气，元气渐复，活力回满。', 'good');
+    this.toast('闭关静修，活力回满', 'good');
     this.afterAction();
   }
 

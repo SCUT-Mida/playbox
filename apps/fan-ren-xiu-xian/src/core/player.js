@@ -4,7 +4,7 @@
 import {
   REALMS, SPIRIT_ROOTS, globalLevel, xpNeeded,
   baseMaxHp, baseMaxMp, baseAtk, baseDef, baseSpirit,
-  MAX_VITALITY, vitalityMax, dayKey, nowSec, clamp,
+  MAX_VITALITY, VITALITY_COSTS, vitalityMax, dayKey, nowSec, clamp,
 } from '../config.js';
 import { ITEMS } from '../data/items.js';
 import { TALENTS, TALENT_LIST, BACKGROUNDS, BACKGROUND_LIST, pickPortrait } from '../data/characters.js';
@@ -86,6 +86,7 @@ export function newPlayer(rng, template) {
     vitality: 0,            // 每日活力（recompute 后置满）
     maxVitality: MAX_VITALITY,
     lastVitalityDate: '',
+    restUsedDate: '',       // 「闭关静修」兜底上次使用的日期键（每日仅一次）
     stats: { battlesWon: 0, breakthroughs: 0, alchemyFails: 0, alchemyOk: 0, lowHpWins: 0, breakthroughStreak: 0, exploreCount: 0, deaths: 0 },
     createdAt: nowSec(),
     lastSeen: 0,
@@ -336,11 +337,23 @@ export function spendVitality(player, cost) {
   return true;
 }
 
-// 主动「静候次日」：活力耗尽时的兜底入口，避免玩家无任何行动可做而被卡死。
-// 立即回满每日活力并刷新日期键。注意：不改动 lastSeen 时间戳，故不会影响离线修炼结算。
+// 活力是否已低到「连最省力的修行都付不起」（修炼/探索/炼制均无法进行）。
+// 仅用于决定是否显示「闭关静修」兜底入口；坊市买卖、装备穿脱、扩容等不耗活力的操作不受影响。
+export function vitalityDepleted(player) {
+  const cheapest = Math.min(VITALITY_COSTS.cultivate, VITALITY_COSTS.explore, VITALITY_COSTS.craft);
+  return (player.vitality || 0) < cheapest;
+}
+
+// 主动「闭关静修」：活力耗尽时的兜底入口，避免玩家无任何行动可做而被卡死。
+// 【平衡守卫】每个自然日仅可触发一次（与 rolloverVitality「每日仅回满一次」对齐），
+// 杜绝「花光活力→回满→再花光→再回满」的无限刷取，守住每日活力上限这道进度门。
+// 须真正处于活力耗尽态才会消耗当日额度。注意：不改动 lastSeen，故不影响离线修炼结算。
 export function restToNextDay(player) {
+  const today = dayKey();
+  if (player.restUsedDate === today) return false; // 当日已用过：拒绝，杜绝无限刷活力
+  if (!vitalityDepleted(player)) return false;     // 未耗尽时不消耗当日额度
   player.maxVitality = vitalityMax(player);
   player.vitality = player.maxVitality;
-  player.lastVitalityDate = dayKey();
+  player.restUsedDate = today;
   return true;
 }

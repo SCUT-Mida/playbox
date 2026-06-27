@@ -55,6 +55,11 @@ export function buyItem(player, entry, qty = 1) {
   qty = Math.min(qty, entry.stock);
   if (qty <= 0) return { ok: false, reason: '库存不足' };
   const cost = entry.price * qty;
+  const def = ITEMS[entry.id];
+  const occupiesBag = !(entry.isRecipe || (def && def.type === 'technique'));
+  // 先校验背包能否装下（新种类），再扣费扣库存，与 explore「先校验再扣消耗」一致；
+  // 此前背包满分支只退款不回库存，致货架库存被永久扣减（库存为 1 时直接从货架消失）。
+  if (occupiesBag && bagFull(player) && !countItem(player, entry.id)) return { ok: false, reason: '背包已满' };
   if (!spendStones(player, cost)) return { ok: false, reason: '灵石不足' };
   entry.stock -= qty;
   // 配方/功法直接学习（不占背包）；已掌握则退款并归还库存，避免“扣费却无收获”
@@ -62,12 +67,10 @@ export function buyItem(player, entry, qty = 1) {
     if (!learnRecipe(player, entry.id)) { addStones(player, cost); entry.stock += qty; return { ok: false, reason: '该配方已掌握' }; }
     return { ok: true, learned: true, qty: 1, cost };
   }
-  const def = ITEMS[entry.id];
   if (def && def.type === 'technique') {
     if (!learnTechnique(player, entry.id)) { addStones(player, cost); entry.stock += qty; return { ok: false, reason: '该功法已习得' }; }
     return { ok: true, learned: true, qty: 1, cost };
   }
-  if (bagFull(player) && !countItem(player, entry.id)) { addStones(player, cost); return { ok: false, reason: '背包已满' }; }
   addItem(player, entry.id, qty);
   return { ok: true, qty, cost };
 }

@@ -137,6 +137,19 @@ export function addItem(player, id, qty = 1) {
   player.bag[id] = (player.bag[id] || 0) + qty;
   return qty;
 }
+
+// 入袋并生成日志条目：成功为「+N × 名」(good)；背包满致新种类无法放入则为「背包已满，名 遗失」(bad)。
+// 统一收敛所有「奖励/产出入袋」路径，杜绝 addItem 返回 0 被忽略而静默丢物（炼丹/炼器/战斗/坊市等同源缺陷）。
+export function addItemOrLog(player, id, qty = 1) {
+  const added = addItem(player, id, qty);
+  const name = ITEMS[id] ? ITEMS[id].name : id;
+  return {
+    added,
+    log: added > 0
+      ? { text: `+${added} × ${name}`, type: 'good' }
+      : { text: `背包已满，${name} 遗失`, type: 'bad' },
+  };
+}
 export function removeItem(player, id, qty = 1) {
   if ((player.bag[id] || 0) < qty) return false;
   player.bag[id] -= qty;

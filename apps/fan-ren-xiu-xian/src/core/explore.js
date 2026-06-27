@@ -8,7 +8,7 @@ import {
   EXPLORE_MP_COST, EXPLORE_HP_COST, PITTY_THRESHOLD, PITTY_BOOST, nowSec,
 } from '../config.js';
 import {
-  addStones, addXp, addItem, learnTechnique, learnRecipe, grantTitle,
+  addStones, addXp, addItem, addItemOrLog, learnTechnique, learnRecipe, grantTitle,
   upgradeRoot, bagFull, removeItem, hasItem,
 } from './player.js';
 import { ITEMS } from '../data/items.js';
@@ -50,9 +50,8 @@ export function applyReward(player, reward, rng) {
   if (reward.stones) { addStones(player, reward.stones); push(`+${reward.stones} 灵石`, 'good'); }
   if (reward.items) {
     for (const it of reward.items) {
-      const added = addItem(player, it.id, it.qty);
-      if (added > 0) push(`+${added} × ${ITEMS[it.id] ? ITEMS[it.id].name : it.id}`, 'good');
-      else push(`背包已满，${ITEMS[it.id] ? ITEMS[it.id].name : it.id} 被丢弃`, 'bad');
+      const { log } = addItemOrLog(player, it.id, it.qty);
+      push(log.text, log.type);
     }
   }
   if (reward.xp) { const g = addXp(player, reward.xp); push(`+${g} 修为`, 'good'); }

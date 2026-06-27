@@ -13,7 +13,7 @@ import { ITEMS, TREASURE_SKILLS } from '../data/items.js';
 import { RECIPE_BY_ID, ALCHEMY_RECIPES, FORGE_BLUEPRINTS } from '../data/recipes.js';
 import {
   newPlayer, recompute, realmInfo, rootDef, addXp, isXpFull,
-  equip, unequip, expandBag, bagExpandCost, countItem, hasItem, removeItem, addItem,
+  equip, unequip, expandBag, bagExpandCost, countItem, hasItem, removeItem, addItemOrLog,
   distinctItems, learnTechnique, upgradeRoot,
 } from '../core/player.js';
 import { activeCultivate, passiveTick } from '../core/cultivate.js';
@@ -77,6 +77,9 @@ export class GameUI {
         this.player = p;
         const off = computeOffline(p);
         if (off.xp > 0) { addXp(p, off.xp); offline = off; }
+        // 立即落盘刷新 lastSeen：否则 lastSeen 要等到 10 秒定时器 / 首次 afterAction 才更新，
+        // 若玩家开档后 10 秒内、未做任何操作即关闭页面，下次开档会按旧 lastSeen 再次发放同一时段收益。
+        saveGame(p);
       }
     }
     if (!this.player) {
@@ -480,13 +483,26 @@ export class GameUI {
       const rw = battleRewards(p, enemy, Math.random);
       // 结算奖励
       if (rw.gain.stones) p.stones += rw.gain.stones;
-      for (const it of rw.gain.items) addItem(p, it.id, it.qty);
-      if (rw.gain.treasure) addItem(p, rw.gain.treasure, 1);
-      if (rw.gain.recipe) { try { learnRecipeGuard(p, rw.gain.recipe); } catch (_) {} }
+      for (const l of rw.logs) this.pushLog(l, 'good');
+      // 掉落入袋：背包满（新种类）则遗失并提示，避免 addItem 返回 0 被忽略而静默丢物
+      for (const it of rw.gain.items) {
+        const { log } = addItemOrLog(p, it.id, it.qty);
+        this.pushLog(log.text, log.type);
+      }
+      if (rw.gain.treasure) {
+        const { log } = addItemOrLog(p, rw.gain.treasure, 1);
+        this.pushLog(log.text, log.type);
+      }
+      if (rw.gain.recipe) {
+        try {
+          const had = p.recipes.includes(rw.gain.recipe);
+          learnRecipeGuard(p, rw.gain.recipe);
+          if (!had) this.pushLog(`意外获得配方【${RECIPE_BY_ID[rw.gain.recipe] ? RECIPE_BY_ID[rw.gain.recipe].name : rw.gain.recipe}】`, 'epic');
+        } catch (_) {}
+      }
       // 战斗修为奖励
       const xp = Math.round(p.xpMax * 0.05);
       addXp(p, xp);
-      for (const l of rw.logs) this.pushLog(l, 'good');
       this.pushLog(`战斗胜利！修为 +${xp}。`, 'epic');
       this.float('胜利！', 'epic');
     } else if (result === 'lose') {

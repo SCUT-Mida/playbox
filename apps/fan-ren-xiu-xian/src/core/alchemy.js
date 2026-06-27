@@ -4,7 +4,7 @@
 import { clamp } from '../config.js';
 import { ALCHEMY_RECIPES, FORGE_BLUEPRINTS, RECIPE_BY_ID } from '../data/recipes.js';
 import { ITEMS } from '../data/items.js';
-import { removeItem, hasItem, addItem, addStones, grantAchievement, countItem } from './player.js';
+import { removeItem, hasItem, addItemOrLog, addStones, grantAchievement, countItem } from './player.js';
 import { chance } from './rng.js';
 
 // 是否拥有配方所需全部材料
@@ -46,9 +46,11 @@ export function tryAlchemy(player, recipeId, rng) {
   if (r < 0.2) { quality = 'low'; qty = 1; }
   else if (r > 0.8) { quality = 'high'; qty = 2; }
   player.stats.alchemyOk += 1;
-  const added = addItem(player, recipe.out, qty);
+  const { added, log: addLog } = addItemOrLog(player, recipe.out, qty);
   const name = ITEMS[recipe.out] ? ITEMS[recipe.out].name : recipe.out;
-  if (quality === 'high') logs.push({ text: `🔥 极品成丹！炼出 ${added} × ${name}。`, type: 'epic' });
+  // 背包满且为新种类时产物无法入袋：提示遗失，避免“成功炼制 0 ×”的静默丢物
+  if (added === 0) logs.push(addLog);
+  else if (quality === 'high') logs.push({ text: `🔥 极品成丹！炼出 ${added} × ${name}。`, type: 'epic' });
   else if (quality === 'low') logs.push({ text: `成丹品质平平，得 ${added} × ${name}。`, type: 'normal' });
   else logs.push({ text: `成功炼制 ${added} × ${name}。`, type: 'good' });
   return { ok: true, success: true, quality, qty: added, out: recipe.out, logs };
@@ -73,9 +75,12 @@ export function tryForge(player, blueprintId, rng) {
   }
   const r = (rng || Math.random)();
   const quality = r > 0.8 ? 'high' : r < 0.2 ? 'low' : 'normal';
-  const added = addItem(player, bp.out, 1);
+  const { added, log: addLog } = addItemOrLog(player, bp.out, 1);
   const name = ITEMS[bp.out] ? ITEMS[bp.out].name : bp.out;
-  if (quality === 'high') {
+  // 背包满且为新种类时法宝无法入袋：提示遗失，避免“神兵出炉”却凭空消失
+  if (added === 0) {
+    logs.push(addLog);
+  } else if (quality === 'high') {
     addStones(player, 30);
     logs.push({ text: `✨ 神兵出炉！锻得【${name}】，另得余料灵石。`, type: 'epic' });
   } else if (quality === 'low') {

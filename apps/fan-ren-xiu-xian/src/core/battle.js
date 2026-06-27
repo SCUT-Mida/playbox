@@ -123,19 +123,18 @@ function applyPillEffect(player, pill) {
   if (e.kind === 'heal_mp') player.mp = Math.min(player.maxMp, player.mp + Math.round(player.maxMp * e.pct));
 }
 
-// 结算胜利奖励：返回日志条目（不直接 mutate stats 之外的状态，由调用方落库）
+// 结算胜利奖励：返回 { logs, gain }。gain 描述「掉落了什么」，由调用方落库并按实际入袋情况
+// （背包满可能遗失）打印日志；此处不再断言「获得 N × 物品 / 意外掉落法宝」，以免与背包满
+// 致遗失的真实结果自相矛盾。仅灵石恒定获得，可在此直接日志。
 export function battleRewards(player, enemy, rng) {
   const r = enemy.rewards || {};
   const logs = [];
   const gain = { stones: 0, items: [], treasure: null, recipe: null };
   if (r.stones) { gain.stones = r.stones; logs.push(`获得 ${r.stones} 灵石。`); }
-  for (const d of (r.drops || [])) {
-    gain.items.push(d);
-    logs.push(`获得 ${d.qty} × 物品。`);
-  }
+  for (const d of (r.drops || [])) gain.items.push(d);
   if (r.rare) {
-    if (r.rare.kind === 'treasure') { gain.treasure = r.rare.id; logs.push('意外掉落一件法宝！'); }
-    if (r.rare.kind === 'recipe') { gain.recipe = r.rare.id; logs.push('意外掉落一份配方！'); }
+    if (r.rare.kind === 'treasure') gain.treasure = r.rare.id;
+    if (r.rare.kind === 'recipe') gain.recipe = r.rare.id;
   }
   return { logs, gain };
 }

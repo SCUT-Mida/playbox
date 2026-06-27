@@ -2,7 +2,7 @@
 import {
   REALMS, SPIRIT_ROOTS, globalLevel, fromGlobalLevel, xpNeeded, MAX_GLOBAL_LEVEL,
   passiveXpPerSec, breakthroughChance, computeDamage, counterMult, clamp,
-  PITTY_THRESHOLD, PITTY_BOOST,
+  PITTY_THRESHOLD, PITTY_BOOST, dayKey,
 } from '../src/config.js';
 import { ITEMS, TREASURE_SKILLS } from '../src/data/items.js';
 import { makeEnemy } from '../src/data/enemies.js';
@@ -10,6 +10,7 @@ import { EVENTS, eligibleEvents } from '../src/data/events.js';
 import {
   newPlayer, recompute, addXp, isXpFull, addItem, removeItem, countItem, hasItem,
   equip, unequip, expandBag, bagExpandCost, upgradeRoot, distinctItems, realmInfo, START_BAG_CAPACITY,
+  restToNextDay, vitalityDepleted,
 } from '../src/core/player.js';
 import { activeCultivate, passiveTick } from '../src/core/cultivate.js';
 import { rollExplore, applyReward, chaosActive } from '../src/core/explore.js';
@@ -269,6 +270,30 @@ ok(p.achievements.includes('ach_first_battle'), '成就入库');
 // 重复检测
 const granted2 = checkAchievements(p);
 ok(granted2.length === 0, '已获成就不再重复授予');
+
+// ---------- 每日活力兜底：restToNextDay 每日仅一次（防无限刷活力）----------
+console.log('— restToNextDay (once per day) —');
+{
+  const q = newPlayer(() => 0);
+  q.vitality = 0; q.restUsedDate = ''; // 模拟活力耗尽、当日尚未用过
+  ok(vitalityDepleted(q) === true, '活力为 0 时判定为耗尽');
+  ok(restToNextDay(q) === true, '首次「闭关静修」成功');
+  ok(q.vitality === q.maxVitality, '闭关后活力回满');
+  ok(q.restUsedDate === dayKey(), '记录当日已用');
+  // 玩家再次把活力花光后，试图当日无限刷 —— 必须被守卫拒绝
+  q.vitality = 0;
+  ok(vitalityDepleted(q) === true, '再次耗尽');
+  ok(restToNextDay(q) === false, '当日第二次被守卫拒绝（杜绝无限刷活力）');
+  ok(q.vitality === 0, '被拒绝时活力不变');
+}
+// 未耗尽时不消耗当日额度（满活力不应触发兜底）
+{
+  const q = newPlayer(() => 0);
+  q.vitality = q.maxVitality;
+  ok(vitalityDepleted(q) === false, '满活力非耗尽');
+  ok(restToNextDay(q) === false, '未耗尽时不消耗当日额度');
+  ok(q.restUsedDate === '', '未触发则不记录');
+}
 
 // ---------- 存档 / 离线 ----------
 console.log('— save / offline —');

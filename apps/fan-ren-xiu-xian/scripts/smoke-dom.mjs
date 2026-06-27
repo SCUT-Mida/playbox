@@ -58,7 +58,7 @@ ok(document.querySelector('.qiyun-bar') !== null, '气运条渲染');
 
 // ---------- 3) 反复重随（不报错） ----------
 for (let i = 0; i < 5; i++) {
-  document.querySelector('.create__foot .btn-ghost')?.click(); // 🎲 重新随机
+  document.querySelector('.reroll-btn')?.click(); // 🎲 重新随机属性
   await sleep(5);
 }
 ok(document.querySelector('.portrait-big') !== null, '多次重随后创角页仍正常');
@@ -104,6 +104,21 @@ ui.refreshStatus();
 ui.doActiveCultivate();
 await sleep(5);
 ok(ui.player.vitality === 100 - vitCost, `主动修炼消耗活力（剩 ${ui.player.vitality}）`);
+
+// ---------- 7b) 活力耗尽 → 顶部「进入次日」横幅 → 回满 ----------
+ui.player.vitality = 0;
+ui.renderPanel();
+ok(document.querySelector('.rest-banner') !== null, '活力耗尽时渲染「进入次日」横幅');
+ok(document.querySelector('.rest-btn') !== null, '横幅含「进入次日」按钮');
+document.querySelector('.rest-btn').click();
+await sleep(5);
+ok(ui.player.vitality === ui.player.maxVitality, `点击「进入次日」后活力回满（${ui.player.vitality}/${ui.player.maxVitality}）`);
+ok(document.querySelector('.rest-banner') === null, '活力回满后横幅消失');
+
+// ---------- 7c) 顶部境界徽章文字可读且不冗余 ----------
+const badgeText = document.querySelector('.realm-badge .realm-name')?.textContent || '';
+ok(badgeText === '凡人', `凡人境界徽章显示「凡人」而非冗余「凡人凡人」（实际「${badgeText}」）`);
+ok(document.querySelector('.realm-badge .seal') !== null, '境界徽章仍保留印章色块');
 
 // ---------- 8) 持久化：重开实例后槽 1 应已占用 ----------
 const slotMeta = JSON.parse(localStorage.getItem('frxx_slot_1'));

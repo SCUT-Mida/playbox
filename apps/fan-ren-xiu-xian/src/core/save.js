@@ -195,6 +195,7 @@ function migrate(player) {
   if (player.vitality == null) player.vitality = 0;
   if (player.maxVitality == null) player.maxVitality = vitalityMax(player);
   if (!player.lastVitalityDate) player.lastVitalityDate = '';
+  if (!player.restUsedDate) player.restUsedDate = '';
   if (player.slot == null) player.slot = 1;
   return player;
 }

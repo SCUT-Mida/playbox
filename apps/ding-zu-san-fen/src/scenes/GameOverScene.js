@@ -127,11 +127,12 @@ export default class GameOverScene extends Phaser.Scene {
       color: '#2c2418',
       fontStyle: 'bold',
     }).setOrigin(0.5));
-    // 命中区必须落在按钮实际绘制位置：按钮容器 cont 被挂到 panel（屏幕中心）下，
-    // 其视觉中心为 (panel.x + x, panel.y + y)。早期版本把 zone 直接放在 (x,y)，
-    // 即画布左上角附近，导致两个结算按钮都无法点击。这里对齐到面板绝对坐标。
-    const zone = this.add.zone(parent.x + x, parent.y + y, w, h).setDepth(92);
-    zone.setInteractive({ useHandCursor: true });
+    // 命中区作为 panel 的子节点：与按钮视觉共用同一变换（缩放/位移）。
+    // panel 入场时 scale 由 0.8 弹到 1（Back.Out），若命中区是独立的场景级对象，
+    // 它会固定在最终绝对坐标、而视觉随 panel 缩放移动，二者在动画期间错位，
+    // 玩家点到可见按钮却落空 → 「再战一局/返回主菜单」点不动。挂在 panel 下后
+    // 命中区始终贴着视觉中心，任意时刻点击都能命中。
+    const zone = this.add.zone(x, y, w, h).setInteractive({ useHandCursor: true });
     zone.on('pointerover', () => cont.setScale(1.04));
     zone.on('pointerout', () => cont.setScale(1));
     zone.on('pointerdown', () => {
@@ -139,5 +140,6 @@ export default class GameOverScene extends Phaser.Scene {
       this.time.delayedCall(80, onClick);
     });
     parent.add(cont);
+    parent.add(zone);
   }
 }

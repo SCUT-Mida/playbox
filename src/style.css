@@ -224,11 +224,45 @@ header {
   background: rgba(0, 0, 0, 0.92);
 }
 
+/* 顶栏 + 画布 的纵向框架：关闭✕ 收进顶栏，置于画布之上方，
+   不再以悬浮✕压住游戏内右上角的控件（如倍速按钮）。 */
+.game-frame {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  width: 100%;
+  /* 顶栏(40) + 间距(6) + 安全边距，确保画布在视口高度内完整放下 */
+  max-width: min(96vw, calc((100vh - 96px) * 720 / 1280));
+}
+
+.game-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 40px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #ead9b6;
+}
+
+.game-topbar__title {
+  padding: 0 8px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  opacity: 0.9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .game-stage {
   position: relative;
   width: 100%;
-  /* 保持 720×1280 竖屏画布比例，并随视口自适应 */
-  max-width: min(96vw, calc((100vh - 48px) * 720 / 1280));
+  /* 保持 720×1280 竖屏画布比例，宽度由 .game-frame 统一约束 */
   aspect-ratio: 720 / 1280;
   background: #1f1812;
   border-radius: 10px;
@@ -275,22 +309,21 @@ header {
 
 .game-mount canvas {
   display: block;
+  /* 嵌入落地页时也禁用浏览器手势（滚动/缩放）抢占触摸，保证游戏内点击/拖拽可靠 */
+  touch-action: none;
 }
 
 .game-close {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 2;
+  flex: none;
   min-width: 36px;
-  height: 36px;
-  padding: 0 10px;
+  height: 30px;
+  padding: 0 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   border: none;
-  border-radius: 18px;
-  background: rgba(0, 0, 0, 0.55);
+  border-radius: 15px;
+  background: rgba(0, 0, 0, 0.4);
   color: #ead9b6;
   font-size: 13px;
   font-family: var(--font-body);

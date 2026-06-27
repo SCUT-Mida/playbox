@@ -297,7 +297,29 @@ export default class UIScene extends Phaser.Scene {
     dim.setVisible(false);
     cont.add(dim);
 
-    return { def, container: cont, dim, rect: { x: cx - w / 2, y: cy - h / 2, w, h } };
+    // 已部署标记：同名武将每局仅可部署一个。已上场时盖一枚"已部署"徽章并禁用拖拽，
+    // 避免玩家见"金币够→可拖"却放不下的困惑（点按仍可长按查看图鉴）。
+    const deployedTag = this.add.container(0, 0).setVisible(false);
+    const dtBg = this.add.graphics();
+    dtBg.fillStyle(0x2f5d3a, 0.94);
+    dtBg.fillRoundedRect(-31, -9, 62, 18, 9);
+    dtBg.lineStyle(1.5, 0x6fd08a, 0.95);
+    dtBg.strokeRoundedRect(-31, -9, 62, 18, 9);
+    deployedTag.add(dtBg);
+    deployedTag.add(this.add.text(0, 0, '✓ 已部署', {
+      fontFamily: '"PingFang SC",sans-serif', fontSize: '11px', color: '#eafff0', fontStyle: 'bold',
+    }).setOrigin(0.5));
+    cont.add(deployedTag);
+
+    return { def, container: cont, dim, deployedTag, rect: { x: cx - w / 2, y: cy - h / 2, w, h } };
+  }
+
+  // 该武将是否已上场（同名唯一）：同名每局仅可部署一个
+  _isDeployed(id) {
+    for (const g of this.gameScene.generals.values()) {
+      if (g.def.id === id) return true;
+    }
+    return false;
   }
 
   // ---------------- 输入 ----------------
@@ -366,6 +388,12 @@ export default class UIScene extends Phaser.Scene {
       const dx = p.x - this._press.px;
       const dy = p.y - this._press.py;
       if (dx * dx + dy * dy > 144) { // 12px 起拖阈值
+        if (this._press.noDrag) {
+          // 已上场武将不可重复部署：给出反馈但不启动拖拽（长按查看图鉴仍可用）
+          this._cancelPress();
+          audio.play('error');
+          return;
+        }
         const def = this._press.def;
         this._cancelPress();
         this._startDrag(def, p.x, p.y);
@@ -423,7 +451,8 @@ export default class UIScene extends Phaser.Scene {
   // —— 长按图鉴：按下后等待 ~450ms，期间未移动则弹出图鉴浮层 ——
   _beginPress(def, px, py) {
     this._cancelPress();
-    this._press = { def, px, py, longFired: false };
+    // 已上场武将不可重复部署：仍允许长按查看图鉴，但拖拽无效
+    this._press = { def, px, py, longFired: false, noDrag: this._isDeployed(def.id) };
     this._pressTimer = this.time.delayedCall(450, () => {
       if (this._press && !this._press.longFired && !this.drag) {
         const d = this._press.def;
@@ -815,9 +844,14 @@ export default class UIScene extends Phaser.Scene {
     // 波间空档：在棋盘空白处呈现可点击的"提前迎战"倒计时横幅（圆环 + 秒数）
     this._updateEarlyBanner(s);
 
-    // 武将卡可负担状态
+    // 武将卡状态：金币不足 或 已上场同名武将 时禁用（已上场者额外盖"已部署"徽章）
+    const deployedIds = new Set();
+    for (const g of this.gameScene.generals.values()) deployedIds.add(g.def.id);
     for (const card of this.cards) {
-      card.dim.setVisible(this.gameScene.gold < card.def.cost);
+      const deployed = deployedIds.has(card.def.id);
+      const cantAfford = this.gameScene.gold < card.def.cost;
+      card.dim.setVisible(cantAfford || deployed);
+      if (card.deployedTag) card.deployedTag.setVisible(deployed);
     }
 
     // 羁绊展示

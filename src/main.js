@@ -52,13 +52,18 @@ app.innerHTML = `
         <p class="orientation-hint__desc">展品为竖屏设计，请旋转设备以获得最佳体验。</p>
       </div>
     </div>
-    <div class="game-stage">
-      <button class="game-close" id="game-close" type="button" aria-label="退出游戏">✕</button>
-      <div class="game-loading" id="game-loading">
-        <span class="game-loading__spinner" aria-hidden="true"></span>
-        <span class="game-loading__text">加载中…</span>
+    <div class="game-frame">
+      <div class="game-topbar">
+        <span class="game-topbar__title" id="game-topbar-title">展品</span>
+        <button class="game-close" id="game-close" type="button" aria-label="退出游戏">✕</button>
       </div>
-      <div class="game-mount" id="game-mount"></div>
+      <div class="game-stage">
+        <div class="game-loading" id="game-loading">
+          <span class="game-loading__spinner" aria-hidden="true"></span>
+          <span class="game-loading__text">加载中…</span>
+        </div>
+        <div class="game-mount" id="game-mount"></div>
+      </div>
     </div>
   </div>
 `
@@ -110,6 +115,10 @@ async function openGame(def, btn) {
   btn.disabled = true
   btn.classList.add('is-loading')
   playLabel.textContent = '加载中…'
+
+  // 顶栏展示当前展品名（关闭✕已移入顶栏，不再压住游戏右上角的控件）
+  const topbarTitle = document.getElementById('game-topbar-title')
+  if (topbarTitle) topbarTitle.textContent = def.title
 
   overlay.hidden = false
   loadingEl.hidden = false

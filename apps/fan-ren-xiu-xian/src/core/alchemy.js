@@ -4,7 +4,7 @@
 import { clamp } from '../config.js';
 import { ALCHEMY_RECIPES, FORGE_BLUEPRINTS, RECIPE_BY_ID } from '../data/recipes.js';
 import { ITEMS } from '../data/items.js';
-import { removeItem, hasItem, addItemOrLog, addStones, grantAchievement, countItem } from './player.js';
+import { removeItem, hasItem, addItemOrLog, addStones, grantAchievement, countItem, talentAlchemyBonus } from './player.js';
 import { chance } from './rng.js';
 
 // 是否拥有配方所需全部材料
@@ -15,9 +15,9 @@ export function consumeMaterials(player, inputs) {
   for (const [id, n] of Object.entries(inputs)) removeItem(player, id, n);
 }
 
-// 成功率：神识越高越易成，难度越高越难
+// 成功率：神识越高越易成，难度越高越难；天赋（丹道天才/神识通明）额外加成
 export function successRate(player, diff) {
-  return clamp(0.55 + (player.spirit - 10) / 220 - (diff - 1) * 0.13, 0.15, 0.95);
+  return clamp(0.55 + (player.spirit - 10) / 220 - (diff - 1) * 0.13 + talentAlchemyBonus(player), 0.15, 0.95);
 }
 
 // 炼丹

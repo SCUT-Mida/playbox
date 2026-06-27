@@ -1,6 +1,7 @@
 // ============================================================================
 // 凡人修仙录 · 全局配置与数值公式（纯函数，无 DOM 依赖，便于单测）
 // ============================================================================
+import { TALENTS } from './data/characters.js';
 
 // ── 境界体系（大境界，从低到高）───────────────────────────────────────────────
 // subs: 小层名称列表；trial: 进入本境界需经历的考验（null 表示无）
@@ -90,9 +91,10 @@ export function baseAtk(lv) { return 6 + lv * 3; }
 export function baseDef(lv) { return 3 + lv * 2; }
 export function baseSpirit(lv) { return 10 + lv * 4; } // 神识：影响炼丹/心魔判定
 
-// ── 修炼速度总倍率（灵根 × 称号 × 功法 × 混沌事件 buff）────────────────────────
+// ── 修炼速度总倍率（灵根 × 天赋 × 称号 × 功法 × 混沌事件 buff）──────────────────
 export function cultivateSpeedMult(player) {
   let m = player.rootMult;
+  for (const id of (player.talentIds || [])) m *= (TALENTS[id] && TALENTS[id].cultMult) || 1;
   for (const id of player.titles) m *= titleCultivateMult(id);
   for (const id of player.techniques) m *= techniqueDef(id).cultivate || 1;
   if (player.chaos && player.chaos.speedBoostUntil > nowSec()) m *= 2;
@@ -117,10 +119,11 @@ export function counterMult(atkEl, defEl) {
   return COUNTER[atkEl] === defEl ? 1.3 : 0.85;
 }
 
-// ── 突破成功率（基础 + 灵根 + 丹药 + 功法 + 境界难度）────────────────────────
+// ── 突破成功率（基础 + 灵根 + 天赋 + 丹药 + 功法 + 境界难度）────────────────────
 export function breakthroughChance(player, hasBreakPill, targetTier) {
   let base = 0.7;
   base += player.rootBonus; // 灵根加成
+  for (const id of (player.talentIds || [])) base += (TALENTS[id] && TALENTS[id].breakBonus) || 0; // 天赋加成
   if (hasBreakPill) base += 0.2; // 服用突破丹
   for (const id of player.techniques) base += (techniqueDef(id).breakBonus || 0);
   // 越往后境界越难
@@ -138,9 +141,38 @@ export const EXPLORE_HP_COST = 6;
 export const PITTY_THRESHOLD = 10; // 连续 N 次无稀有事件后，下次概率提升
 export const PITTY_BOOST = 0.45;
 
+// ── 活力（每日周期：消耗型行动力，次日恢复）──────────────────────────────────
+export const MAX_VITALITY = 100;
+export const VITALITY_COSTS = { explore: 10, cultivate: 4, craft: 6 };
+// 活力上限：基础 + 天赋加成
+export function vitalityMax(player) {
+  let m = MAX_VITALITY;
+  for (const id of (player && player.talentIds) || []) {
+    const t = TALENTS[id];
+    if (t && t.maxVitBonus) m += t.maxVitBonus;
+  }
+  return m;
+}
+
+// ── 气运 → 奇遇辅助：气运越高，保底阈值越低、稀有事件权重越高 ──────────────────
+export function pityThresholdForQiyun(qiyun) {
+  return Math.max(3, PITTY_THRESHOLD - Math.floor((qiyun || 50) / 20));
+}
+export function rareBoostForQiyun(qiyun) {
+  return 1 + Math.min(0.15, (qiyun || 50) * 0.0015);
+}
+
 // ── 工具 ────────────────────────────────────────────────────────────────────
 export function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 export function nowSec() { return Math.floor(Date.now() / 1000); }
+// 本地日期键（YYYY-MM-DD）：用于「每日」刷新判定（活力等）
+export function dayKey(ts) {
+  const d = new Date(ts != null ? ts : Date.now());
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 // ============================================================================
 // 以下为对 items / techniques 的轻量查表入口（避免循环依赖，data 模块再 import 本文件）。

@@ -1,0 +1,15 @@
+{
+  "name": "fan-ren-xiu-xian",
+  "version": "1.0.0",
+  "description": "《凡人修仙录》文字修仙挂机游戏 - A Record of a Mortal's Cultivation (text idle RPG)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "test": "node scripts/logic-test.mjs"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

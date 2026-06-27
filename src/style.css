@@ -282,23 +282,33 @@ header {
   top: 8px;
   right: 8px;
   z-index: 2;
-  width: 36px;
+  min-width: 36px;
   height: 36px;
+  padding: 0 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   border: none;
-  border-radius: 50%;
+  border-radius: 18px;
   background: rgba(0, 0, 0, 0.55);
   color: #ead9b6;
-  font-size: 16px;
+  font-size: 13px;
+  font-family: var(--font-body);
   line-height: 1;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, transform 0.12s ease;
 }
 
 .game-close:hover {
   background: rgba(0, 0, 0, 0.85);
+}
+
+/* 二次确认 armed 态：放大、变暖色并显示"再按退出"文案，提示需要再点一次才退出 */
+.game-close.is-armed {
+  background: rgba(176, 58, 30, 0.92);
+  color: #ffe6d8;
+  font-weight: 600;
+  transform: scale(1.06);
 }
 
 .game-loading {

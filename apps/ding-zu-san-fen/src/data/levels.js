@@ -61,6 +61,64 @@ export const LEVELS = {
       [{ enemy: 'cavalry', count: 8, interval: 0.8, start: 0 }, { enemy: 'shield', count: 6, interval: 1.5, start: 4 }, { enemy: 'boss_dongzhuo', count: 1, interval: 1, start: 10 }],
     ],
   },
+
+  guandu: {
+    key: 'guandu',
+    name: '官渡之战',
+    subtitle: '以少胜多 · 焚烬粮草',
+    startGold: 400,
+    startLives: 12,
+    bgTone: 0x35302a,
+    // 蛇形蜿蜒：自顶部入，迂回下行至底部主营
+    path: [
+      [4, 0], [4, 3], [1, 3], [1, 7], [7, 7], [7, 10], [3, 10], [3, 13],
+    ],
+    roadSlots: [
+      4, 1, 4, 2, 2, 3, 3, 3,
+      1, 4, 1, 5, 1, 6, 3, 7, 4, 7, 5, 7,
+      7, 8, 7, 9, 4, 10, 5, 10, 6, 10,
+      3, 11, 3, 12,
+    ],
+    waves: [
+      [{ enemy: 'shu_soldier', count: 10, interval: 0.9, start: 0 }],
+      [{ enemy: 'cavalry', count: 8, interval: 0.9, start: 0 }, { enemy: 'scout', count: 8, interval: 0.5, start: 3 }],
+      [{ enemy: 'shield', count: 5, interval: 1.6, start: 0 }, { enemy: 'warlock', count: 4, interval: 1.4, start: 2 }],
+      [{ enemy: 'cavalry', count: 10, interval: 0.8, start: 0 }, { enemy: 'shu_soldier', count: 8, interval: 0.7, start: 4 }],
+      [{ enemy: 'warlock', count: 6, interval: 1.2, start: 0 }, { enemy: 'scout', count: 12, interval: 0.4, start: 2 }],
+      [{ enemy: 'shield', count: 7, interval: 1.3, start: 0 }, { enemy: 'cavalry', count: 8, interval: 0.9, start: 3 }],
+      [{ enemy: 'warlock', count: 7, interval: 1.0, start: 0 }, { enemy: 'shield', count: 6, interval: 1.4, start: 3 }, { enemy: 'cavalry', count: 10, interval: 0.6, start: 6 }],
+      [{ enemy: 'shield', count: 8, interval: 1.3, start: 0 }, { enemy: 'warlock', count: 6, interval: 1.2, start: 3 }, { enemy: 'boss_yuanshao', count: 1, interval: 1, start: 11 }],
+    ],
+  },
+
+  chibi: {
+    key: 'chibi',
+    name: '赤壁之战',
+    subtitle: '火烧连营 · 决战江畔',
+    startGold: 420,
+    startLives: 14,
+    bgTone: 0x332a2a,
+    // 赤壁火阵：多重折返的长蛇径
+    path: [
+      [2, 0], [2, 2], [6, 2], [6, 5], [2, 5], [2, 8], [7, 8], [7, 11], [4, 11], [4, 13],
+    ],
+    roadSlots: [
+      2, 1, 3, 2, 4, 2, 5, 2,
+      6, 3, 6, 4, 3, 5, 4, 5, 5, 5,
+      2, 6, 2, 7, 3, 8, 4, 8, 5, 8, 6, 8,
+      7, 9, 7, 10, 5, 11, 6, 11, 4, 12,
+    ],
+    waves: [
+      [{ enemy: 'cavalry', count: 10, interval: 0.8, start: 0 }],
+      [{ enemy: 'warlock', count: 6, interval: 1.0, start: 0 }, { enemy: 'scout', count: 10, interval: 0.4, start: 2 }],
+      [{ enemy: 'shield', count: 6, interval: 1.4, start: 0 }, { enemy: 'cavalry', count: 10, interval: 0.7, start: 3 }],
+      [{ enemy: 'warlock', count: 8, interval: 0.9, start: 0 }, { enemy: 'shu_soldier', count: 12, interval: 0.5, start: 2 }],
+      [{ enemy: 'shield', count: 8, interval: 1.2, start: 0 }, { enemy: 'cavalry', count: 12, interval: 0.6, start: 3 }],
+      [{ enemy: 'warlock', count: 10, interval: 0.8, start: 0 }, { enemy: 'scout', count: 14, interval: 0.35, start: 3 }],
+      [{ enemy: 'shield', count: 10, interval: 1.0, start: 0 }, { enemy: 'warlock', count: 8, interval: 1.0, start: 3 }, { enemy: 'cavalry', count: 12, interval: 0.5, start: 6 }],
+      [{ enemy: 'cavalry', count: 12, interval: 0.7, start: 0 }, { enemy: 'shield', count: 8, interval: 1.3, start: 3 }, { enemy: 'warlock', count: 8, interval: 1.0, start: 6 }, { enemy: 'boss_caofleet', count: 1, interval: 1, start: 12 }],
+    ],
+  },
 };
 
-export const LEVEL_LIST = ['huangjin', 'hulao'];
+export const LEVEL_LIST = ['huangjin', 'hulao', 'guandu', 'chibi'];

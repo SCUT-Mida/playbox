@@ -1,5 +1,9 @@
 // WaveManager: 控制敌军生成序列
 // 将每波拆解为按时间轴触发的 spawn 事件，逐帧推进时间并回调生成。
+
+// 波间空档自动开启下一波的倒计时（秒）：给玩家留出"提前迎战"的操作窗口。
+export const BETWEEN_DELAY = 5.0;
+
 export default class WaveManager {
   constructor(waves, spawnFn) {
     this.waves = waves; // [[group,...], ...]
@@ -10,6 +14,7 @@ export default class WaveManager {
     this.timer = 0;
     this.spawnedCount = 0;
     this.betweenDelay = 0;
+    this.betweenMax = BETWEEN_DELAY; // 倒计时满值，用于绘制圆环比例
   }
 
   get totalWaves() {
@@ -76,7 +81,7 @@ export default class WaveManager {
         this.state = 'cleared'; // 全部通关
       } else {
         this.state = 'between';
-        this.betweenDelay = 4.0; // 自动进入下一波的倒计时
+        this.betweenDelay = BETWEEN_DELAY; // 自动进入下一波的倒计时
       }
     }
   }

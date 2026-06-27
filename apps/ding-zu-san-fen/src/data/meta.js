@@ -41,7 +41,7 @@ export function starOf(id) {
 }
 
 // 通关金币奖励（每次通关）+ 首通额外奖励（仅首次）
-export const LEVEL_REWARD = { huangjin: 220, hulao: 320 };
+export const LEVEL_REWARD = { huangjin: 220, hulao: 320, guandu: 280, chibi: 380 };
 export const FIRST_CLEAR_BONUS = 150;
 
 function defaults() {

@@ -259,8 +259,13 @@ export default class GameScene extends Phaser.Scene {
     // 波次进入"波间空档"（无存活敌军的干净检查点）→ 更新存档快照
     const ws = this.waveManager.state;
     if (ws !== this._lastWaveState) {
+      const prev = this._lastWaveState;
       this._lastWaveState = ws;
-      if (ws === 'between') this._saveBattle();
+      if (ws === 'between') {
+        // 由 running 切入波间：本波清剿完成，补一记清脆提示（首波 idle / 续战恢复均不会触发）
+        if (prev === 'running') audio.play('waveclear');
+        this._saveBattle();
+      }
     }
 
     // 阻挡分配
@@ -347,14 +352,22 @@ export default class GameScene extends Phaser.Scene {
     e.container.x = p.x;
     e.container.y = p.y;
     this.enemies.push(e);
+    // BOSS 入场：警示音 + 落地冲击，强化压迫感
+    if (e.def.boss) {
+      audio.play('boss');
+      this.fx.impact(p.x, p.y, 90, e.def.color);
+    }
     this._emitState();
   }
 
   _handleKill(e) {
     this.gold += e.def.gold;
+    const before = this.morale;
     this.morale = Math.min(100, this.morale + e.def.morale);
     this.fx.spark(e.x, e.y, e.def.color);
     audio.play('kill');
+    // 气势首次攒满大招：就绪提示音（仅跨过阈值时触发一次，避免重复）
+    if (before < ULT_COST && this.morale >= ULT_COST) audio.play('ready');
     this._emitState();
   }
 
@@ -475,10 +488,12 @@ export default class GameScene extends Phaser.Scene {
     const wasBetween = this.waveManager.state === 'between';
     const started = this.waveManager.startNextWave();
     if (started) {
-      audio.play('wave');
+      // 提前迎战：以更亮的"early"奖励音覆盖普通开波号角；否则吹号角
+      const granted = wasBetween && !this._suppressEarlyBonus;
+      audio.play(granted ? 'early' : 'wave');
       // 续战后首次开波不再发放"提前迎战"奖励：该奖励属于本局推进，
       // 避免反复"续战→开波→退出"刷取 EARLY_BONUS 金币
-      if (wasBetween && !this._suppressEarlyBonus) {
+      if (granted) {
         this.gold += EARLY_BONUS;
       }
       this._suppressEarlyBonus = false;
@@ -524,8 +539,12 @@ export default class GameScene extends Phaser.Scene {
 
   _recomputeBonds() {
     const list = [...this.generals.values()].filter((g) => g.alive);
+    const prev = this.bondManager.active.length;
     this.bondManager.recompute(list);
     for (const g of list) g.refreshBonds();
+    // 新激活羁绊（数量增加）时播放激活音，强化"阵法成型"反馈。
+    // 存档恢复期间（_resume）AudioContext 尚未解锁，跳过以免解锁时堆积/误触发。
+    if (!this._resume && this.bondManager.active.length > prev) audio.play('bond');
   }
 
   // ---------------- 胜负 ----------------
@@ -563,10 +582,13 @@ export default class GameScene extends Phaser.Scene {
       morale: Math.floor(this.morale),
       ultCost: ULT_COST,
       ultReady: this.morale >= ULT_COST,
+      earlyBonus: EARLY_BONUS,
       wave: this.waveManager.currentWaveNumber,
       totalWaves: this.waveManager.totalWaves,
       waveState: this.waveManager.state,
       betweenRemaining: this.waveManager.betweenRemaining,
+      betweenDelay: this.waveManager.betweenDelay,
+      betweenMax: this.waveManager.betweenMax,
       enemiesAlive: this.enemies.reduce((n, e) => n + (e.alive ? 1 : 0), 0),
       bonds: this.bondManager.active.map((b) => ({ id: b.id, name: b.name, desc: b.desc })),
       deployedCount: this.generals.size,
@@ -634,6 +656,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   get ULT_COST() { return ULT_COST; }
+  get EARLY_BONUS() { return EARLY_BONUS; }
 
   // 部署悬停高亮（由 UIScene 拖拽时调用）
   setHover(col, row, valid) {

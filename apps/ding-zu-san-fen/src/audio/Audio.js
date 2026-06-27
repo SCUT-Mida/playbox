@@ -134,6 +134,11 @@ const SFX = {
     tone({ freq: 320, type: 'sawtooth', dur: 0.4, vol: 0.16 });
     tone({ freq: 240, type: 'sawtooth', dur: 0.4, vol: 0.12, delay: 0.02 });
   },
+  waveclear() {
+    // 本波清剿完成：明亮短促的上行双音，区别于整局胜利的 win 长琶音
+    tone({ freq: 784, type: 'triangle', dur: 0.14, vol: 0.16 });
+    tone({ freq: 1175, type: 'sine', dur: 0.22, vol: 0.15, delay: 0.08 });
+  },
   ult() {
     // 火烧连营：噪声 + 下行铜管
     noise({ dur: 0.5, vol: 0.22, filterType: 'bandpass', freq: 800 });
@@ -174,6 +179,39 @@ const SFX = {
     [784, 1047, 1568].forEach((f, i) => {
       tone({ freq: f, type: 'triangle', dur: 0.25, vol: 0.18, delay: i * 0.08 });
     });
+  },
+  // —— 战斗事件音效（丰富反馈）——
+  boss() {
+    // BOSS 出场：低沉双层铜锣 + 警报感下行
+    tone({ freq: 160, type: 'sawtooth', dur: 0.7, vol: 0.24, slideTo: 70 });
+    tone({ freq: 110, type: 'square', dur: 0.7, vol: 0.16, slideTo: 55, delay: 0.04 });
+    noise({ dur: 0.5, vol: 0.16, filterType: 'lowpass', freq: 500, delay: 0.02 });
+  },
+  ready() {
+    // 大招就绪：清亮上行双音 + 闪烁
+    tone({ freq: 988, type: 'triangle', dur: 0.16, vol: 0.18 });
+    tone({ freq: 1319, type: 'sine', dur: 0.28, vol: 0.16, delay: 0.1 });
+  },
+  bond() {
+    // 羁绊激活：大三和弦（C E G）齐鸣，明亮
+    [523, 659, 784].forEach((f) => {
+      tone({ freq: f, type: 'triangle', dur: 0.34, vol: 0.15 });
+    });
+    tone({ freq: 1047, type: 'sine', dur: 0.2, vol: 0.1, delay: 0.08 });
+  },
+  select() {
+    // 选中武将：柔和上挑，区别于普通 click
+    tone({ freq: 600, type: 'triangle', dur: 0.08, vol: 0.14, slideTo: 900 });
+  },
+  early() {
+    // 提前迎战奖励：金币 + 拨弦亮音
+    tone({ freq: 1047, type: 'square', dur: 0.07, vol: 0.13 });
+    tone({ freq: 1568, type: 'triangle', dur: 0.14, vol: 0.14, delay: 0.06 });
+    tone({ freq: 2093, type: 'sine', dur: 0.12, vol: 0.1, delay: 0.12 });
+  },
+  countdown() {
+    // 倒计时滴答：短促木鱼
+    tone({ freq: 440, type: 'square', dur: 0.04, vol: 0.1 });
   },
 };
 

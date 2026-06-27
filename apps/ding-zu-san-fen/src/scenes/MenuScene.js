@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { COLORS, GAME_WIDTH, GAME_HEIGHT } from '../config.js';
 import { LEVELS, LEVEL_LIST } from '../data/levels.js';
 import { GENERAL_BY_ID } from '../data/generals.js';
-import { getMeta, isMuted, setMuted } from '../data/meta.js';
+import { getMeta, isMuted, setMuted, LEVEL_REWARD } from '../data/meta.js';
 import { loadBattle } from '../data/save.js';
 import { drawChibi, optsForGeneral } from '../utils/Chibi.js';
 import audio from '../audio/Audio.js';
@@ -67,11 +67,14 @@ export default class MenuScene extends Phaser.Scene {
       }
     }
 
-    // 关卡按钮
+    // 关卡按钮：两列网格排布（8 关紧凑铺满，告别冗长列表）
+    const colL = width / 2 - 138;
+    const colR = width / 2 + 138;
     LEVEL_LIST.forEach((key, i) => {
       const lv = LEVELS[key];
-      const y = startY + i * 124;
-      this._levelCard(width / 2, y, lv);
+      const cx = i % 2 === 0 ? colL : colR;
+      const y = startY + Math.floor(i / 2) * 108;
+      this._levelCard(cx, y, lv);
     });
 
     // 玩法说明
@@ -247,8 +250,8 @@ export default class MenuScene extends Phaser.Scene {
   }
 
   _levelCard(cx, cy, lv) {
-    const w = 520;
-    const h = 96;
+    const w = 252;
+    const h = 92;
     const cont = this.add.container(cx, cy);
 
     const g = this.add.graphics();
@@ -260,23 +263,39 @@ export default class MenuScene extends Phaser.Scene {
     g.strokeRoundedRect(-w / 2, -h / 2, w, h, 14);
     cont.add(g);
 
-    cont.add(this.add.text(-w / 2 + 28, -18, lv.name, {
+    cont.add(this.add.text(-w / 2 + 18, -h / 2 + 26, lv.name, {
       fontFamily: 'serif',
-      fontSize: '34px',
+      fontSize: '28px',
       color: '#f0d9a8',
     }).setOrigin(0, 0.5));
 
-    cont.add(this.add.text(-w / 2 + 30, 20, `${lv.subtitle} · 共 ${lv.waves.length} 波`, {
+    // 难度星级（右上角）
+    const diff = Math.max(1, Math.min(5, lv.difficulty || 1));
+    cont.add(this.add.text(w / 2 - 16, -h / 2 + 22, '★'.repeat(diff), {
+      fontFamily: 'serif',
+      fontSize: '15px',
+      color: '#ffce5a',
+    }).setOrigin(1, 0.5));
+
+    cont.add(this.add.text(-w / 2 + 18, 2, lv.subtitle, {
       fontFamily: '"PingFang SC",sans-serif',
-      fontSize: '16px',
+      fontSize: '13px',
       color: '#cdb888',
+    }).setOrigin(0, 0.5).setWordWrapWidth(w - 36));
+
+    // 波数 + 通关奖励
+    const reward = LEVEL_REWARD[lv.key] || 0;
+    cont.add(this.add.text(-w / 2 + 18, h / 2 - 16, `共 ${lv.waves.length} 波 · 通关 +${reward} 金`, {
+      fontFamily: '"PingFang SC",sans-serif',
+      fontSize: '12px',
+      color: '#b9a47e',
     }).setOrigin(0, 0.5));
 
     // 通关标记
     const cleared = getMeta().cleared.includes(lv.key);
-    cont.add(this.add.text(w / 2 - 30, -22, cleared ? '✓ 已通关' : '▶ 出征', {
+    cont.add(this.add.text(w / 2 - 16, h / 2 - 18, cleared ? '✓ 已通关' : '▶ 出征', {
       fontFamily: '"PingFang SC",sans-serif',
-      fontSize: '22px',
+      fontSize: '15px',
       color: cleared ? '#8fd06a' : '#ffe08a',
     }).setOrigin(1, 0.5));
 

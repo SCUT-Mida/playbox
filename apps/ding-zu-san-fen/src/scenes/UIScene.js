@@ -24,7 +24,7 @@ const CARD_ROW2_CY = CARD_BAR_TOP + 118;
 
 const MORALE_BAR_X = 236;
 const MORALE_BAR_Y = 36;
-const MORALE_BAR_W = 380;
+const MORALE_BAR_W = 336;
 
 // UIScene: 顶部 HUD + 底部武将卡（拖拽部署）+ 武将操作菜单 + 大招/波次控制
 export default class UIScene extends Phaser.Scene {
@@ -83,6 +83,7 @@ export default class UIScene extends Phaser.Scene {
       enemiesAlive: g.enemies.reduce((n, e) => n + (e.alive ? 1 : 0), 0),
       bonds: g.bondManager.active.map((b) => ({ id: b.id, name: b.name, desc: b.desc })),
       deployedCount: g.generals.size,
+      speed: g._speed,
     };
   }
 
@@ -120,6 +121,9 @@ export default class UIScene extends Phaser.Scene {
     this.moraleText = this.add.text(MORALE_BAR_X + MORALE_BAR_W + 6, cy1, '0/100', {
       fontFamily: '"PingFang SC",sans-serif', fontSize: '13px', color: '#dff3ff',
     }).setOrigin(0, 0.5).setDepth(7);
+
+    // 倍速切换（右上角）：1× / 2×，长关卡加速推进
+    this._buildSpeedToggle();
 
     // —— 第二行：波次 / 大招 / 召唤 ——
     const cy2 = HUD_ROW2;
@@ -181,6 +185,26 @@ export default class UIScene extends Phaser.Scene {
   _setBtnLabel(parent, label) {
     const t = parent.getByName('label');
     if (t) t.setText(label);
+  }
+
+  // 右上角圆形倍速按钮（1× / 2×）。命中与点击由 _topButtons 统一处理，与其它按钮一致。
+  _buildSpeedToggle() {
+    const cx = GAME_WIDTH - 40;
+    const cy = HUD_ROW1;
+    const r = 24;
+    this.speedContainer = this.add.container(cx, cy).setDepth(7);
+    const g = this.add.graphics();
+    g.fillStyle(0x000000, 0.3);
+    g.fillCircle(2, 3, r);
+    g.fillStyle(0x2c2218, 0.97);
+    g.fillCircle(0, 0, r);
+    g.lineStyle(2, COLORS.gold, 0.7);
+    g.strokeCircle(0, 0, r);
+    this.speedContainer.add(g);
+    this.speedContainer.add(this.add.text(0, 0, '1×', {
+      fontFamily: 'serif', fontSize: '20px', color: '#ffe9a8', fontStyle: 'bold',
+    }).setOrigin(0.5).setName('label'));
+    this._speedRect = { x: cx - r, y: cy - r, w: r * 2, h: r * 2 };
   }
 
   // ---------------- 武将卡栏 ----------------
@@ -736,6 +760,20 @@ export default class UIScene extends Phaser.Scene {
         visible: true,
       },
     ];
+    // 倍速按钮：切换并即时刷新标签
+    this._setBtnLabel(this.speedContainer, `${s.speed}×`);
+    this.speedContainer.setAlpha(s.speed >= 2 ? 1 : 0.78);
+    this._topButtons.push({
+      rect: this._speedRect,
+      action: () => {
+        const sp = this.gameScene.toggleSpeed();
+        audio.play('click');
+        this.tweens.add({ targets: this.speedContainer, scale: 0.9, duration: 70, yoyo: true });
+        return sp;
+      },
+      enabled: true,
+      visible: true,
+    });
 
     // 波次文本
     const ws = s.waveState;

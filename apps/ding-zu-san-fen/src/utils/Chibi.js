@@ -299,9 +299,13 @@ const APPEARANCE = {
   // —— 魏 ——
   caocao: { skin: 0xe8c0a0, body: 0x33415c, accent: 0xf0c040, hatStyle: 'plume', hat: 0x28344a, plume: 0xf0c040, mood: 'angry', beard: 0x2a2620 },
   sima: { skin: 0xd8b0a0, body: 0x473a5a, accent: 0x8a6aa0, hatStyle: 'wizard', hat: 0x362a45, glow: 0xa06fd0, weapon: 'staff', mood: 'glow' },
+  // 张辽：魏之良将，持弓急射
+  zhangliao: { skin: 0xe2b48a, body: 0x3a4a6a, accent: 0xf0c040, hatStyle: 'plume', hat: 0x28344a, plume: 0xf0c040, weapon: 'bow', mood: 'angry', beard: 0x2a2620 },
   xiahou: { skin: 0xc89878, body: 0x3a4a6a, accent: 0xb0b8c0, hatStyle: 'cap', hat: 0x2a3850, plume: 0x8a3a2a, weapon: 'sword', mood: 'angry', beard: 0x2a2620 },
   // —— 吴 ——
   zhouyu: { skin: 0xeec6a4, body: 0xb04030, accent: 0xf0c040, hatStyle: 'wizard', hat: 0x7a2a20, glow: 0xff7a3a, weapon: 'staff', mood: 'glow' },
+  // 陆逊：儒将火计，持法杖
+  luxun: { skin: 0xeec8a4, body: 0x9a3a2a, accent: 0xf0c040, hatStyle: 'wizard', hat: 0x6a2a20, glow: 0xff8a3a, weapon: 'staff', mood: 'glow' },
   sunce: { skin: 0xe0b080, body: 0xcc4f36, accent: 0xf0c040, hatStyle: 'cap', hat: 0x8a2f20, plume: 0xf0c040, weapon: 'sword', mood: 'angry' },
   // —— 群雄 ——
   // 吕布：头戴双翎（雉鸡翎）——三国第一猛将标志

@@ -69,6 +69,12 @@ export const GENERALS = [
     skill: { name: '刚烈', type: 'AOE', cd: 9, radius: 1.5, mult: 2.6 },
     desc: '肉盾 · 阻挡 3 · 魏之刚烈',
   },
+  {
+    id: 'zhangliao', name: '张辽', char: '辽', faction: '魏', cls: 'RANGE', tags: ['魏'],
+    cost: 175, hp: 640, atk: 60, range: 3.4, block: 0, atkCD: 0.8, dmgType: 'PHYSICAL',
+    skill: { name: '突袭逍遥津', type: 'SNIPE', cd: 8, mult: 4.2 },
+    desc: '远程 · 八百破十万 · 急速点杀',
+  },
 
   // ---------- 吴 ----------
   {
@@ -82,6 +88,12 @@ export const GENERALS = [
     cost: 150, hp: 1250, atk: 57, range: 1.1, block: 2, atkCD: 0.78, dmgType: 'PHYSICAL',
     skill: { name: '小霸王', type: 'AOE', cd: 8, radius: 1.6, mult: 2.5 },
     desc: '近战 · 江东小霸王',
+  },
+  {
+    id: 'luxun', name: '陆逊', char: '逊', faction: '吴', cls: 'MAGE', tags: ['吴'],
+    cost: 195, hp: 540, atk: 54, range: 2.9, block: 0, atkCD: 1.4, dmgType: 'MAGIC',
+    skill: { name: '火烧连营', type: 'SPELL', cd: 10, radius: 2.2, mult: 2.1, burn: { dps: 38, dur: 3.5 } },
+    desc: '策士 · 烈焰燎原 · 灼烧破甲',
   },
 
   // ---------- 群雄 ----------

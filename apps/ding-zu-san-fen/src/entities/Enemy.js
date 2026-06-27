@@ -24,6 +24,9 @@ export default class Enemy {
     this.burnT = 0;
     this.burnDps = 0;
 
+    // 巫医治疗计时（def.heal 存在时启用）
+    this.healTimer = this.def.heal ? this.def.heal.interval : 0;
+
     // 阻挡 / 攻击近战武将
     this.blockedBy = null;
     this.atkTimer = 0;
@@ -41,6 +44,27 @@ export default class Enemy {
   // 场景重开时重置 UID 计数，避免无限增长
   static resetUid() {
     Enemy._uid = 0;
+  }
+
+  // 巫医范围治疗（纯逻辑，无场景依赖，便于单测）：
+  // 治疗 healer 周围 radiusPx 内、血量未满的友军（不含自身），返回实际治疗单位数。
+  // 单位对象需具备 { x, y, hp, maxHp, alive }；若提供 _refreshHpBar 则同步刷新血条。
+  static applyHealAround(enemies, healer, radiusPx, amount) {
+    if (!enemies || !healer || amount <= 0) return 0;
+    const r2 = radiusPx * radiusPx;
+    let count = 0;
+    for (const e of enemies) {
+      if (e === healer || !e.alive) continue;
+      if (e.hp >= e.maxHp) continue;
+      const dx = e.x - healer.x;
+      const dy = e.y - healer.y;
+      if (dx * dx + dy * dy <= r2) {
+        e.hp = Math.min(e.maxHp, e.hp + amount);
+        if (typeof e._refreshHpBar === 'function') e._refreshHpBar();
+        count++;
+      }
+    }
+    return count;
   }
 
   _build() {
@@ -159,6 +183,17 @@ export default class Enemy {
     if (this.slowT > 0) {
       this.slowT -= dt;
       if (this.slowT <= 0) this.slowFactor = 1;
+    }
+
+    // 巫医周期治疗（无论是否被阻挡都生效）：奶满周围残血友军
+    if (this.def.heal) {
+      this.healTimer -= dt;
+      if (this.healTimer <= 0) {
+        this.healTimer = this.def.heal.interval;
+        const radiusPx = this.def.heal.radius * TILE;
+        const healed = Enemy.applyHealAround(scene.enemies, this, radiusPx, this.def.heal.amount);
+        if (healed > 0 && scene.fx) scene.fx.heal(this.x, this.y, radiusPx, 0x6fd08a);
+      }
     }
 
     if (this.blockedBy && this.blockedBy.alive) {

@@ -5,6 +5,7 @@ import {
 import MapManager from '../src/managers/MapManager.js';
 import WaveManager from '../src/managers/WaveManager.js';
 import BondManager from '../src/managers/BondManager.js';
+import Enemy from '../src/entities/Enemy.js';
 import { LEVELS, LEVEL_LIST } from '../src/data/levels.js';
 import { GENERALS, GENERAL_BY_ID, LEVEL_MULT, upgradeCost, retreatRefund } from '../src/data/generals.js';
 import { ENEMIES } from '../src/data/enemies.js';
@@ -92,6 +93,16 @@ bm = new BondManager();
 active = bm.recompute([mkGen('zhuge', 1, 1), mkGen('pangtong', 9, 9)]);
 ok(!active.map((b) => b.id).includes('wolong'), 'wolong NOT active when far apart');
 
+// 三国鼎立羁绊：蜀魏吴各 ≥1 将才激活，全军 +15% 攻击/血量
+bm = new BondManager();
+const tri = [mkGen('guanyu', 1, 1), mkGen('caocao', 1, 2), mkGen('zhouyu', 1, 3)];
+active = bm.recompute(tri);
+ok(active.map((b) => b.id).includes('dingzu'), 'dingzu active with 蜀/魏/吴');
+ok(near(tri[0].buffAtk, 1.15) && near(tri[0].buffHp, 1.15), 'dingzu buffs all generals +15%');
+bm = new BondManager();
+active = bm.recompute([mkGen('guanyu', 1, 1), mkGen('caocao', 1, 2)]);
+ok(!active.map((b) => b.id).includes('dingzu'), 'dingzu NOT active without 吴');
+
 // ---------- 波次 ----------
 console.log('— WaveManager —');
 for (const key of LEVEL_LIST) {
@@ -126,6 +137,33 @@ for (const [k, e] of Object.entries(ENEMIES)) {
   ok(e.hp > 0 && e.speed > 0 && e.gold > 0, `enemy ${k} valid`);
   ok(['NONE', 'PHYSICAL', 'HEAVY', 'MAGIC'].includes(e.armor), `enemy ${k} armor type valid`);
 }
+// 新敌军：巫医(治疗) / 战象(精英) / 孟获(BOSS)
+ok(ENEMIES.shaman && ENEMIES.shaman.heal && ENEMIES.shaman.heal.amount > 0, 'shaman has heal ability');
+ok(ENEMIES.shaman.heal.interval > 0 && ENEMIES.shaman.heal.radius > 0, 'shaman heal params valid');
+ok(ENEMIES.elephant && ENEMIES.elephant.leakLives === 2, 'elephant leakLives = 2 (elite)');
+ok(ENEMIES.boss_menghuo && ENEMIES.boss_menghuo.boss === true, 'menghuo is a boss');
+
+// ---------- 巫医治疗机制（纯逻辑） ----------
+console.log('— healer mechanic —');
+const healer = { x: 0, y: 0, hp: 100, maxHp: 100, alive: true };
+const wounded = { x: 30, y: 0, hp: 50, maxHp: 100, alive: true };
+const farEnemy = { x: 500, y: 0, hp: 10, maxHp: 100, alive: true };
+const fullHp = { x: 20, y: 0, hp: 100, maxHp: 100, alive: true };
+const deadAlly = { x: 20, y: 0, hp: 0, maxHp: 100, alive: false };
+let healedN = Enemy.applyHealAround([healer, wounded, farEnemy, fullHp, deadAlly], healer, 64, 45);
+ok(healedN === 1, `heal hits only the 1 wounded in range (got ${healedN})`);
+ok(wounded.hp === 95, `wounded healed 50→95 (got ${wounded.hp})`);
+ok(farEnemy.hp === 10, 'out-of-range enemy untouched');
+ok(fullHp.hp === 100, 'full-hp enemy unchanged');
+ok(healer.hp === 100, 'healer does not heal itself');
+// 不溢出上限
+wounded.hp = 80;
+Enemy.applyHealAround([wounded], healer, 64, 45);
+ok(wounded.hp === 100, `heal capped at maxHp (got ${wounded.hp})`);
+// amount <= 0 不治疗
+const w2 = { x: 10, y: 0, hp: 10, maxHp: 100, alive: true };
+ok(Enemy.applyHealAround([w2], healer, 64, 0) === 0, 'zero amount heals nothing');
+ok(Enemy.applyHealAround([w2], null, 64, 45) === 0, 'null healer heals nothing');
 
 // ---------- 元进度 meta ----------
 console.log('— meta —');
@@ -241,9 +279,35 @@ while (lockedPool().length > 0 && guard2++ < 5000) performDraw(variedRng);
 ok(lockedPool().length === 0, 'can collect all generals via draws');
 ok(unlockedGenerals().length === GENERALS.length, 'all unlocked after enough draws');
 
+// ---------- 关卡拓展：难度曲线 / 奖励 / 新武将 ----------
+console.log('— levels expansion —');
+// 关卡数量已扩展（原 4 关 → 8 关）
+ok(LEVEL_LIST.length >= 8, `level count expanded to >= 8 (got ${LEVEL_LIST.length})`);
+// 每关都有难度星级，且曲线大致单调递增（平滑"第三关偏难"的旧曲线）
+let prevDiff = 0;
+for (const key of LEVEL_LIST) {
+  const d = LEVELS[key].difficulty;
+  ok(typeof d === 'number' && d >= 1 && d <= 5, `${key}: difficulty rating 1..5 (got ${d})`);
+  ok(d >= prevDiff, `${key}: difficulty ${d} non-decreasing (prev ${prevDiff})`);
+  prevDiff = d;
+}
+// 每关都配置了通关奖励
+ok(LEVEL_LIST.every((k) => Number.isFinite(LEVEL_REWARD[k]) && LEVEL_REWARD[k] > 0), 'every level has a positive reward');
+// 新关卡齐备
+['sishui', 'xuzhou', 'changban', 'nanman'].forEach((k) => {
+  ok(LEVEL_LIST.includes(k), `new level ${k} in LEVEL_LIST`);
+  ok(LEVELS[k].waves.length >= 6, `${k}: has >= 6 waves`);
+});
+
+// 新武将：张辽(魏远程) / 陆逊(吴策士) 已加入图鉴与抽卡池
+ok(GENERAL_BY_ID.zhangliao && GENERAL_BY_ID.zhangliao.faction === '魏', 'zhangliao added (魏)');
+ok(GENERAL_BY_ID.zhangliao.cls === 'RANGE', 'zhangliao is ranged');
+ok(GENERAL_BY_ID.luxun && GENERAL_BY_ID.luxun.faction === '吴', 'luxun added (吴)');
+ok(GENERAL_BY_ID.luxun.cls === 'MAGE', 'luxun is a mage');
+ok(GENERALS.includes(GENERAL_BY_ID.zhangliao) && GENERALS.includes(GENERAL_BY_ID.luxun), 'new generals in draw pool');
+
 // ---------- 羁绊 match / pool（图鉴搭档） ----------
-console.log('— bonds match/pool —');
-const guanyuBonds = bondsForGeneral(GENERAL_BY_ID.guanyu).map((b) => b.id);
+console.log('— bonds match/pool —');const guanyuBonds = bondsForGeneral(GENERAL_BY_ID.guanyu).map((b) => b.id);
 ok(guanyuBonds.includes('wuhu'), 'guanyu participates in wuhu');
 ok(guanyuBonds.includes('taoyuan'), 'guanyu participates in taoyuan');
 const taoyuan = BONDS.find((b) => b.id === 'taoyuan');

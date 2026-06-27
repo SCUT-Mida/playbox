@@ -41,7 +41,11 @@ export function starOf(id) {
 }
 
 // 通关金币奖励（每次通关）+ 首通额外奖励（仅首次）
-export const LEVEL_REWARD = { huangjin: 220, hulao: 320, guandu: 280, chibi: 380 };
+// 难度越高奖励越丰厚，引导玩家循序渐进
+export const LEVEL_REWARD = {
+  huangjin: 220, sishui: 250, hulao: 300, xuzhou: 320,
+  guandu: 360, changban: 390, chibi: 430, nanman: 480,
+};
 export const FIRST_CLEAR_BONUS = 150;
 
 function defaults() {

@@ -335,3 +335,12 @@ export function spendVitality(player, cost) {
   player.vitality -= cost;
   return true;
 }
+
+// 主动「静候次日」：活力耗尽时的兜底入口，避免玩家无任何行动可做而被卡死。
+// 立即回满每日活力并刷新日期键。注意：不改动 lastSeen 时间戳，故不会影响离线修炼结算。
+export function restToNextDay(player) {
+  player.maxVitality = vitalityMax(player);
+  player.vitality = player.maxVitality;
+  player.lastVitalityDate = dayKey();
+  return true;
+}

@@ -17,7 +17,7 @@ import {
   equip, unequip, expandBag, bagExpandCost, countItem, hasItem, removeItem, addItemOrLog,
   distinctItems, learnTechnique, upgradeRoot,
   rollCharacter, effectiveQiyun,
-  rolloverVitality, canAffordVitality, spendVitality,
+  rolloverVitality, canAffordVitality, spendVitality, restToNextDay,
 } from '../core/player.js';
 import { activeCultivate, passiveTick } from '../core/cultivate.js';
 import { rollExplore, applyReward, chaosActive } from '../core/explore.js';
@@ -184,43 +184,43 @@ export class GameUI {
             h('button', { class: t.gender === 'female' ? 'active' : '', onClick: () => { this.charTemplate.gender = 'female'; this.charTemplate.portraitId = pickPortrait('female', t.talentIds).id; this.renderCreate(); } }, '♀ 女'),
           ),
         ),
-        h('div', { class: 'create__stats' },
-          h('div', { class: 'card' },
-            h('div', { class: 'row' },
-              h('div', { class: 'grow' }, h('h4', null, `灵根 · ${root.name}`), h('div', { class: 'muted' }, root.desc)),
-              h('div', { class: 'muted', style: { textAlign: 'right' } }, h('div', null, `修炼 ×${root.mult.toFixed(2)}`), h('div', null, `突破 ${(root.breakBonus >= 0 ? '+' : '')}${Math.round(root.breakBonus * 100)}%`)),
-            ),
-            h('div', { class: 'row', style: { marginTop: '0.5rem', alignItems: 'center' } },
-              h('span', { class: 'k' }, '气运'),
-              h('div', { class: 'qiyun-bar' }, h('div', { class: 'qiyun-bar__fill', style: { width: `${qy}%` } })),
-              h('span', { class: `qiyun-label ${ql.cls}` }, `${qy} · ${ql.text}`),
-            ),
-            h('div', { class: 'talent-list' },
-              h('div', { class: 'muted', style: { margin: '0.5rem 0 0.25rem' } }, '天赋'),
-              ...(t.talentIds.length ? t.talentIds.map((id) => talentChip(id)) : [h('div', { class: 'muted' }, '（无）')]),
-            ),
-            h('div', { class: 'muted', style: { margin: '0.5rem 0 0.25rem' } }, `出身 · ${bg.emoji} ${bg.name}`),
-            h('div', { class: 'muted' }, bg.desc),
+        // 流程① 先随机：灵根 / 气运 / 天赋 / 出身，不满意可反复重随
+        h('div', { class: 'card' },
+          h('div', { class: 'row' },
+            h('div', { class: 'grow' }, h('h4', null, `灵根 · ${root.name}`), h('div', { class: 'muted' }, root.desc)),
+            h('div', { class: 'muted', style: { textAlign: 'right' } }, h('div', null, `修炼 ×${root.mult.toFixed(2)}`), h('div', null, `突破 ${(root.breakBonus >= 0 ? '+' : '')}${Math.round(root.breakBonus * 100)}%`)),
           ),
-          h('div', { class: 'card' },
-            h('h4', null, '道号'),
-            h('input', { class: 'name-input', dataset: { id: 'name' }, maxlength: 8, placeholder: '请输入道号（可留空）', value: this.charName || '' }),
-            h('div', { class: 'muted', style: { marginTop: '0.3rem' } }, '取一个称心的名号，踏入修仙之途。'),
+          h('div', { class: 'row', style: { marginTop: '0.5rem', alignItems: 'center' } },
+            h('span', { class: 'k' }, '气运'),
+            h('div', { class: 'qiyun-bar' }, h('div', { class: 'qiyun-bar__fill', style: { width: `${qy}%` } })),
+            h('span', { class: `qiyun-label ${ql.cls}` }, `${qy} · ${ql.text}`),
           ),
+          h('div', { class: 'talent-list' },
+            h('div', { class: 'muted', style: { margin: '0.5rem 0 0.25rem' } }, '天赋'),
+            ...(t.talentIds.length ? t.talentIds.map((id) => talentChip(id)) : [h('div', { class: 'muted' }, '（无）')]),
+          ),
+          h('div', { class: 'muted', style: { margin: '0.5rem 0 0.25rem' } }, `出身 · ${bg.emoji} ${bg.name}`),
+          h('div', { class: 'muted' }, bg.desc),
+        ),
+        h('button', { class: 'btn-ghost big-btn reroll-btn', onClick: () => this.reroll() }, '🎲 重新随机属性'),
+        // 流程② 后取名：属性随机满意后，再主动点击此处输入道号
+        h('div', { class: 'card' },
+          h('h4', null, '道号'),
+          h('input', { class: 'name-input', dataset: { id: 'name' }, maxlength: 8, placeholder: '请输入道号（可留空）', value: this.charName || '' }),
+          h('div', { class: 'muted', style: { marginTop: '0.3rem' } }, '取一个称心的名号，踏入修仙之途。'),
         ),
       ),
       h('div', { class: 'create__foot' },
-        h('button', { class: 'btn-ghost', onClick: () => { this.reroll(); } }, '🎲 重新随机'),
         h('button', { class: 'btn-primary big-btn', onClick: () => this.confirmCreate() }, '⚡ 开始修仙'),
       ),
-      h('div', { class: 'muted', style: { textAlign: 'center', padding: '0 1rem 1rem' } }, '灵根、天赋、气运、出身皆随机生成；不满意可反复重随，直至称心。'),
+      h('div', { class: 'muted', style: { textAlign: 'center', padding: '0 1rem 1rem' } }, '灵根、天赋、气运、出身皆随机生成；先随机至称心，再取道号入道。'),
     );
     this.stage.appendChild(wrap);
     const inp = wrap.querySelector('[data-id="name"]');
     if (inp) {
       inp.addEventListener('input', () => { this.charName = inp.value; });
-      // 自动聚焦便于直接取名
-      setTimeout(() => { try { inp.focus(); } catch (_) {} }, 50);
+      // 不自动聚焦：手机端聚焦会唤起软键盘遮挡「重新随机」按钮，且每次重随都会重复弹出。
+      // 流程上应先随机满意后，由玩家主动点击此处取名。
     }
   }
 
@@ -304,7 +304,7 @@ export class GameUI {
     this.ui.avatar = h('button', { class: 'avatar-btn', title: '人物', onClick: () => this.showCharacter() }, pt.emoji);
     this.ui.realmBadge = h('div', { class: 'realm-badge' },
       h('span', { class: 'seal', style: { background: info.realm.color } }, info.realm.short),
-      h('span', null, `${info.majorName}${info.subName}`),
+      h('span', { class: 'realm-name' }, realmDisplay(info)),
     );
     this.ui.stones = h('span', { class: 'stones' }, `💎 ${fmt(p.stones)}`);
     this.ui.vitality = h('span', { class: 'vit-pill', title: '每日活力：消耗型行动力，跨日恢复' }, `⚡${Math.floor(p.vitality)}/${p.maxVitality}`);
@@ -336,7 +336,7 @@ export class GameUI {
     // 境界徽章：颜色/文字
     const seal = this.ui.realmBadge.querySelector('.seal');
     seal.style.background = info.realm.color;
-    this.ui.realmBadge.lastChild.textContent = `${info.majorName}${info.subName}`;
+    this.ui.realmBadge.lastChild.textContent = realmDisplay(info);
     // 头像：飞升后切换为仙尊形象
     const pt = portraitDef(p.ascended ? 'pt_ascend' : p.portraitId);
     this.ui.avatar.textContent = pt.emoji;
@@ -399,6 +399,9 @@ export class GameUI {
   renderPanel() {
     clear(this.content);
     if (this.player.ascended) { this.renderAscended(); return; }
+    // 活力耗尽（连最省的修炼都付不起）时，所有页顶部给出醒目的「进入次日」入口，
+    // 避免玩家活力用尽后无任何行动可做、又找不到次日按钮而死锁卡关。
+    if (this.isVitalityDepleted()) this.content.appendChild(this.renderRestBanner());
     switch (this.tab) {
       case 'cultivate': this.renderCultivate(); break;
       case 'explore': this.renderExplore(); break;
@@ -1199,6 +1202,34 @@ export class GameUI {
     this.renderPanel();
   }
 
+  // 活力是否已耗尽到「连最省力的修炼都付不起」——此时除挂机外无可消耗活力的行动，
+  // 视为卡死态，需提供「进入次日」兜底。
+  isVitalityDepleted() {
+    const p = this.player;
+    if (!p) return false;
+    const cheapest = Math.min(VITALITY_COSTS.cultivate, VITALITY_COSTS.explore, VITALITY_COSTS.craft);
+    return (p.vitality || 0) < cheapest;
+  }
+
+  renderRestBanner() {
+    return h('div', { class: 'card rest-banner' },
+      h('div', { class: 'row' },
+        h('div', { class: 'grow' },
+          h('h4', null, '⚡ 活力耗尽'),
+          h('div', { class: 'muted', style: { marginTop: '0.2rem' } }, '今日行动力已尽。可闭关静候，次日活力回满，再续修行。'),
+        ),
+        h('button', { class: 'btn-jade rest-btn', onClick: () => this.doRestToNextDay() }, '🌌 进入次日'),
+      ),
+    );
+  }
+
+  doRestToNextDay() {
+    restToNextDay(this.player);
+    this.pushLog('🌌 你闭关静修，斗转星移，新的一日到来，活力回满。', 'good');
+    this.toast('新的一天，活力回满', 'good');
+    this.afterAction();
+  }
+
   // 跨自然日刷新活力（在线挂机跨过零点时回满）；silent 时不弹提示
   checkDayRollover(notify) {
     if (!this.player || this.screen !== 'game') return;
@@ -1228,10 +1259,14 @@ export class GameUI {
   tick() {
     if (!this.player || this.player.ascended) return;
     this.checkDayRollover(true);
+    // 修炼页挂机时，记录「突破前」可用态；修为积满会令按钮由灰转亮，需实时刷新面板
+    const watching = this.tab === 'cultivate' && !this.battle && !this.trial;
+    const couldBreak = watching ? canBreakthrough(this.player) : false;
     // 渡劫/战斗弹窗期间不自动回血（保留压力），仅累积修为与恢复灵力
     passiveTick(this.player, 1, { hp: !(this.battle || this.trial) });
     this.refreshStatus();
-    // 进行中的战斗/渡劫不重建面板，只刷新状态
+    // 修为圆满→突破按钮可用：实时重建修炼面板，免得玩家还要切页再回来才点得动
+    if (watching && !couldBreak && canBreakthrough(this.player)) this.renderPanel();
   }
 
   destroy() {
@@ -1250,6 +1285,15 @@ function kv(k, v) { return [h('div', { class: 'k' }, k), h('div', { class: 'v' }
 function line(text, ok) { return h('div', { class: 'req-line' }, h('span', { class: ok ? 'ok' : 'no' }, `${ok ? '✓' : '○'} ${text}`)); }
 function typeName(t) { return { pill: '丹药', material: '材料', treasure: '法宝', technique: '功法', misc: '杂物', recipe: '配方' }[t] || t; }
 function elName(el) { return ({ metal: '金', wood: '木', water: '水', fire: '火', earth: '土' })[el] ? `${({ metal: '金', wood: '木', water: '水', fire: '火', earth: '土' })[el]}属性` : ''; }
+// 顶部境界徽章的紧凑文案：凡人去重（避免「凡人凡人」）、大境界去「期」（「炼气期一层」→「炼气一层」）、
+// 飞升单独处理，让窄屏顶栏也能完整显示当前境界。
+function realmDisplay(info) {
+  const major = info.majorName || '';
+  const sub = info.subName || '';
+  if (major === '凡人') return '凡人';
+  if (major === '飞升') return '飞升';
+  return `${major.replace(/期$/, '')}${sub}`;
+}
 function trialLabel(kind) { return { heart: '渡心魔', trib: '渡天劫', ascend: '飞升天劫' }[kind] || '突破'; }
 function learnRecipeGuard(p, id) { const r = RECIPE_BY_ID[id]; if (r && !p.recipes.includes(id)) p.recipes.push(id); }
 // 大数简写：1.2k / 3.4w

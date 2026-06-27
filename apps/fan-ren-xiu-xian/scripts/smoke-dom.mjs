@@ -149,6 +149,23 @@ try {
 } catch (e) { renderErr = e; }
 ok(!renderErr, `五大功能页渲染无异常（${renderErr ? renderErr.message : 'ok'}）`);
 
+// ---------- 9b2) 损坏境界档不闪退（「点修炼偶发闪退」UI 回归）----------
+// 模拟 tier/sub 非法（损坏档/导入串/旧版缺字段）：点修炼 + 刷新状态栏 + 渲染修炼页
+// 这条热路径必须全程不抛错，否则整页白屏即「闪退」。
+{
+  ui.tab = 'cultivate';
+  ui.player.tier = 999; ui.player.sub = 999;
+  ui.player.mp = ui.player.maxMp; ui.player.vitality = ui.player.maxVitality;
+  let bad = null;
+  try {
+    ui.doActiveCultivate();      // 修炼 → afterAction → recompute(钳制) → refreshStatus → realmInfo
+    ui.refreshStatus();
+    ui.renderPanel();
+  } catch (e) { bad = e; }
+  ok(!bad, `损坏境界档点修炼不闪退（${bad ? bad.message : 'ok'}）`);
+  ok(ui.player.tier <= 9, `越界 tier 经修炼后被钳制到合法区间（tier=${ui.player.tier}）`);
+}
+
 // ---------- 9c) 设置弹窗 → 返回存档列表 ----------
 ui.showSettings();
 await sleep(10);

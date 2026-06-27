@@ -13,13 +13,13 @@ import { TALENTS } from './data/characters.js';
 export const REALMS = [
   { name: '凡人', short: '凡', subs: ['凡人'], color: '#9b8c7a', trial: null, reqItem: null, speedFactor: 0.5, desc: '一介凡夫，尚未引气入体。' },
   { name: '炼气期', short: '气', subs: ['一层', '二层', '三层', '四层', '五层', '六层', '七层', '八层', '九层', '十层', '十一层', '十二层', '十三层'], color: '#7fd17f', trial: null, reqItem: null, speedFactor: 1.0, desc: '吐纳天地灵气，洗髓伐毛。' },
-  { name: '筑基期', short: '筑', subs: ['初期', '中期', '后期', '圆满'], color: '#5fb8e0', trial: 'heart', reqItem: 'pill_zhuji', speedFactor: 1.7, desc: '筑就大道根基，灵力凝液。' },
-  { name: '结丹期', short: '丹', subs: ['初期', '中期', '后期', '圆满'], color: '#b07cf0', trial: 'heart', reqItem: 'pill_jiedan', speedFactor: 2.6, desc: '灵力结丹，寿元大增。' },
-  { name: '元婴期', short: '婴', subs: ['初期', '中期', '后期', '圆满'], color: '#f0a04b', trial: 'trib', reqItem: 'pill_yuanying', speedFactor: 3.7, desc: '元婴离体，神通初显。' },
-  { name: '化神期', short: '神', subs: ['初期', '中期', '后期', '圆满'], color: '#e05b5b', trial: 'trib', reqItem: 'pill_huashen', speedFactor: 5.0, desc: '元神化形，感悟天地。' },
-  { name: '炼虚期', short: '虚', subs: ['初期', '中期', '后期', '圆满'], color: '#4bd0c0', trial: 'trib', reqItem: null, speedFactor: 6.6, desc: '炼虚合道，初窥空间之理。' },
-  { name: '合体期', short: '合', subs: ['初期', '中期', '后期'], color: '#d0c04b', trial: 'trib', reqItem: null, speedFactor: 8.4, desc: '元神肉身合一，难如登天。' },
-  { name: '大乘期', short: '乘', subs: ['初期', '中期', '后期'], color: '#c8c4dc', trial: 'trib', reqItem: null, speedFactor: 10.4, desc: '大乘圆满，为飞升做准备。' },
+  { name: '筑基期', short: '筑', subs: ['初期', '中期', '后期', '圆满', '巅峰'], color: '#5fb8e0', trial: 'heart', reqItem: 'pill_zhuji', speedFactor: 1.7, desc: '筑就大道根基，灵力凝液。' },
+  { name: '结丹期', short: '丹', subs: ['初期', '中期', '后期', '圆满', '巅峰'], color: '#b07cf0', trial: 'heart', reqItem: 'pill_jiedan', speedFactor: 2.6, desc: '灵力结丹，寿元大增。' },
+  { name: '元婴期', short: '婴', subs: ['初期', '中期', '后期', '圆满', '巅峰'], color: '#f0a04b', trial: 'trib', reqItem: 'pill_yuanying', speedFactor: 3.7, desc: '元婴离体，神通初显。' },
+  { name: '化神期', short: '神', subs: ['初期', '中期', '后期', '圆满', '巅峰'], color: '#e05b5b', trial: 'trib', reqItem: 'pill_huashen', speedFactor: 5.0, desc: '元神化形，感悟天地。' },
+  { name: '炼虚期', short: '虚', subs: ['初期', '中期', '后期', '圆满', '巅峰'], color: '#4bd0c0', trial: 'trib', reqItem: null, speedFactor: 6.6, desc: '炼虚合道，初窥空间之理。' },
+  { name: '合体期', short: '合', subs: ['初期', '中期', '后期', '巅峰'], color: '#d0c04b', trial: 'trib', reqItem: null, speedFactor: 8.4, desc: '元神肉身合一，难如登天。' },
+  { name: '大乘期', short: '乘', subs: ['初期', '中期', '后期', '巅峰'], color: '#c8c4dc', trial: 'trib', reqItem: null, speedFactor: 10.4, desc: '大乘圆满，为飞升做准备。' },
   { name: '飞升', short: '仙', subs: ['飞升成仙'], color: '#ffd700', trial: 'ascend', reqItem: null, speedFactor: 13.0, desc: '渡过飞升之劫，得道成仙。' },
 ];
 
@@ -41,8 +41,9 @@ export const SPIRIT_ROOTS = [
 // 凡人=0；炼气一层..十三层=1..13；筑基=14..17；…… 以此类推。
 export function globalLevel(tier, sub) {
   let lv = 0;
-  for (let t = 0; t < tier; t++) lv += REALMS[t].subs.length;
-  return lv + sub;
+  const t = Math.min(Math.max(0, Math.floor(tier) || 0), ASCEND_INDEX);
+  for (let i = 0; i < t; i++) lv += REALMS[i].subs.length;
+  return lv + (Math.floor(sub) || 0);
 }
 
 // 从全局等级反推 (tier, sub)
@@ -57,6 +58,20 @@ export function fromGlobalLevel(lv) {
 }
 
 export const MAX_GLOBAL_LEVEL = globalLevel(ASCEND_INDEX, REALMS[ASCEND_INDEX].subs.length - 1);
+
+// —— 境界越界防御 ——
+// REALMS[player.tier] / realm.subs[player.sub] 在 tier/sub 非法（损坏档 / 导入串 /
+// 旧版缺字段）时会读到 undefined，进而抛 TypeError 导致整页闪退（修炼→刷新状态栏
+// → realmInfo 这条热路径尤为常见，表现为「点修炼偶发闪退」）。这里集中兜底：
+// 把 tier/sub 钳制到合法区间，杜绝越界访问。
+// 就地修正玩家境界到合法区间（mutate）。供 recompute 等可写场景使用。
+export function sanitizeRealm(player) {
+  if (!player) return player;
+  player.tier = clamp(Math.floor(Number.isFinite(player.tier) ? player.tier : 0), 0, ASCEND_INDEX);
+  const subs = REALMS[player.tier].subs;
+  player.sub = clamp(Math.floor(Number.isFinite(player.sub) ? player.sub : 0), 0, subs.length - 1);
+  return player;
+}
 
 // ── 修为阈值：经验曲线，随等级指数增长 ────────────────────────────────────────
 export function xpNeeded(lv) {

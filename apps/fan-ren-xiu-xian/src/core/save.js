@@ -145,13 +145,13 @@ function realmSub(tier, sub) {
   const subsByTier = [
     ['凡人'],
     ['一层','二层','三层','四层','五层','六层','七层','八层','九层','十层','十一层','十二层','十三层'],
-    ['初期','中期','后期','圆满'],
-    ['初期','中期','后期','圆满'],
-    ['初期','中期','后期','圆满'],
-    ['初期','中期','后期','圆满'],
-    ['初期','中期','后期','圆满'],
-    ['初期','中期','后期'],
-    ['初期','中期','后期'],
+    ['初期','中期','后期','圆满','巅峰'],
+    ['初期','中期','后期','圆满','巅峰'],
+    ['初期','中期','后期','圆满','巅峰'],
+    ['初期','中期','后期','圆满','巅峰'],
+    ['初期','中期','后期','圆满','巅峰'],
+    ['初期','中期','后期','巅峰'],
+    ['初期','中期','后期','巅峰'],
     ['飞升成仙'],
   ];
   const arr = subsByTier[tier];
@@ -175,6 +175,10 @@ export function importSave(str) {
 
 // 存档结构向后兼容：补齐新字段
 function migrate(player) {
+  if (!player) return player;
+  // 境界兜底：tier/sub 缺失或非法时归零，避免下游 REALMS[tier] 越界致整页闪退
+  if (!Number.isFinite(player.tier) || player.tier < 0) player.tier = 0;
+  if (!Number.isFinite(player.sub) || player.sub < 0) player.sub = 0;
   if (!player.stats) player.stats = {};
   const dflt = { battlesWon: 0, breakthroughs: 0, alchemyFails: 0, alchemyOk: 0, lowHpWins: 0, breakthroughStreak: 0, exploreCount: 0, deaths: 0 };
   for (const k of Object.keys(dflt)) if (player.stats[k] == null) player.stats[k] = dflt[k];

@@ -80,6 +80,21 @@ export const BONDS = [
     match: (d) => ['guanyu', 'zhangfei', 'zhaoyun'].includes(d.id),
     pool: () => ['guanyu', 'zhangfei', 'zhaoyun'],
   },
+  {
+    // 三国鼎立：蜀魏吴三国各有 ≥1 将在场 —— 呼应"鼎足三分"主题的全局激励
+    id: 'dingzu',
+    name: '三国鼎立',
+    desc: '蜀、魏、吴三国各有一将在场：全军攻击 +15%、血量 +15%',
+    test: (c) => c.countFaction('蜀') >= 1 && c.countFaction('魏') >= 1 && c.countFaction('吴') >= 1,
+    effect: (gs) => {
+      for (const g of gs) {
+        g.buffAtk *= 1.15;
+        g.buffHp *= 1.15;
+      }
+    },
+    match: (d) => d.faction === '蜀' || d.faction === '魏' || d.faction === '吴',
+    pool: () => GENERALS.filter((g) => ['蜀', '魏', '吴'].includes(g.faction)).map((g) => g.id),
+  },
 ];
 
 // 该武将参与（可触发）的全部羁绊

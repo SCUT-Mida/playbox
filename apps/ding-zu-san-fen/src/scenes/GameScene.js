@@ -50,6 +50,8 @@ export default class GameScene extends Phaser.Scene {
     this.result = null;
     this._lastWaveState = null;
     this._suppressEarlyBonus = false;
+    // 游戏倍速（1× / 2×）：作用于战斗逻辑 dt，长关卡可加速推进
+    this._speed = 1;
 
     // 管理器 / 集合
     this.map = new MapManager(level);
@@ -247,7 +249,8 @@ export default class GameScene extends Phaser.Scene {
   // ---------------- 主循环 ----------------
   update(time, delta) {
     if (this.ended) return;
-    const dt = clampDt(delta / 1000);
+    // 倍速作用于逻辑 dt（波次/移动/冷却同步加快）；特效补间走真实时间不受影响
+    const dt = clampDt(delta / 1000) * this._speed;
 
     // 波次推进
     const aliveCount = this.enemies.reduce((n, e) => n + (e.alive ? 1 : 0), 0);
@@ -483,6 +486,13 @@ export default class GameScene extends Phaser.Scene {
     return true;
   }
 
+  // 切换 1× / 2× 倍速（仅战斗进行中有意义；返回切换后的倍速）
+  toggleSpeed() {
+    this._speed = this._speed >= 2 ? 1 : 2;
+    this._emitState();
+    return this._speed;
+  }
+
   startNextWave() {
     // 仅波间空档"提前迎战"才发放奖励，第一波（idle）正常开始不计
     const wasBetween = this.waveManager.state === 'between';
@@ -592,6 +602,7 @@ export default class GameScene extends Phaser.Scene {
       enemiesAlive: this.enemies.reduce((n, e) => n + (e.alive ? 1 : 0), 0),
       bonds: this.bondManager.active.map((b) => ({ id: b.id, name: b.name, desc: b.desc })),
       deployedCount: this.generals.size,
+      speed: this._speed,
     });
   }
 

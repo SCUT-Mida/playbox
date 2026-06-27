@@ -99,6 +99,40 @@ export default class Fx {
     });
   }
 
+  // 巫医治疗：柔和绿环扩散 + 上浮的「+」
+  heal(x, y, radius, color = 0x6fd08a) {
+    const s = this.scene;
+    const g = s.add.graphics();
+    g.setDepth(58);
+    g.lineStyle(3, color, 0.9);
+    g.strokeCircle(x, y, radius * 0.4);
+    s.tweens.add({
+      targets: g,
+      alpha: 0,
+      duration: 420,
+      ease: 'Quad.Out',
+      onUpdate: (tween) => {
+        const p = tween.progress;
+        g.clear();
+        g.lineStyle(3, color, 0.9 * (1 - p));
+        g.strokeCircle(x, y, radius * (0.4 + p * 0.6));
+      },
+      onComplete: () => g.destroy(),
+    });
+    // 上浮的「+」标记
+    const plus = s.add.text(x, y - 10, '+', {
+      fontFamily: 'serif', fontSize: '22px', color: '#9affb8', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(59);
+    s.tweens.add({
+      targets: plus,
+      y: y - 36,
+      alpha: 0,
+      duration: 520,
+      ease: 'Quad.Out',
+      onComplete: () => plus.destroy(),
+    });
+  }
+
   // 终极技：火烧连营 —— 沿路径燃起连环火，全屏暖光
   fireAssault(path) {
     const s = this.scene;

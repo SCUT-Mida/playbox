@@ -1,6 +1,6 @@
 // 纯逻辑自测（不依赖浏览器/DOM）。运行：npm test
 import {
-  REALMS, SPIRIT_ROOTS, globalLevel, fromGlobalLevel, xpNeeded, MAX_GLOBAL_LEVEL,
+  REALMS, SPIRIT_ROOTS, ASCEND_INDEX, globalLevel, fromGlobalLevel, xpNeeded, MAX_GLOBAL_LEVEL,
   passiveXpPerSec, breakthroughChance, computeDamage, counterMult, clamp,
   PITTY_THRESHOLD, PITTY_BOOST, dayKey,
 } from '../src/config.js';
@@ -212,7 +212,8 @@ else { ok(p.tier === 1, '心魔失败 → 停留炼气'); }
 
 // ---------- 突破（大境界：天劫）----------
 console.log('— breakthrough major (trib) —');
-p = newPlayer(() => 0); p.tier = 4; p.sub = 3; recompute(p); p.xp = p.xpMax; p.hp = p.maxHp; p.mp = p.maxMp;
+// 取元婴期最末小层（subs 数量可变，动态读取末位下标，避免硬编码）
+p = newPlayer(() => 0); p.tier = 4; p.sub = REALMS[4].subs.length - 1; recompute(p); p.xp = p.xpMax; p.hp = p.maxHp; p.mp = p.maxMp;
 ok(nextTarget(p).trial === 'trib', '元婴圆满 → 化神需渡天劫');
 addItem(p, 'fabao_leiyin', 1); equip(p, 'fabao_leiyin');
 trial = startMajorTrial(p, () => 0);
@@ -329,6 +330,48 @@ for (const e of EVENTS) {
 }
 const elig = eligibleEvents(1, 'mountain');
 ok(elig.length > 0, '炼气山脉有可探索事件');
+
+// ---------- 境界越界防御（「点修炼偶发闪退」根因回归）----------
+// 损坏档 / 导入串 / 旧版缺字段会让 tier/sub 非法，曾导致 REALMS[tier] 越界、
+// 修炼→刷新状态栏时整页闪退。recompute/realmInfo/globalLevel 现均已兜底。
+console.log('— realm bounds safety —');
+{
+  // globalLevel 对越界入参不抛错并截断到顶
+  ok(globalLevel(999, 0) === MAX_GLOBAL_LEVEL, 'globalLevel 越界 tier 截断到飞升');
+  ok(globalLevel(-1, 0) === 0, 'globalLevel 负 tier 归零');
+  // realmInfo 任意非法 tier/sub 不抛错，且降级到合法境界
+  let crashed = false;
+  try {
+    for (const t of [-1, 0, 5, 9, 10, 99, undefined, null, 'x']) {
+      for (const s of [-1, 0, 3, 99, undefined, null]) {
+        const info = realmInfo({ tier: t, sub: s });
+        ok(info && info.realm && typeof info.majorName === 'string', `realmInfo(${t},${s}) 不抛错且返回合法境界`);
+      }
+    }
+  } catch (e) { crashed = true; }
+  ok(!crashed, 'realmInfo 对各种非法 tier/sub 全程不抛异常');
+  // recompute 就地把非法 tier/sub 钳制到合法区间
+  const q = newPlayer(() => 0);
+  q.tier = 50; q.sub = 99; recompute(q);
+  ok(q.tier === ASCEND_INDEX && q.sub === REALMS[ASCEND_INDEX].subs.length - 1, 'recompute 钳制越界 tier/sub 到边界');
+  ok(Number.isFinite(q.maxHp) && q.maxHp > 0, '越界档 recompute 后属性仍合法');
+  q.tier = undefined; q.sub = undefined; recompute(q);
+  ok(q.tier === 0 && q.sub === 0, 'recompute 把缺失 tier/sub 归零（旧版/损坏档兜底）');
+  // 钳制后修炼链路（addXp/realmInfo）不再闪退
+  let cultCrash = false;
+  try { q.mp = q.maxMp; q.vitality = q.maxVitality; activeCultivate(q, () => 0.5); } catch (e) { cultCrash = true; }
+  ok(!cultCrash, '非法境界档经 recompute 后可正常修炼（不再闪退）');
+}
+
+// ---------- 境界深度（「境界还是太小了」优化回归）----------
+console.log('— realm depth —');
+ok(REALMS[2].subs.length >= 5, '筑基期子层 >= 5（初/中/后/圆满/巅峰）');
+ok(REALMS[4].subs.length >= 5, '元婴期子层 >= 5');
+ok(REALMS[6].subs.length >= 5, '炼虚期子层 >= 5');
+ok(REALMS[7].subs.length >= 4, '合体期子层 >= 4');
+ok(REALMS[8].subs.length >= 4, '大乘期子层 >= 4');
+// 子层扩张后，全局等级映射仍自洽：每个境界末位 +1 恰为下一境界首位
+ok(globalLevel(2, REALMS[2].subs.length - 1) + 1 === globalLevel(3, 0), '筑基末位 +1 = 结丹首位（映射自洽）');
 
 console.log(`\n结果: ${pass} 通过, ${fail} 失败`);
 process.exit(fail ? 1 : 0);

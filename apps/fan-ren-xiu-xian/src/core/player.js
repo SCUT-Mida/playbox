@@ -2,9 +2,10 @@
 // 玩家状态：创建、衍生属性、背包、装备、灵石、修为等核心数据操作（纯逻辑）
 // ============================================================================
 import {
-  REALMS, SPIRIT_ROOTS, globalLevel, xpNeeded,
+  REALMS, SPIRIT_ROOTS, ASCEND_INDEX, globalLevel, xpNeeded,
   baseMaxHp, baseMaxMp, baseAtk, baseDef, baseSpirit,
   MAX_VITALITY, VITALITY_COSTS, vitalityMax, dayKey, nowSec, clamp,
+  sanitizeRealm,
 } from '../config.js';
 import { ITEMS } from '../data/items.js';
 import { TALENTS, TALENT_LIST, BACKGROUNDS, BACKGROUND_LIST, pickPortrait } from '../data/characters.js';
@@ -112,6 +113,9 @@ function applyBackgroundBonus(player, bg) {
 
 // 重算所有衍生属性（境界/装备/功法/称号 → maxHp/maxMp/atk/def/spirit/lv/xpMax）
 export function recompute(player) {
+  // 先把境界钳制到合法区间：损坏/导入/旧版存档可能带非法 tier/sub，
+  // 不兜底则下方 globalLevel / 后续 realmInfo 会越界抛错致整页闪退。
+  sanitizeRealm(player);
   const lv = globalLevel(player.tier, player.sub);
   player.lv = lv;
   player.xpMax = xpNeeded(lv);
@@ -312,10 +316,13 @@ export function bagExpandCost(player) {
   return 200 * (times + 1);
 }
 
-// 当前境界信息
+// 当前境界信息（只读、不 mutate）。tier/sub 非法时安全降级到边界境界，
+// 杜绝 REALMS[tier] 越界致「点修炼偶发闪退」。
 export function realmInfo(player) {
-  const realm = REALMS[player.tier];
-  return { realm, subName: realm.subs[player.sub], majorName: realm.name };
+  const tier = clamp(Math.floor(Number.isFinite(player && player.tier) ? player.tier : 0), 0, ASCEND_INDEX);
+  const realm = REALMS[tier];
+  const sub = clamp(Math.floor(Number.isFinite(player && player.sub) ? player.sub : 0), 0, realm.subs.length - 1);
+  return { realm, subName: realm.subs[sub], majorName: realm.name };
 }
 
 // —— 每日活力（活力周期：跨自然日时回满）——

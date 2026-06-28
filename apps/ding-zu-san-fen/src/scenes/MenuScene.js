@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { COLORS, GAME_WIDTH, GAME_HEIGHT } from '../config.js';
 import { LEVELS, LEVEL_LIST } from '../data/levels.js';
-import { getMeta, getActiveSlot, isMuted, setMuted, LEVEL_REWARD } from '../data/meta.js';
+import { getMeta, getActiveSlot, isMuted, setMuted, LEVEL_REWARD, NUM_SLOTS } from '../data/meta.js';
 import { loadBattle } from '../data/save.js';
 import audio from '../audio/Audio.js';
 
@@ -158,7 +158,7 @@ export default class MenuScene extends Phaser.Scene {
       { title: '武将图鉴', sub: '属性·羁绊', color: 0x4a3a8a, onClick: () => { audio.play('click'); this.scene.start('RosterScene'); } },
       { title: '点将台', sub: '抽将扩阵', color: 0x8a4a3a, onClick: () => { audio.play('click'); this.scene.start('GachaScene'); } },
       { title: '演武场', sub: '演练得金', color: 0x2f6a4a, onClick: () => { audio.play('click'); this.scene.start('ArenaScene'); } },
-      { title: '切换存档', sub: `档 ${getActiveSlot()} / 5`, color: 0x6b5a40, onClick: () => { audio.play('click'); this.scene.start('SlotScene'); } },
+      { title: '切换存档', sub: `档 ${getActiveSlot()} / ${NUM_SLOTS}`, color: 0x6b5a40, onClick: () => { audio.play('click'); this.scene.start('SlotScene'); } },
     ];
     defs.forEach((d, i) => this._navButton(xs[i], cy, 148, 78, d.title, d.sub, d.color, d.onClick));
   }

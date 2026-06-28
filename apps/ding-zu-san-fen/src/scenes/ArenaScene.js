@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { COLORS, GAME_WIDTH, GAME_HEIGHT } from '../config.js';
+import { COLORS } from '../config.js';
 import {
   getActiveSlot, getMeta, addGold, unlockedGenerals, generalStar, starAtkMult, starHpMult,
 } from '../data/meta.js';
@@ -364,9 +364,5 @@ export default class ArenaScene extends Phaser.Scene {
       this._startDrill();
     });
     this._action(width / 2, 790, 320, 60, '返回演武场', 0x6b5a40, () => this._renderReady());
-  }
-
-  shutdown() {
-    this._clearBody();
   }
 }

@@ -69,8 +69,13 @@
 }
 /* 顶行右侧预留空间，避开落地页悬浮关闭按钮(✕) 与安全区 */
 .frxx .status-row {
-  display: flex; align-items: center; gap: 0.4rem;
+  display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
   padding-right: max(3rem, env(safe-area-inset-right));
+}
+/* 右侧工具组：窄屏放不下时整组换行，确保设置按钮永不被挤出可视区 */
+.frxx .status-tools {
+  display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
+  margin-left: auto; justify-content: flex-end;
 }
 .frxx .avatar-btn {
   flex: none; width: 34px; height: 34px; padding: 0; border-radius: 50%;
@@ -79,20 +84,16 @@
 }
 .frxx .avatar-btn svg { width: 100%; height: 100%; display: block; }
 .frxx .realm-badge {
-  display: flex; align-items: center; gap: 0.35rem;
-  flex: 0 1 auto; min-width: 5.5rem;   /* 保底宽度：境界文字至少可见数字符，不再被挤到只剩一个印章字 */
+  display: flex; align-items: center;
+  flex: none;
   background: var(--card); border: 1px solid var(--gold-dim);
-  border-radius: 999px; padding: 0.2rem 0.55rem 0.2rem 0.3rem;
+  border-radius: 999px; padding: 0.15rem 0.2rem;
   font-weight: 600;
 }
-.frxx .realm-badge .realm-name {
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  min-width: 0; max-width: 7em;
-}
 .frxx .realm-badge .seal {
-  flex: none; width: 22px; height: 22px; border-radius: 50%;
+  flex: none; padding: 0.12rem 0.42rem; border-radius: 999px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 13px; color: #1a1208; font-weight: 700;
+  font-size: 12px; color: #1a1208; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap;
 }
 .frxx .spacer { flex: 1; min-width: 0; }
 .frxx .stones { font-weight: 600; color: var(--gold); font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -393,10 +394,9 @@
 .frxx .char-name { font-size: 1.1rem; font-weight: 600; color: var(--text); }
 .frxx .char-realm { font-weight: 600; margin-top: 0.15rem; }
 
-/* —— 境界徽章（现为可点击按钮）—— */
+/* —— 境界徽章（现为可点击按钮，仅显示 2 字图标）—— */
 .frxx button.realm-badge {
-  padding: 0.2rem 0.55rem 0.2rem 0.3rem;
-  font-size: 0.82rem;
+  padding: 0.15rem 0.2rem;
   line-height: 1.2;
 }
 

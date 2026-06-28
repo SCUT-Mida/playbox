@@ -26,7 +26,9 @@ export function rollMarket(player, rng) {
       name: def.name || id,
       emoji: def.emoji || '📦',
       kind: def.type || 'recipe',
+      desc: shopBlurb(def),                 // 一句话介绍，货架直接展示
       price: priced(base, rng, mojie),
+      basePrice: base,                       // 基础价，供「涨价/打折」提示
       stock: 1 + Math.floor((rng || Math.random)() * maxStock),
       isRecipe: !ITEMS[id],
     });
@@ -45,9 +47,55 @@ export function rollMarket(player, rng) {
   // 配方（低概率）
   if (chance(rng, 0.35)) {
     const rcp = pick(rng, ALL_RECIPES);
-    entries.push({ id: rcp.id, name: rcp.name, emoji: '📜', kind: 'recipe', price: priced(Math.round(rcp.diff * 80), rng, mojie), stock: 1, isRecipe: true });
+    entries.push({ id: rcp.id, name: rcp.name, emoji: '📜', kind: 'recipe', desc: rcp.desc || '一份炼制配方。', price: priced(Math.round(rcp.diff * 80), rng, mojie), basePrice: Math.round(rcp.diff * 80), stock: 1, isRecipe: true });
   }
   return { entries, mojie };
+}
+
+// 货架一句话介绍：在物品自身 desc 基础上，补足对购买决策最有用的关键信息
+// （丹药效果量 / 法宝属性 / 功法加成 / 配方产出）。
+export function shopBlurb(def) {
+  if (!def) return '';
+  if (def.type === 'recipe') {
+    const out = def.out ? (ITEMS[def.out] ? ITEMS[def.out].name : def.out) : '';
+    return `${def.desc || '一份炼制配方'}${out ? `，可炼出【${out}】` : ''}`;
+  }
+  const extra = itemEffectText(def);
+  return extra ? `${def.desc || ''}${extra}` : (def.desc || '');
+}
+
+// 物品的「实际功效」文案，供货架介绍与背包详情共用：
+// 丹药→效果量；法宝→攻防/五行/技能；功法→修炼/突破/攻血加成；材料→五行。
+export function itemEffectText(def) {
+  if (!def) return '';
+  if (def.type === 'pill') {
+    if (def.effect && def.effect.kind === 'heal_hp') return `（恢复 ${Math.round(def.effect.pct * 100)}% 气血）`;
+    if (def.effect && def.effect.kind === 'heal_mp') return `（恢复 ${Math.round(def.effect.pct * 100)}% 灵力）`;
+    if (def.role === 'break_boost') return '（突破时服，成功率 +20%）';
+    return '';
+  }
+  if (def.type === 'treasure') {
+    const s = def.stats || {};
+    const parts = [];
+    if (s.atk) parts.push(`攻+${s.atk}`);
+    if (s.def) parts.push(`防+${s.def}`);
+    if (s.dur) parts.push(`耐久${s.dur}`);
+    if (s.el) parts.push(`${({ metal: '金', wood: '木', water: '水', fire: '火', earth: '土' })[s.el]}属性`);
+    return parts.length ? `（${parts.join(' · ')}）` : '';
+  }
+  if (def.type === 'technique') {
+    const parts = [];
+    if (def.cultivate) parts.push(`修炼 ×${def.cultivate.toFixed(2)}`);
+    if (def.breakBonus) parts.push(`突破 +${Math.round(def.breakBonus * 100)}%`);
+    if (def.atkPct) parts.push(`攻击 +${Math.round(def.atkPct * 100)}%`);
+    if (def.hpPct) parts.push(`气血 +${Math.round(def.hpPct * 100)}%`);
+    return parts.length ? `（${parts.join(' · ')}）` : '';
+  }
+  if (def.type === 'material') {
+    const el = def.el ? ({ metal: '金', wood: '木', water: '水', fire: '火', earth: '土' })[def.el] : '';
+    return el ? `（${el}属性材料）` : '（炼制材料）';
+  }
+  return '';
 }
 
 // 购买：成功返回 true 并结算；entry 来自当前货架快照

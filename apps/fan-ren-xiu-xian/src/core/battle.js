@@ -4,6 +4,7 @@
 // ============================================================================
 import { computeDamage, counterMult } from '../config.js';
 import { ITEMS, TREASURE_SKILLS } from '../data/items.js';
+import { recordSectActivity } from './sect.js';
 import { chance } from './rng.js';
 
 export function createBattle(player, enemy) {
@@ -132,6 +133,7 @@ export function battleRewards(player, enemy, rng) {
   const gain = { stones: 0, items: [], treasure: null, recipe: null };
   if (r.stones) { gain.stones = r.stones; logs.push(`获得 ${r.stones} 灵石。`); }
   for (const d of (r.drops || [])) gain.items.push(d);
+  recordSectActivity(player, 'battle'); // 宗门任务：战胜妖兽 +1（本函数仅胜利时调用）
   if (r.rare) {
     if (r.rare.kind === 'treasure') gain.treasure = r.rare.id;
     if (r.rare.kind === 'recipe') gain.recipe = r.rare.id;

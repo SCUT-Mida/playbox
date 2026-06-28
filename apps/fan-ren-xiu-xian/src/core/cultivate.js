@@ -6,6 +6,7 @@ import {
   EPIPHANY_CHANCE, EPIPHANY_MULT, hpRegenPerSec, mpRegenPerSec, cultivateSpeedMult,
 } from '../config.js';
 import { addXp, healHp, healMp } from './player.js';
+import { recordSectActivity } from './sect.js';
 import { chance } from './rng.js';
 
 // 被动修炼一帧（seconds 秒）：累积修为 + 气血/灵力回复
@@ -33,5 +34,6 @@ export function activeCultivate(player, rng) {
   const epiphany = chance(rng, EPIPHANY_CHANCE);
   if (epiphany) gain = Math.round(gain * EPIPHANY_MULT);
   const real = addXp(player, gain);
+  recordSectActivity(player, 'cultivate'); // 宗门任务：主动修炼 +1
   return { ok: true, xp: real, epiphany };
 }

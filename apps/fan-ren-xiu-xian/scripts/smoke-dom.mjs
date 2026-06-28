@@ -142,12 +142,62 @@ ok(document.querySelector('.status-bar') !== null, '进入后渲染游戏界面'
 // ---------- 9b) 各功能页渲染不报错 ----------
 let renderErr = null;
 try {
-  for (const tab of ['cultivate', 'explore', 'market', 'bag', 'alchemy']) {
+  for (const tab of ['cultivate', 'explore', 'market', 'bag', 'alchemy', 'sect']) {
     ui.tab = tab;
     ui.renderPanel();
   }
 } catch (e) { renderErr = e; }
-ok(!renderErr, `五大功能页渲染无异常（${renderErr ? renderErr.message : 'ok'}）`);
+ok(!renderErr, `六大功能页渲染无异常（${renderErr ? renderErr.message : 'ok'}）`);
+
+// ---------- 9b1) 坊市商品有介绍 + 可点开详情 ----------
+{
+  ui.tab = 'market'; ui.market = null; ui.renderPanel();
+  await sleep(5);
+  const rows = document.querySelectorAll('.shop-row');
+  ok(rows.length > 0, '坊市货架有商品');
+  const desc = [...document.querySelectorAll('.shop-desc')];
+  ok(desc.length > 0 && desc.every((d) => d.textContent.trim().length > 0), '每个商品都有介绍文案');
+  const infoBtn = document.querySelector('.shop-row__info');
+  ok(!!infoBtn, '商品行可点击查看详情');
+  infoBtn.click();
+  await sleep(10);
+  ok(/商品详情/.test(document.querySelector('.sheet__head .t')?.textContent || ''), '点开商品详情弹窗');
+  document.querySelector('.sheet__foot .btn-ghost').click();
+  await sleep(5);
+}
+
+// ---------- 9b1b) 境界徽章可点击展开「境界总纲」 ----------
+{
+  const badge = document.querySelector('button.realm-badge');
+  ok(!!badge, '境界徽章为可点击按钮');
+  badge.click();
+  await sleep(10);
+  ok(/境界总纲/.test(document.querySelector('.sheet__head .t')?.textContent || ''), '点击境界徽章展开境界总纲');
+  ok(document.querySelectorAll('.realm-node').length === 10, '境界总纲列出全部 10 大境界');
+  ok(document.querySelector('.realm-node.current') !== null, '当前境界有明显标注');
+  document.querySelector('.sheet__foot .btn-ghost').click();
+  await sleep(5);
+}
+
+// ---------- 9b1c) 宗门：拜入 → 任务/俸禄页渲染 ----------
+{
+  ui.tab = 'sect'; ui.renderPanel();
+  await sleep(5);
+  ok(/拜入宗门/.test(document.querySelector('.content')?.textContent || ''), '未入宗门时展示拜入宗门页');
+  const joinBtn = [...document.querySelectorAll('.content button')].find((b) => /拜入/.test(b.textContent));
+  ok(!!joinBtn, '有拜入宗门按钮');
+  joinBtn.click();
+  await sleep(10);
+  ok(!!ui.player.sectId, '拜入后已加入宗门');
+  ok(/今日宗门任务/.test(document.querySelector('.content')?.textContent || ''), '入宗后展示今日宗门任务');
+  ok(/每日宗门俸禄/.test(document.querySelector('.content')?.textContent || ''), '入宗后展示每日俸禄');
+  // 领取记名弟子俸禄
+  const rewardBtn = [...document.querySelectorAll('.content button')].find((b) => /领取俸禄/.test(b.textContent));
+  ok(rewardBtn && !rewardBtn.disabled, '俸禄按钮可领取');
+  rewardBtn.click();
+  await sleep(10);
+  ok(!!ui.player.sectRewardDate, '领取俸禄后记录当日已领');
+}
 
 // ---------- 9b2) 损坏境界档不闪退（「点修炼偶发闪退」UI 回归）----------
 // 模拟 tier/sub 非法（损坏档/导入串/旧版缺字段）：点修炼 + 刷新状态栏 + 渲染修炼页

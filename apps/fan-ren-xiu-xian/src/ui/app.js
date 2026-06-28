@@ -28,8 +28,14 @@ import {
   startMajorTrial, trialRespond, advanceRealm, failMajor,
 } from '../core/breakthrough.js';
 import { tryAlchemy, tryForge, hasMaterials, successRate } from '../core/alchemy.js';
-import { rollMarket, buyItem, sellItem, sellPrice } from '../core/market.js';
+import { rollMarket, buyItem, sellItem, sellPrice, itemEffectText } from '../core/market.js';
 import { ACHIEVEMENTS, TITLES, checkAchievements } from '../core/achievements.js';
+import { SECTS, SECT_LIST, SECT_TITLES } from '../data/sect.js';
+import {
+  joinSect, sectDef, currentSectTitle, titleProgress,
+  ensureSectTasks, dailySectRollover, claimSectTask, claimAllSectTasks,
+  claimDailySectReward, sectRewardClaimedToday, sectCultivateBonus,
+} from '../core/sect.js';
 import {
   saveGame, clearSave, exportSave, importSave, computeOffline,
   listSlots, loadSlot, saveSlot, deleteSlot, getActiveSlot, setActiveSlot, migrateLegacy,
@@ -41,6 +47,7 @@ const TABS = [
   { key: 'market', icon: '🏪', label: '坊市' },
   { key: 'bag', icon: '🎒', label: '背包' },
   { key: 'alchemy', icon: '⚗️', label: '炼丹' },
+  { key: 'sect', icon: '🏯', label: '宗门' },
 ];
 
 export class GameUI {
@@ -302,10 +309,12 @@ export class GameUI {
     const p = this.player;
     const info = realmInfo(p);
     const pt = portraitDef(p.portraitId);
-    this.ui.avatar = h('button', { class: 'avatar-btn', title: '人物', html: portraitSVG(pt, 34), onClick: () => this.showCharacter() });
-    this.ui.realmBadge = h('div', { class: 'realm-badge' },
+    this.ui.avatar = h('button', { class: 'avatar-btn', title: '人物档案', html: portraitSVG(pt, 34), onClick: () => this.showCharacter() });
+    // 境界徽章：只呈现大境界，点击展开完整「境界总纲」（可上下滑动，标注当前境界）
+    this.ui.realmBadge = h('button', { class: 'realm-badge', title: '查看境界总纲',
+      onClick: () => this.showRealmAxis() },
       h('span', { class: 'seal', style: { background: info.realm.color } }, info.realm.short),
-      h('span', { class: 'realm-name' }, realmDisplay(info)),
+      h('span', { class: 'realm-name' }, info.majorName),
     );
     this.ui.stones = h('span', { class: 'stones' }, `💎 ${fmt(p.stones)}`);
     this.ui.vitality = h('span', { class: 'vit-pill', title: '每日活力：消耗型行动力，跨日恢复' }, `⚡${Math.floor(p.vitality)}/${p.maxVitality}`);
@@ -334,10 +343,10 @@ export class GameUI {
   refreshStatus() {
     const p = this.player;
     const info = realmInfo(p);
-    // 境界徽章：颜色/文字
+    // 境界徽章：颜色/文字（只呈现大境界，详情见「境界总纲」）
     const seal = this.ui.realmBadge.querySelector('.seal');
     seal.style.background = info.realm.color;
-    this.ui.realmBadge.lastChild.textContent = realmDisplay(info);
+    this.ui.realmBadge.querySelector('.realm-name').textContent = info.majorName;
     // 头像：飞升后切换为仙尊形象
     const pt = portraitDef(p.ascended ? 'pt_ascend' : p.portraitId);
     this.ui.avatar.innerHTML = portraitSVG(pt, 34);
@@ -383,7 +392,13 @@ export class GameUI {
     for (const t of TABS) {
       const btn = h('button', {
         class: `tab ${this.tab === t.key ? 'active' : ''}`,
-        onClick: () => { this.tab = t.key; if (t.key === 'market' && !this.market) this.market = rollMarket(this.player, Math.random); this.buildTabs(); this.renderPanel(); },
+        onClick: () => {
+          this.tab = t.key;
+          if (t.key === 'market' && !this.market) this.market = rollMarket(this.player, Math.random);
+          if (t.key === 'sect') ensureSectTasks(this.player, Math.random);
+          this.buildTabs();
+          this.renderPanel();
+        },
       }, h('span', { class: 'ic' }, t.icon), h('span', null, t.label));
       this.tabBar.appendChild(btn);
     }
@@ -415,6 +430,7 @@ export class GameUI {
       case 'market': this.renderMarket(); break;
       case 'bag': this.renderBag(); break;
       case 'alchemy': this.renderAlchemy(); break;
+      case 'sect': this.renderSect(); break;
     }
   }
 
@@ -841,9 +857,16 @@ export class GameUI {
     );
     if (!this.market.entries.length) c.append(h('div', { class: 'muted' }, '货架空空如也。'));
     for (const e of this.market.entries) {
+      const priceTrend = e.basePrice && e.price > e.basePrice ? '　📈' : (e.basePrice && e.price < e.basePrice ? '　📉' : '');
       c.append(h('div', { class: 'shop-row' },
-        h('div', { class: 'emo' }, e.emoji),
-        h('div', { class: 'meta' }, h('div', { class: 'nm' }, e.name), h('div', { class: 'px' }, `💎${e.price}　库存 ${e.stock}`)),
+        h('button', { class: 'shop-row__info', title: '查看详情', onClick: () => this.showShopEntryDetail(e) },
+          h('div', { class: 'emo' }, e.emoji),
+          h('div', { class: 'meta' },
+            h('div', { class: 'nm' }, e.name),
+            h('div', { class: 'shop-desc' }, e.desc || '——'),
+            h('div', { class: 'px' }, `💎${e.price}${priceTrend}　库存 ${e.stock}`),
+          ),
+        ),
         h('button', {
           class: 'btn-primary', disabled: p.stones < e.price || e.stock <= 0,
           onClick: () => this.doBuy(e),
@@ -861,7 +884,7 @@ export class GameUI {
       const d = ITEMS[id];
       c.append(h('div', { class: 'shop-row' },
         h('div', { class: 'emo' }, d.emoji),
-        h('div', { class: 'meta' }, h('div', { class: 'nm' }, `${d.name} ×${countItem(p, id)}`), h('div', { class: 'px' }, `回收 💎${sellPrice(id)}`)),
+        h('div', { class: 'meta' }, h('div', { class: 'nm' }, `${d.name} ×${countItem(p, id)}`), h('div', { class: 'shop-desc' }, d.desc), h('div', { class: 'px' }, `回收 💎${sellPrice(id)}`)),
         h('button', { class: 'btn-ghost', onClick: () => this.doSell(id) }, '出售'),
       ));
     }
@@ -891,7 +914,37 @@ export class GameUI {
     this.afterAction();
   }
 
-  // ============ 背包 ============
+  // 货架商品详情：购买前看清功效（丹药效果 / 法宝属性 / 功法加成 / 配方产出）
+  showShopEntryDetail(entry) {
+    const p = this.player;
+    const def = ITEMS[entry.id];
+    const isRecipe = !!entry.isRecipe;
+    const recipe = isRecipe ? RECIPE_BY_ID[entry.id] : null;
+    const effectTxt = def ? itemEffectText(def) : '';
+    const body = [
+      h('div', { style: { textAlign: 'center', fontSize: '2.2rem' } }, entry.emoji),
+      h('h4', { style: { textAlign: 'center' } }, entry.name),
+      h('div', { class: 'muted', style: { textAlign: 'center', marginBottom: '0.4rem' } }, typeName(entry.kind)),
+      h('div', { class: 'muted', style: { textAlign: 'center', marginBottom: '0.4rem' } }, def ? def.desc : (recipe ? recipe.desc : '')),
+      effectTxt ? h('div', { class: 'shop-effect', style: { textAlign: 'center', marginBottom: '0.4rem' } }, effectTxt) : null,
+    ];
+    if (isRecipe && recipe) {
+      const out = ITEMS[recipe.out];
+      const inputs = Object.entries(recipe.inputs).map(([mid, n]) => `${ITEMS[mid] ? ITEMS[mid].name : mid} ×${n}`).join('、');
+      body.push(h('div', { class: 'muted', style: { textAlign: 'center' } }, `炼制需：${inputs}`));
+      if (out) body.push(h('div', { class: 'muted', style: { textAlign: 'center' } }, `产出：${out.emoji} ${out.name}`));
+    }
+    body.push(h('div', { class: 'muted', style: { textAlign: 'center', marginTop: '0.4rem' } }, `售价 💎${entry.price} · 库存 ${entry.stock}`));
+    this.showSheet({
+      title: '商品详情',
+      body,
+      foot: [
+        h('button', { class: 'btn-primary', disabled: p.stones < entry.price || entry.stock <= 0, onClick: () => { this.closeModal(); this.doBuy(entry); } }, `💎${entry.price} 购买`),
+        h('button', { class: 'btn-ghost', onClick: () => this.closeModal() }, '关闭'),
+      ],
+    });
+  }
+
   renderBag() {
     const p = this.player;
     const used = distinctItems(p).length;
@@ -954,6 +1007,7 @@ export class GameUI {
       h('div', { style: { textAlign: 'center', fontSize: '2.2rem' } }, d.emoji),
       h('h4', { style: { textAlign: 'center' } }, d.name),
       h('div', { class: 'muted', style: { textAlign: 'center', marginBottom: '0.5rem' } }, d.desc),
+      h('div', { class: 'shop-effect', style: { textAlign: 'center', marginBottom: '0.4rem' } }, itemEffectText(d)),
       h('div', { class: 'muted', style: { textAlign: 'center' } }, `持有 ×${countItem(p, id)} · 回收 💎${sellPrice(id)}`),
     ];
     const foot = [];
@@ -1028,6 +1082,178 @@ export class GameUI {
     this.afterAction();
   }
 
+  // ============ 宗门 ============
+  renderSect() {
+    const p = this.player;
+    ensureSectTasks(p, Math.random);
+    const c = h('div', null);
+    c.append(h('div', { class: 'panel-title' }, '宗门'));
+
+    // 未入宗门：展示可加入的宗门
+    if (!p.sectId) {
+      c.append(h('div', { class: 'card' },
+        h('h4', null, '拜入宗门'),
+        h('div', { class: 'muted', style: { marginBottom: '0.5rem' } }, '加入宗门方可接取每日宗门任务、积累声望、凭境界与声望晋升宗门称号，领取每日俸禄与修炼加成。'),
+      ));
+      for (const s of SECT_LIST) {
+        c.append(h('div', { class: 'card sect-card' },
+          h('div', { class: 'row' },
+            h('div', { class: 'emo sect-emo' }, s.emoji),
+            h('div', { class: 'grow' },
+              h('div', { class: 'nm' }, s.name),
+              h('div', { class: 'muted', style: { marginTop: '0.15rem' } }, s.desc),
+              h('div', { class: 'muted', style: { marginTop: '0.15rem' } }, `修炼加成 ×${s.cultMult.toFixed(2)}`),
+            ),
+            h('button', { class: 'btn-primary', onClick: () => this.doJoinSect(s.id) }, '拜入'),
+          ),
+        ));
+      }
+      this.content.appendChild(c);
+      return;
+    }
+
+    // 已入宗门：展示宗门 / 称号 / 声望 / 每日任务 / 俸禄
+    const sect = sectDef(p.sectId);
+    const title = currentSectTitle(p);
+    const prog = titleProgress(p);
+    c.append(h('div', { class: 'card' },
+      h('div', { class: 'row' },
+        h('div', { class: 'emo sect-emo' }, sect ? sect.emoji : '🏯'),
+        h('div', { class: 'grow' },
+          h('div', { class: 'nm' }, sect ? sect.name : '宗门'),
+          h('div', { class: 'muted', style: { marginTop: '0.15rem' } }, title ? `${title.emoji} ${title.name} · 修炼 ×${sectCultivateBonus(p).toFixed(2)}` : ''),
+        ),
+        h('button', { class: 'btn-ghost', onClick: () => this.showSectTitleLadder() }, '称号阶'),
+      ),
+      h('div', { class: 'stat-grid', style: { marginTop: '0.5rem' } },
+        kv('宗门声望', Math.floor(p.sectRep || 0)),
+        kv('当前称号', title ? `${title.emoji} ${title.name}` : '——'),
+      ),
+      prog.atTop
+        ? h('div', { class: 'muted', style: { marginTop: '0.35rem' } }, '👑 已达本宗最高称号，威震一方。')
+        : h('div', { class: 'req-line', style: { marginTop: '0.35rem' } },
+            h('span', { class: prog.tierOk ? 'ok' : 'no' }, `下一阶：${prog.next.emoji} ${prog.next.name}（需境界 ${REALMS[prog.next.minTier].name}${prog.tierOk ? ' ✓' : ' ✗'} · 声望 ${Math.floor(prog.repHave)}/${prog.repNeed}）`),
+          ),
+    ));
+
+    // 每日宗门任务
+    const claimable = (p.sectTasks || []).filter((t) => !t.claimed && (t.progress || 0) >= t.goal).length;
+    c.append(
+      h('div', { class: 'row', style: { margin: '0.2rem 0 0.4rem', alignItems: 'center' } },
+        h('h4', { class: 'muted', style: { margin: 0 } }, '今日宗门任务'),
+        h('div', { class: 'spacer' }),
+        claimable > 0 ? h('button', { class: 'btn-jade', onClick: () => this.doClaimAllSectTasks() }, `一键领取(+${claimable})`) : null,
+      ),
+    );
+    if (!p.sectTasks || !p.sectTasks.length) {
+      c.append(h('div', { class: 'card muted' }, '今日暂无任务。'));
+    } else {
+      for (const t of p.sectTasks) {
+        const done = (t.progress || 0) >= t.goal;
+        c.append(h('div', { class: `card sect-task ${t.claimed ? 'claimed' : ''}` },
+          h('div', { class: 'row' },
+            h('div', { class: 'emo' }, t.emoji),
+            h('div', { class: 'grow' },
+              h('div', { class: 'nm' }, `${t.label}（${t.verb} ${t.goal} 次）`),
+              bar(t.progress || 0, t.goal, { class: 'xp', label: `${Math.min(t.progress || 0, t.goal)}/${t.goal}` }),
+            ),
+            h('div', { class: 'muted', style: { textAlign: 'right', whiteSpace: 'nowrap' } }, `声望 +${t.rep}`),
+          ),
+          h('div', { class: 'row', style: { marginTop: '0.4rem' } },
+            t.claimed
+              ? h('div', { class: 'muted grow', style: { textAlign: 'center' } }, '✓ 已领取')
+              : h('button', { class: done ? 'btn-jade' : 'btn-ghost', style: { width: '100%' }, disabled: !done, onClick: () => this.doClaimSectTask(t.id) }, done ? '领取声望' : '进行中…'),
+          ),
+        ));
+      }
+      c.append(h('div', { class: 'muted', style: { textAlign: 'center', margin: '0.3rem 0' } }, '完成修炼 / 探索 / 战斗 / 炼制 / 突破可推进对应任务，每日刷新。'));
+    }
+
+    // 每日宗门俸禄
+    const claimedToday = sectRewardClaimedToday(p);
+    const dailyTxt = title && title.daily
+      ? `${title.daily.stones ? `💎${title.daily.stones}` : ''}${title.daily.items ? ' ' + title.daily.items.map((it) => `${ITEMS[it.id] ? ITEMS[it.id].name : it.id}×${it.qty}`).join('、') : ''}`
+      : '——';
+    c.append(h('div', { class: 'card' },
+      h('h4', null, '每日宗门俸禄'),
+      h('div', { class: 'muted', style: { marginBottom: '0.4rem' } }, `按当前称号发放：${dailyTxt}`),
+      h('button', { class: 'btn-primary big-btn', disabled: claimedToday || !title, onClick: () => this.doClaimDailySectReward() }, claimedToday ? '今日已领取' : '🎁 领取俸禄'),
+    ));
+
+    this.content.appendChild(c);
+  }
+
+  doJoinSect(sectId) {
+    const p = this.player;
+    const wasIn = !!p.sectId;
+    const s = SECTS[sectId];
+    const performJoin = () => {
+      joinSect(p, sectId, Math.random);
+      this.pushLog(`你拜入${s.name}，自此为门下弟子。`, 'epic');
+      this.toast(`加入${s.name}`, 'epic');
+      this.afterAction();
+    };
+    if (wasIn) {
+      // 转宗：保留声望，但需玩家确认
+      this.showSheet({
+        title: `转投${s.name}？`,
+        body: [h('div', { class: 'muted' }, `你将离开${sectDef(p.sectId).name}。宗门声望与称号予以保留，转宗后立即可在新宗门接取任务。`)],
+        foot: [
+          h('button', { class: 'btn-primary', onClick: () => { this.closeModal(); performJoin(); } }, '确认转宗'),
+          h('button', { class: 'btn-ghost', onClick: () => this.closeModal() }, '再想想'),
+        ],
+      });
+    } else {
+      performJoin();
+    }
+  }
+
+  doClaimSectTask(taskId) {
+    const res = claimSectTask(this.player, taskId);
+    if (!res.ok) { this.toast(res.reason, 'bad'); return; }
+    this.pushLog(`完成宗门任务，声望 +${res.rep}（累计 ${res.total}）。`, 'good');
+    this.float(`声望 +${res.rep}`, 'good');
+    this.afterAction();
+  }
+
+  doClaimAllSectTasks() {
+    const res = claimAllSectTasks(this.player);
+    if (!res.count) { this.toast('暂无可领取的任务', 'bad'); return; }
+    this.pushLog(`一次性领取 ${res.count} 项宗门任务，声望 +${res.rep}。`, 'good');
+    this.float(`声望 +${res.rep}`, 'good');
+    this.afterAction();
+  }
+
+  doClaimDailySectReward() {
+    const res = claimDailySectReward(this.player);
+    if (!res.ok) { this.toast(res.reason, 'bad'); return; }
+    this.pushLog(`领取${res.title.name}每日俸禄。`, 'epic');
+    for (const l of res.logs) this.pushLog(l.text, l.type);
+    this.toast(`俸禄已入帐`, 'epic');
+    this.afterAction();
+  }
+
+  // 宗门称号进阶一览（境界 + 声望双门槛）
+  showSectTitleLadder() {
+    const p = this.player;
+    const cur = currentSectTitle(p);
+    const body = SECT_TITLES.map((t) => {
+      const isCur = cur && cur.id === t.id;
+      const tierOk = (p.tier || 0) >= t.minTier;
+      const repOk = (p.sectRep || 0) >= t.minRep;
+      const dailyTxt = t.daily ? `${t.daily.stones ? `💎${t.daily.stones}` : ''}${t.daily.items ? ' ' + t.daily.items.map((it) => `${ITEMS[it.id] ? ITEMS[it.id].name : it.id}×${it.qty}`).join('、') : ''}` : '——';
+      return h('div', { class: `achv ${isCur ? '' : 'locked'}` },
+        h('div', { class: 'emo' }, t.emoji),
+        h('div', { class: 'grow' },
+          h('div', null, `${t.name}${isCur ? '（当前）' : ''}`),
+          h('div', { class: 'muted' }, `${t.desc} 修炼 ×${t.cultMult.toFixed(2)}`),
+          h('div', { class: 'muted', style: { marginTop: '0.1rem' } }, `需 ${REALMS[t.minTier].name}${tierOk ? ' ✓' : ' ✗'} · 声望 ${t.minRep}${repOk ? ' ✓' : ''} · 日俸 ${dailyTxt}`),
+        ),
+      );
+    });
+    this.showSheet({ title: '宗门称号阶', body, foot: [h('button', { class: 'btn-ghost', onClick: () => this.closeModal() }, '关闭')] });
+  }
+
   // ============ 人物档案 ============
   showCharacter() {
     const p = this.player;
@@ -1038,6 +1264,8 @@ export class GameUI {
     const ql = qiyunLabel(qy);
     const bg = BACKGROUNDS[p.bgId] || BACKGROUNDS[Object.keys(BACKGROUNDS)[0]];
     const talents = (p.talentIds || []).map((id) => TALENTS[id]).filter(Boolean);
+    const sect = p.sectId ? sectDef(p.sectId) : null;
+    const sectTitle = currentSectTitle(p);
 
     const body = [
       h('div', { class: 'char-head' },
@@ -1054,6 +1282,8 @@ export class GameUI {
         kv('神识', p.spirit), kv('气血上限', p.maxHp),
         kv('灵力上限', p.maxMp), kv('每日活力', `${Math.floor(p.vitality)}/${p.maxVitality}`),
         kv('修炼/秒', passiveXpPerSec(p.tier, cultivateSpeedMult(p)).toFixed(2)), kv('出身', `${bg.emoji}${bg.name}`),
+        kv('宗门', sect ? `${sect.emoji}${sect.name}` : '散修（未入宗门）'),
+        kv('宗门称号', sectTitle ? `${sectTitle.emoji} ${sectTitle.name}` : '——'),
       ),
     ];
     if (talents.length) {
@@ -1066,12 +1296,56 @@ export class GameUI {
     this.showSheet({ title: '人物档案', body, foot: [h('button', { class: 'btn-ghost', onClick: () => this.closeModal() }, '关闭')] });
   }
 
-  // ============ 成就 / 设置 弹窗 ============
+  // ============ 境界总纲（境界轴）============
+  // 点击顶部境界徽章展开：完整大境界 + 小层 + 文案，可上下滑动，当前境界明显标注。
+  showRealmAxis() {
+    const p = this.player;
+    const info = realmInfo(p);
+    const curTier = REALMS.indexOf(info.realm); // info.realm 即 REALMS[tier]（已钳制），引用相等
+    const curSub = p.sub || 0;
+    const axis = h('div', { class: 'realm-axis' });
+    REALMS.forEach((r, idx) => {
+      const isCurrent = idx === curTier;
+      const passed = idx < curTier;
+      const node = h('div', { class: `realm-node ${isCurrent ? 'current' : ''} ${passed ? 'passed' : ''} ${idx > curTier ? 'future' : ''}` },
+        h('div', { class: 'realm-node__rail' },
+          h('div', { class: 'seal', style: { background: r.color } }, r.short),
+          h('div', { class: 'realm-node__line' }),
+        ),
+        h('div', { class: 'realm-node__body' },
+          h('div', { class: 'realm-node__head' },
+            h('span', { class: 'realm-node__name', style: { color: r.color } }, r.name),
+            isCurrent ? h('span', { class: 'realm-node__now' }, `当前 · ${info.subName}`) : (passed ? h('span', { class: 'realm-node__tag ok' }, '已证') : h('span', { class: 'realm-node__tag' }, '未达')),
+          ),
+          h('div', { class: 'realm-node__subs' }, r.subs.map((s, si) => h('span', { class: `sub-chip ${(isCurrent && si === curSub) ? 'active' : ''}` }, s))),
+          h('div', { class: 'muted', style: { marginTop: '0.25rem' } }, r.desc),
+          h('div', { class: 'muted', style: { marginTop: '0.15rem', fontSize: '0.72rem' } },
+            r.trial ? `渡劫：${trialLabel(r.trial)}` : '无需渡劫',
+            r.reqItem && ITEMS[r.reqItem] ? ` · 推荐${ITEMS[r.reqItem].name}` : '',
+            ` · 修炼系数 ×${r.speedFactor.toFixed(1)}`),
+        ),
+      );
+      axis.appendChild(node);
+    });
+    this.showSheet({
+      title: '境界总纲',
+      body: [
+        h('div', { class: 'muted', style: { marginBottom: '0.6rem' } }, '凡人 → 炼气 → 筑基 → 结丹 → 元婴 → 化神 → 炼虚 → 合体 → 大乘 → 飞升。大境界之间需渡心魔 / 天劫。'),
+        axis,
+      ],
+      foot: [h('button', { class: 'btn-ghost', onClick: () => this.closeModal() }, '关闭')],
+    });
+  }
+
   showAchievements() {
     const p = this.player;
+    const sectTitle = currentSectTitle(p);
     const body = [h('div', { class: 'card' },
       h('h4', null, '称号'),
-      p.titles.length ? h('div', { class: 'muted' }, p.titles.map((id) => `${TITLES[id] ? TITLES[id].emoji + ' ' + TITLES[id].name + '：' + TITLES[id].desc : id}`).join('\n')) : h('div', { class: 'muted' }, '尚无称号。'),
+      // 宗门称号：随境界与声望动态变化的「活称号」
+      sectTitle ? h('div', { class: 'muted', style: { marginBottom: '0.3rem' } }, `${sectTitle.emoji} 宗门·${sectTitle.name}：${sectTitle.desc}（修炼 ×${sectCultivateBonus(p).toFixed(2)}）`) : null,
+      // 突破称号：筑基道子 / 结丹仙缘 等（固定，存于 player.titles）
+      p.titles.length ? h('div', { class: 'muted' }, p.titles.map((id) => `${TITLES[id] ? TITLES[id].emoji + ' ' + TITLES[id].name + '：' + TITLES[id].desc : id}`).join('　')) : (sectTitle ? null : h('div', { class: 'muted' }, '尚无称号。')),
     )];
     for (const a of ACHIEVEMENTS) {
       const got = p.achievements.includes(a.id);
@@ -1252,6 +1526,8 @@ export class GameUI {
       saveGame(this.player);
       this.refreshStatus();
     }
+    // 宗门每日任务跨日刷新（在线跨过零点时；进入游戏由 renderSect 兜底补齐）
+    dailySectRollover(this.player, Math.random);
   }
 
   startLoop() {
@@ -1296,15 +1572,6 @@ function kv(k, v) { return [h('div', { class: 'k' }, k), h('div', { class: 'v' }
 function line(text, ok) { return h('div', { class: 'req-line' }, h('span', { class: ok ? 'ok' : 'no' }, `${ok ? '✓' : '○'} ${text}`)); }
 function typeName(t) { return { pill: '丹药', material: '材料', treasure: '法宝', technique: '功法', misc: '杂物', recipe: '配方' }[t] || t; }
 function elName(el) { return ({ metal: '金', wood: '木', water: '水', fire: '火', earth: '土' })[el] ? `${({ metal: '金', wood: '木', water: '水', fire: '火', earth: '土' })[el]}属性` : ''; }
-// 顶部境界徽章的紧凑文案：凡人去重（避免「凡人凡人」）、大境界去「期」（「炼气期一层」→「炼气一层」）、
-// 飞升单独处理，让窄屏顶栏也能完整显示当前境界。
-function realmDisplay(info) {
-  const major = info.majorName || '';
-  const sub = info.subName || '';
-  if (major === '凡人') return '凡人';
-  if (major === '飞升') return '飞升';
-  return `${major.replace(/期$/, '')}${sub}`;
-}
 function trialLabel(kind) { return { heart: '渡心魔', trib: '渡天劫', ascend: '飞升天劫' }[kind] || '突破'; }
 function learnRecipeGuard(p, id) { const r = RECIPE_BY_ID[id]; if (r && !p.recipes.includes(id)) p.recipes.push(id); }
 // 大数简写：1.2k / 3.4w

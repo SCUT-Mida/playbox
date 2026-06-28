@@ -112,6 +112,7 @@ export function cultivateSpeedMult(player) {
   for (const id of (player.talentIds || [])) m *= (TALENTS[id] && TALENTS[id].cultMult) || 1;
   for (const id of player.titles) m *= titleCultivateMult(id);
   for (const id of player.techniques) m *= techniqueDef(id).cultivate || 1;
+  if (_SECT_BONUS_FN) m *= _SECT_BONUS_FN(player) || 1; // 宗门 + 宗门称号加成
   if (player.chaos && player.chaos.speedBoostUntil > nowSec()) m *= 2;
   return m;
 }
@@ -197,6 +198,11 @@ let _ITEMS = null;
 let _TECHNIQUES = null;
 export function _registerItems(items) { _ITEMS = items; }
 export function _registerTechniques(techs) { _TECHNIQUES = techs; }
+// 宗门修炼加成懒注册：宗门自身加成 + 当前宗门称号加成。
+// 由 core/sect.js 注入，避免此处直接 import 宗门模块造成 config↔sect 循环依赖
+// （沿用 items/techniques 的懒注册模式）。未注册时默认 1（无加成）。
+let _SECT_BONUS_FN = null;
+export function _registerSectBonus(fn) { _SECT_BONUS_FN = fn; }
 export function itemDef(id) { return (_ITEMS && _ITEMS[id]) || null; }
 export function techniqueDef(id) { return (_TECHNIQUES && _TECHNIQUES[id]) || { cultivate: 1, breakBonus: 0 }; }
 export function titleCultivateMult(id) {

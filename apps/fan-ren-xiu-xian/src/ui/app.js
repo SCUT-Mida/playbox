@@ -1843,24 +1843,44 @@ export class GameUI {
     this.afterAction();
   }
 
-  // 大限将至横幅：寿元耗尽时呈现。仍有轮回次数 → 轮回重修入口；否则 → 陨落，仅可重开。
+  // 大限将至横幅：寿元耗尽时呈现。仍有轮回次数 → 轮回重修入口；
+  // 否则 → 若尚有更高大境界可突破延寿，给出「去突破延寿」入口（凡人挂机被动攒修为不耗活力，
+  // 总能逐步突破），「重开新篇」降级为非唯一选项，避免误导玩家误清档。
   renderDeathBanner() {
     const p = this.player;
     const can = canReincarnate(p);
+    // 仍可突破至更高大境界即仍可延寿续命（nextTarget 为 null 表示已登顶飞升，无可突破）。
+    const canExtend = !!nextTarget(p);
+    const actions = [];
+    if (can) {
+      actions.push(h('button', { class: 'btn-jade rest-btn', onClick: () => this.confirmReincarnate() }, '♻ 轮回重修'));
+    } else {
+      if (canExtend) actions.push(h('button', { class: 'btn-jade rest-btn', onClick: () => this.goBreakthroughForLife() }, '⚡ 去突破延寿'));
+      actions.push(h('button', { class: 'btn-danger rest-btn', onClick: () => this.confirmReset() }, '🌌 重开新篇'));
+    }
+    const desc = can
+      ? `寿元已逾${REALMS[p.tier].name}之限。可轮回重修一次：境界与修为归零、年龄重置，但携带前世灵根、气运与一项天赋，更获「前世记忆」修炼加成（×${REINCARNATION_CULT_BONUS.toFixed(2)}）。`
+      : (canExtend
+          ? '前世今生寿元皆尽，再无轮回之路。然大道未绝——突破至更高大境界可延寿续命；若决意舍弃此身，亦可重开新篇。'
+          : '前世今生寿元皆尽，再无轮回之路，亦已登仙绝顶。唯余重开新篇，再入红尘。');
     return h('div', { class: 'card rest-banner death-banner' },
       h('div', { class: 'row' },
         h('div', { class: 'grow' },
           h('h4', null, `☠ 大限将至 · ${ageLabel(p)}`),
-          h('div', { class: 'muted', style: { marginTop: '0.2rem' } },
-            can
-              ? `寿元已逾${REALMS[p.tier].name}之限。可轮回重修一次：境界与修为归零、年龄重置，但携带前世灵根、气运与一项天赋，更获「前世记忆」修炼加成（×${REINCARNATION_CULT_BONUS.toFixed(2)}）。`
-              : '前世今生寿元皆尽，再无轮回之路。唯余重开新篇，再入红尘。'),
+          h('div', { class: 'muted', style: { marginTop: '0.2rem' } }, desc),
         ),
-        can
-          ? h('button', { class: 'btn-jade rest-btn', onClick: () => this.confirmReincarnate() }, '♻ 轮回重修')
-          : h('button', { class: 'btn-danger rest-btn', onClick: () => this.confirmReset() }, '🌌 重开新篇'),
+        ...actions,
       ),
     );
+  }
+
+  // 大限且不可轮回时：跳转修炼页引导突破延寿。修为未满时突破按钮为灰，挂机攒满即点亮。
+  goBreakthroughForLife() {
+    this.tab = 'cultivate';
+    this.buildTabs();
+    this.renderPanel();
+    this.pushLog('⚡ 大限将至，唯突破至更高大境界方可延寿续命。', 'bad');
+    this.toast('去突破延寿', 'bad');
   }
 
   confirmReincarnate() {
@@ -1895,19 +1915,19 @@ export class GameUI {
     if (!this.player || this.screen !== 'game') return;
     const rolled = rolloverVitality(this.player); // 同时推进年龄并写入 _cycleAgedYears
     const aged = this.player._cycleAgedYears || 0;
-    if (rolled) {
-      if (notify) {
-        this.pushLog('🌅 新的一月，活力已回满。', 'good');
-        this.toast('新的一月，活力回满', 'good');
-      }
-      saveGame(this.player);
+    if (rolled && notify) {
+      this.pushLog('🌅 新的一月，活力已回满。', 'good');
+      this.toast('新的一月，活力回满', 'good');
     }
     if (aged > 0) {
       this.pushLog(`⏳ 岁月流转，痴长 ${aged} 岁，今已 ${ageLabel(this.player)}。`, 'normal');
       if (isDying(this.player)) this.pushLog('☠ 寿元将尽，大限将至，须尽早突破延寿或轮回重修。', 'bad');
-      saveGame(this.player);
     }
-    if (rolled || aged > 0) this.refreshStatus();
+    // 同一轮既回满活力又推进年龄时合并为一次存档（原本 rolled 与 aged 各存一次）。
+    if (rolled || aged > 0) {
+      saveGame(this.player);
+      this.refreshStatus();
+    }
     // 宗门每月任务跨月刷新（在线跨过月初时；进入游戏由 renderSect 兜底补齐）
     dailySectRollover(this.player, Math.random);
   }

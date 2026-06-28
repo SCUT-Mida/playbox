@@ -267,6 +267,9 @@ export function reincarnate(player, rng) {
   player.reincarnationBonus = REINCARNATION_CULT_BONUS;
   player.hp = 0; player.mp = 0;
   recompute(player);
+  // 截断天赋后须以新天赋集重算活力上限，否则 vitality 会被赋成截断前的「陈旧上限」
+  // （vitalityMax 逐项累加 t.maxVitBonus，依赖 talentIds）。与 newPlayer / restToNextDay 同款写法。
+  player.maxVitality = vitalityMax(player);
   player.vitality = player.maxVitality;
   player.lastVitalityDate = cycleKey();
   player.hp = player.maxHp;
@@ -484,8 +487,10 @@ export function rolloverVitality(player) {
     if (months > 0) {
       aged = months * YEARS_PER_CYCLE;
       player.age = (player.age || 0) + aged;
+      // 仅在前拨（months > 0）时推进记月点；时钟回拨时保持原值，
+      // 否则回拨后再前拨会以更早的月份为基准，造成年龄「超算」。
+      player.lastAgeMonth = cur;
     }
-    player.lastAgeMonth = cur;
   } else if (!player.lastAgeMonth) {
     player.lastAgeMonth = cur;
   }

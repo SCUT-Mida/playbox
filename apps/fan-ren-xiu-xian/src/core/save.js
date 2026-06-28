@@ -60,7 +60,13 @@ export function saveGame(player) {
     if (player) player.slot = slot;
     setActiveSlot(slot);
     player.lastSeen = nowSec();
-    if (storage) storage.setItem(slotKey(slot), JSON.stringify(player));
+    if (storage) {
+      // 剔除瞬态字段（本次周期增长的 _cycleAgedYears），避免泄漏进持久层：
+      // 它在 checkDayRollover 中读完即弃，下次 rolloverVitality 会重新写入。
+      const persist = { ...player };
+      delete persist._cycleAgedYears;
+      storage.setItem(slotKey(slot), JSON.stringify(persist));
+    }
     return true;
   } catch (_) { return false; }
 }

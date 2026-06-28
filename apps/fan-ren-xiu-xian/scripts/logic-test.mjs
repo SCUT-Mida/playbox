@@ -7,6 +7,7 @@ import {
   ROOT_GRADES, ROOT_COUNTS, FIVE_ELEMENTS, MUTANT_ELEMENTS,
   rootDescriptor, rootAffinity, rootGradeDef, rootCountDef, elDef, rootFromLegacy,
   realmLifespan, isDying, canReincarnate, ageLabel,
+  vitalityMax, MAX_VITALITY,
   START_AGE_MIN, START_AGE_MAX, YEARS_PER_CYCLE, MAX_REINCARNATIONS, REINCARNATION_CULT_BONUS,
   ROOT_AFFINITY_MATCH,
 } from '../src/config.js';
@@ -819,6 +820,15 @@ ok(monthsBetween('2024-05', '2024-01') === 0, 'monthsBetween 逆序兜底 0');
   ok(q.age > age0, '跨月后年龄增长');
   ok(q.vitality === q.maxVitality, '活力回满');
 }
+// rolloverVitality 时钟回拨：months<=0 时既不推进年龄，也不改写 lastAgeMonth
+{
+  const q = newPlayer(() => 0);
+  const age0 = q.age;
+  q.lastAgeMonth = '2099-12'; // 未来月份，模拟系统时钟回拨
+  rolloverVitality(q);
+  ok(q.age === age0, '时钟回拨不推进年龄');
+  ok(q.lastAgeMonth === '2099-12', '时钟回拨时保持原记月点（不被污染）');
+}
 
 // ---------- 轮回重修 ----------
 console.log('— reincarnation —');
@@ -826,8 +836,10 @@ console.log('— reincarnation —');
   const q = newPlayer(() => 0);
   q.root = { grade: 'tian', count: 'single', els: ['fire'] };
   q.qiyun = 88;
-  q.talentIds = ['tal_wuxing', 'tal_tiegu'];
+  // 第二项天赋带 maxVitBonus(+30)，轮回后会被 slice(0,1) 丢弃——用于校验活力上限随之重算。
+  q.talentIds = ['tal_wuxing', 'tal_wanshou'];
   q.tier = 3; q.sub = 2; recompute(q); q.xp = 9999;
+  ok(q.maxVitality === MAX_VITALITY + 30, '轮回前活力上限含被携天赋加成');
   ok(canReincarnate(q) === false, '未到大限不可轮回');
   ok(reincarnate(q, makeRng(1)) === false, '未到大限 reincarnate 返回 false');
   q.age = realmLifespan(q.tier) + 10; // 大限
@@ -843,6 +855,10 @@ console.log('— reincarnation —');
   ok(/（轮回）/.test(ageLabel(q)), '年龄标注（轮回）');
   ok(q.age <= START_AGE_MAX, '年龄重置为年少');
   ok(cultivateSpeedMult(q) > q.rootMult, '前世记忆使修炼倍率 > rootMult');
+  // 截断天赋后活力上限须以新天赋集重算，vitality 与之一致（杜绝「陈旧上限」）。
+  ok(q.maxVitality === MAX_VITALITY, '截断带活力加成的天赋后，活力上限回落');
+  ok(q.maxVitality === vitalityMax(q), '轮回后 maxVitality 与当前天赋集一致');
+  ok(q.vitality === q.maxVitality, '轮回后活力回满至当前上限');
   // 再度大限：已用尽轮回次数
   q.age = realmLifespan(q.tier) + 10;
   ok(canReincarnate(q) === false, '已轮回过，再无轮回次数');

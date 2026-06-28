@@ -168,6 +168,9 @@ export default class SlotScene extends Phaser.Scene {
       fontFamily: '"PingFang SC",sans-serif', fontSize: '15px', color: '#cdb888', align: 'center',
     }).setOrigin(0.5).setWordWrapWidth(pw - 60));
 
+    // mkBtn 返回 { cont, zone }：视觉容器 cont 与命中区 zone 一并交由 _closeConfirm 回收，
+    // 否则只销毁 zone 会让 cont（底色 + 文字）作为孤儿残留在屏幕中央、深度 92，
+    // 随每次开关确认框不断堆积（参照 _buildCard 已有的 { cont, zone, del, delBtn } 回收范式）。
     const mkBtn = (lx, ly, w2, label, color, onClick) => {
       const cont = this.add.container(width / 2 + lx, height / 2 + ly).setDepth(92);
       const bgg = this.add.graphics();
@@ -179,19 +182,22 @@ export default class SlotScene extends Phaser.Scene {
       }).setOrigin(0.5));
       const z = this.add.zone(width / 2 + lx, height / 2 + ly, w2, 50).setInteractive({ useHandCursor: true }).setDepth(93);
       z.on('pointerdown', (p) => { p.event.stopPropagation(); this.tweens.add({ targets: cont, scale: 0.95, duration: 60, yoyo: true }); this.time.delayedCall(70, onClick); });
-      return z;
+      return { cont, zone: z };
     };
-    const cancelZ = mkBtn(-90, 60, 160, '取消', 0x6b5a40, () => this._closeConfirm(overlay, panel, [cancelZ, okZ]));
-    const okZ = mkBtn(90, 60, 160, '确认删除', COLORS.base, () => {
+    const cancel = mkBtn(-90, 60, 160, '取消', 0x6b5a40, () => this._closeConfirm(overlay, panel, [cancel, ok]));
+    const ok = mkBtn(90, 60, 160, '确认删除', COLORS.base, () => {
       deleteSlot(slot);
-      this._closeConfirm(overlay, panel, [cancelZ, okZ]);
+      this._closeConfirm(overlay, panel, [cancel, ok]);
       this._renderSlots();
     });
   }
 
-  _closeConfirm(overlay, panel, zones) {
+  _closeConfirm(overlay, panel, btns) {
     overlay.destroy();
     panel.destroy(true);
-    zones.forEach((z) => z.destroy());
+    btns.forEach((b) => {
+      if (b.cont) b.cont.destroy(true);
+      if (b.zone) b.zone.destroy();
+    });
   }
 }

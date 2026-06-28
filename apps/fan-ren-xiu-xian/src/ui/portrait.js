@@ -6,6 +6,10 @@
 // 男：束发髻 + 发簪，剑眉，肩线宽厚；
 // 女：长发披肩 + 额饰花钿，柳眉，肩线柔和 —— 男女一眼可辨。
 
+// 头像序号：同一文档内可能并存多张相同 tag/gender/size 的头像，
+// 用单调递增序号为每个 <radialGradient>/<clipPath> 的 id 追加唯一后缀，避免重复 id（非法 HTML）。
+let portraitSeq = 0;
+
 // 修炼方向 → 配色与点缀
 const PALETTES = {
   剑修: { robe: '#3a5a78', robeDark: '#27425b', trim: '#d7e6f2', accent: '#9fd0ff', aura: '#bfe2ff', motif: 'sword' },
@@ -139,7 +143,7 @@ export function portraitSVG(def, size = 80) {
   // 颈部
   const neck = `<path d="M${50 - 5},${shoulderY - 8} L${50 - 5},${shoulderY + 2} Q50,${shoulderY + 5} ${50 + 5},${shoulderY + 2} L${50 + 5},${shoulderY - 8} Z" fill="${skinShade}"/>`;
 
-  const gid = `pg_${tag}_${gender}_${size}`;
+  const gid = `pg_${tag}_${gender}_${size}_${portraitSeq++}`;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${size}" height="${size}" role="img" aria-label="${tag}头像">
     <defs>

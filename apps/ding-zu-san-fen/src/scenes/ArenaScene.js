@@ -12,6 +12,9 @@ import audio from '../audio/Audio.js';
 const DAILY_DRILLS = 3;
 const ENEMY_BASE = 70;
 const ENEMY_GROWTH = 1.32;
+// 单次演练回合上限：敌军战力按指数递增本已自限，叠加硬上限避免高战力玩家单日内
+// 通过反复演练刷取远超关卡首通收益的金币（roundGold 随 round 线性增长）。
+const MAX_ROUNDS = 30;
 
 const ARENA_PREFIX = 'dzsf_arena_v2_slot_';
 
@@ -218,7 +221,7 @@ export default class ArenaScene extends Phaser.Scene {
       this._startDrill();
     });
 
-    body.add(this.add.text(width / 2, 840, '每轮敌军战力递增；战力高于敌军即胜并获得金币，直至落败。', {
+    body.add(this.add.text(width / 2, 840, `每轮敌军战力递增；战力高于敌军即胜并获得金币，直至落败或满 ${MAX_ROUNDS} 回合。`, {
       fontFamily: '"PingFang SC",sans-serif', fontSize: '13px', color: '#9a8a5a',
     }).setOrigin(0.5));
   }
@@ -315,9 +318,17 @@ export default class ArenaScene extends Phaser.Scene {
       body.add(this.add.text(width / 2, 480, `本轮累计 🪙 ${this._gold}`, {
         fontFamily: '"PingFang SC",sans-serif', fontSize: '18px', color: '#e6d4ac',
       }).setOrigin(0.5));
-      // 继续挑战下一回合（敌军更强）
-      this._action(width / 2, 640, 320, 72, '⚔ 继续挑战（更强）', 0x2f7d4a, () => this._nextRound());
-      this._action(width / 2, 730, 320, 60, '见好就收 · 结算', 0x6b5a40, () => this._endDrill(false));
+      if (this._round >= MAX_ROUNDS) {
+        // 达到单次演练回合上限：直接结算，不再继续（避免高战力无限制刷金）
+        body.add(this.add.text(width / 2, 540, `已达演练极限（${MAX_ROUNDS} 回合满），领取奖励结算`, {
+          fontFamily: '"PingFang SC",sans-serif', fontSize: '15px', color: '#ffe08a',
+        }).setOrigin(0.5));
+        this._action(width / 2, 660, 320, 72, '领取奖励 · 结算', 0x6b5a40, () => this._endDrill(false));
+      } else {
+        // 继续挑战下一回合（敌军更强）
+        this._action(width / 2, 640, 320, 72, '⚔ 继续挑战（更强）', 0x2f7d4a, () => this._nextRound());
+        this._action(width / 2, 730, 320, 60, '见好就收 · 结算', 0x6b5a40, () => this._endDrill(false));
+      }
     } else {
       // 落败：演练结束
       this._endDrill(true);

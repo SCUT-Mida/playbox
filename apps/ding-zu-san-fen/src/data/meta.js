@@ -224,7 +224,9 @@ export function selectSlot(n) {
   return loadMeta();
 }
 
-// 删除某槽存档；若删的是当前活跃槽则重置为默认新档
+// 删除某槽存档；删除后该槽真正变空（listMetaSlots 中显示为"空档位"）。
+// 若删的是当前活跃槽：内存缓存回落到默认开局以维持当前会话可玩，但不再写盘——
+// 否则 saveMeta() 又会把一份默认进度写回该槽，使其显示为"主公府（0 金）"，与"删除"语义不符。
 export function deleteSlot(n) {
   try {
     if (storageAvailable()) localStorage.removeItem(_slotKey(n));
@@ -234,7 +236,6 @@ export function deleteSlot(n) {
   if (getActiveSlot() === n) {
     cache = defaults();
     cacheSlot = n;
-    saveMeta();
   } else if (cacheSlot === n) {
     cache = null;
     cacheSlot = null;

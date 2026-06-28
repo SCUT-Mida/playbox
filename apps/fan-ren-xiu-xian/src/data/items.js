@@ -39,14 +39,24 @@ const MATERIALS = {
 };
 
 // ── 法宝（可装备，攻防加成 + 五行 + 耐久，部分附带技能）────────────────────────
+// slot：装备槽位。同类(slot)法宝仅可装备一件——攻伐槽主攻击、镇御槽主防御，
+// 二者可同时佩戴，让玩家兼顾攻防而非二选一。
 const TREASURES = {
-  fabao_feijian:  { id: 'fabao_feijian',  name: '新手飞剑',   type: 'treasure', emoji: '🗡️', price: 80,   desc: '入门级飞剑，胜在趁手。',   stats: { atk: 8,  def: 0,  el: 'metal', dur: 30 } },
-  fabao_xuangai:  { id: 'fabao_xuangai',  name: '玄龟盾',     type: 'treasure', emoji: '🛡️', price: 90,   desc: '防御法宝，稳如磐石。',     stats: { atk: 0,  def: 14, el: 'earth', dur: 35 } },
-  fabao_huoyun:   { id: 'fabao_huoyun',   name: '火云镋',     type: 'treasure', emoji: '🔥', price: 200,  desc: '烈焰缠绕，攻伐凌厉。',     stats: { atk: 18, def: 2,  el: 'fire',  dur: 40, skill: 'fire_burst' } },
-  fabao_bingpo:   { id: 'fabao_bingpo',   name: '冰魄针',     type: 'treasure', emoji: '🧊', price: 260,  desc: '寒气逼人，伤人于无形。',   stats: { atk: 24, def: 0,  el: 'water', dur: 35, skill: 'ice_shard' } },
-  fabao_leiyin:   { id: 'fabao_leiyin',   name: '雷音钟',     type: 'treasure', emoji: '🔔', price: 420,  desc: '攻防兼备，雷音震魂。',     stats: { atk: 22, def: 18, el: 'metal', dur: 50, skill: 'thunder' } },
-  fabao_qiankun:  { id: 'fabao_qiankun',  name: '乾坤圈',     type: 'treasure', emoji: '♾️', price: 800,  desc: '高阶法宝，吞吐乾坤之力。', stats: { atk: 40, def: 25, el: null,    dur: 60, skill: 'thunder' } },
+  fabao_feijian:  { id: 'fabao_feijian',  name: '新手飞剑',   type: 'treasure', slot: 'weapon', emoji: '🗡️', price: 80,   desc: '入门级飞剑，胜在趁手。',   stats: { atk: 8,  def: 0,  el: 'metal', dur: 30 } },
+  fabao_xuangai:  { id: 'fabao_xuangai',  name: '玄龟盾',     type: 'treasure', slot: 'armor',  emoji: '🛡️', price: 90,   desc: '防御法宝，稳如磐石。',     stats: { atk: 0,  def: 14, el: 'earth', dur: 35 } },
+  fabao_huoyun:   { id: 'fabao_huoyun',   name: '火云镋',     type: 'treasure', slot: 'weapon', emoji: '🔥', price: 200,  desc: '烈焰缠绕，攻伐凌厉。',     stats: { atk: 18, def: 2,  el: 'fire',  dur: 40, skill: 'fire_burst' } },
+  fabao_bingpo:   { id: 'fabao_bingpo',   name: '冰魄针',     type: 'treasure', slot: 'weapon', emoji: '🧊', price: 260,  desc: '寒气逼人，伤人于无形。',   stats: { atk: 24, def: 0,  el: 'water', dur: 35, skill: 'ice_shard' } },
+  fabao_leiyin:   { id: 'fabao_leiyin',   name: '雷音钟',     type: 'treasure', slot: 'armor',  emoji: '🔔', price: 420,  desc: '攻防兼备，雷音震魂。',     stats: { atk: 22, def: 18, el: 'metal', dur: 50, skill: 'thunder' } },
+  fabao_qiankun:  { id: 'fabao_qiankun',  name: '乾坤圈',     type: 'treasure', slot: 'weapon', emoji: '♾️', price: 800,  desc: '高阶法宝，吞吐乾坤之力。', stats: { atk: 40, def: 25, el: null,    dur: 60, skill: 'thunder' } },
 };
+
+// 装备槽位定义：同类法宝仅可装备一件。order 决定背包/档案中的展示顺序。
+export const EQUIP_SLOTS = [
+  { id: 'weapon', name: '攻伐', emoji: '🗡️', desc: '攻伐法宝 · 主攻伐，附带攻击与五行' },
+  { id: 'armor',  name: '镇御', emoji: '🛡️', desc: '镇御法宝 · 主镇御，附带防御与五行' },
+];
+export function slotDef(id) { return EQUIP_SLOTS.find((s) => s.id === id) || null; }
+export function slotName(id) { const s = slotDef(id); return s ? s.name : '法宝'; }
 
 // 法宝技能：战斗中"使用法宝"动作触发（造成额外属性伤害）
 export const TREASURE_SKILLS = {

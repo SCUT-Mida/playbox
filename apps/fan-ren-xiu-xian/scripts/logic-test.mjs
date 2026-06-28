@@ -104,14 +104,24 @@ removeItem(p, 'herb_qingmu', 2);
 ok(countItem(p, 'herb_qingmu') === countItem(p, 'herb_qingmu'), 'removeItem 不报错');
 ok(removeItem(p, 'herb_qingmu', 999) === false, '超额 removeItem 失败');
 
-// 装备
+// 装备（多槽位：攻伐 / 镇御，同类仅一件）
 addItem(p, 'fabao_feijian', 1);
 const atkBefore = p.atk;
 equip(p, 'fabao_feijian');
-ok(p.equipment === 'fabao_feijian', '装备后 equipment 设置');
+ok(p.equipment && p.equipment.weapon === 'fabao_feijian', '装备后 equipment.weapon 设置');
 ok(p.atk >= atkBefore, '装备提升攻击');
-unequip(p);
-ok(p.equipment === null, '卸载后 equipment 清空');
+unequip(p, 'weapon');
+ok(p.equipment.weapon === null, '卸载后 equipment.weapon 清空');
+// 同类槽位互斥：换装另一件攻伐法宝，旧的自动回背包
+addItem(p, 'fabao_huoyun', 1);
+equip(p, 'fabao_huoyun');
+ok(p.equipment.weapon === 'fabao_huoyun' && hasItem(p, 'fabao_feijian', 1), '同类(攻伐)仅一件：换装后旧法宝回背包');
+// 不同类可共存：攻伐 + 镇御同时装备
+addItem(p, 'fabao_xuangai', 1);
+equip(p, 'fabao_xuangai');
+ok(p.equipment.weapon === 'fabao_huoyun' && p.equipment.armor === 'fabao_xuangai', '攻伐+镇御可同时装备');
+unequip(p, 'armor');
+ok(p.equipment.armor === null && p.equipment.weapon === 'fabao_huoyun', '卸下镇御不影响攻伐槽');
 
 // 储物袋扩容
 const capBefore = p.bagCapacity;
@@ -156,6 +166,13 @@ const logs = applyReward(p, { stones: 100, items: [{ id: 'herb_qingmu', qty: 2 }
 ok(logs.length > 0, 'applyReward 返回日志');
 ok(p.stones === stonesBefore + 100, 'applyReward 灵石 +100');
 ok(countItem(p, 'herb_qingmu') >= 2, 'applyReward 入袋');
+// 配方奖励：日志须给出中文名，不得冒出未映射的英文 id（组队/探索奖励常见症状）
+{
+  const q = newPlayer(() => 0);
+  const rlogs = applyReward(q, { recipe: 'rcp_zhuji' }, () => 0);
+  const txt = rlogs.map((l) => l.text).join('');
+  ok(/筑基丹方/.test(txt) && !/rcp_zhuji/.test(txt), '配方奖励日志显示中文名（不含英文 id）');
+}
 // 保底机制（核心随机性链路）：pity >= PITTY_THRESHOLD 时，稀有事件权重 ×(1+PITTY_BOOST)。
 // 用受控 rng 序列证明：同一随机源下，保底激活会把"普通妖兽(common)"选择翻转为"稀有空间裂缝(rare)"。
 // 序列首值 0.6 → pick 场景 'ruin'(idx2)；次值 0.72 → weighted 落点恰好在保底前后跨越 common/rare 边界。

@@ -11,13 +11,14 @@ import {
   VITALITY_COSTS, breakthroughChance, cultivateSpeedMult, passiveXpPerSec, nowSec,
   baseMaxHp, baseMaxMp, baseAtk, baseDef, baseSpirit,
 } from '../config.js';
-import { ITEMS, TREASURE_SKILLS } from '../data/items.js';
+import { ITEMS, TREASURE_SKILLS, EQUIP_SLOTS, slotName } from '../data/items.js';
 import { RECIPE_BY_ID, ALCHEMY_RECIPES, FORGE_BLUEPRINTS } from '../data/recipes.js';
 import { TALENTS, BACKGROUNDS, pickPortrait, portraitDef, qiyunLabel } from '../data/characters.js';
 import {
   newPlayer, recompute, realmInfo, rootDef, addXp, isXpFull, xpOverflow,
   equip, unequip, expandBag, bagExpandCost, countItem, hasItem, removeItem, addItemOrLog,
   distinctItems, learnTechnique, upgradeRoot,
+  equippedList, equippedId, equippedIds, isEquipped, hasAnyEquipped,
   rollCharacter, effectiveQiyun,
   rolloverVitality, canAffordVitality, spendVitality, restToNextDay, vitalityDepleted,
 } from '../core/player.js';
@@ -628,21 +629,13 @@ export class GameUI {
 
   renderInstant(e) {
     const isWorld = e.kind === 'world';
-    this.showSheet({
-      title: e.title,
-      body: [
-        h('div', { style: { textAlign: 'center', fontSize: '2rem', marginBottom: '0.4rem' } }, e.emoji),
-        h('div', { class: 'muted', style: { textAlign: 'center', marginBottom: '0.6rem' } }, e.text),
-      ],
-      foot: [h('button', { class: isWorld ? 'btn-primary' : 'btn-jade', onClick: () => {
-        const logs = applyReward(this.player, e.result, Math.random);
-        for (const l of logs) this.pushLog(l.text, l.type);
-        this.checkAchvAndToast();
-        playSfx('reward');
-        this.closeModal();
-        this.afterAction();
-      } }, '收下')],
-    });
+    // 外出探索 / 组队探险 / 世界事件：先把奖励结算入账，再在弹窗内逐条呈现「收获」，
+    // 不再只把奖励沉到顶部日志条（玩家常因此忽略所得）。
+    const logs = applyReward(this.player, e.result, Math.random);
+    for (const l of logs) this.pushLog(l.text, l.type);
+    this.checkAchvAndToast();
+    playSfx('reward');
+    this._showRewardSheet({ title: e.title, emoji: e.emoji, text: e.text, logs, highlight: isWorld ? 'world' : null });
   }
 
   renderChoice(e) {
@@ -666,11 +659,32 @@ export class GameUI {
       this.startBattle(outcome.battle, '变生肘腋', outcome.text || '对方赫然出手！');
       return;
     }
+    // 抉择结果同样弹「收获」窗呈现得失，胜负一目了然
     const logs = applyReward(this.player, outcome, Math.random);
     for (const l of logs) this.pushLog(l.text, l.type);
     this.checkAchvAndToast();
-    this.closeModal();
-    this.afterAction();
+    playSfx(logs.some((l) => l.type === 'bad') ? 'click' : 'reward');
+    this._showRewardSheet({ title: (this.encounter && this.encounter.title) || '抉择之后', emoji: opt.emoji, logs });
+  }
+
+  // 探索 / 组队 / 抉择 / 战胜 的「收获」弹窗：集中呈现本次所得（含正负变化），
+  // 收下后统一收口到 afterAction（重算 / 落盘 / 刷新）。
+  _showRewardSheet({ title, emoji, text, logs, highlight }) {
+    const body = [];
+    if (emoji) body.push(h('div', { style: { textAlign: 'center', fontSize: '2rem', marginBottom: '0.4rem' } }, emoji));
+    if (text) body.push(h('div', { class: 'muted', style: { textAlign: 'center', marginBottom: '0.5rem' } }, text));
+    const gainLines = (logs || []).filter(Boolean);
+    if (gainLines.length) {
+      body.push(h('div', { class: 'reward-box' },
+        h('div', { class: 'reward-box__title' }, '收获'),
+        ...gainLines.map((l) => h('div', { class: `ln ${l.type || ''}` }, l.text)),
+      ));
+    }
+    this.showSheet({
+      title: title || '探索收获',
+      body,
+      foot: [h('button', { class: highlight === 'world' ? 'btn-primary' : 'btn-jade', onClick: () => { this.closeModal(); this.afterAction(); } }, '收下')],
+    });
   }
 
   // ============ 战斗 ============
@@ -683,7 +697,8 @@ export class GameUI {
     const { state, enemy } = this.battle;
     const p = this.player;
     const usablePills = ['pill_huitian', 'pill_huitian2', 'pill_buling', 'pill_buling2'].filter((id) => countItem(p, id) > 0);
-    const hasTreasureSkill = !!(p.equipment && ITEMS[p.equipment].stats && ITEMS[p.equipment].stats.skill);
+    // 多槽装备：任意一件已装备法宝附带技能即可催动「法宝」绝技
+    const hasTreasureSkill = equippedList(p).some((tr) => tr.stats && tr.stats.skill);
 
     const body = [
       h('div', { class: `enemy-head ${enemy.elite ? 'elite' : ''}` },
@@ -748,31 +763,36 @@ export class GameUI {
       p.stats.battlesWon += 1;
       if (p.hp <= 1) p.stats.lowHpWins += 1;
       const rw = battleRewards(p, enemy, Math.random);
+      const rwLogs = []; // 汇总战利品明细，供「战胜收获」弹窗呈现
+      const addLog = (l) => { rwLogs.push(l); this.pushLog(l.text, l.type); };
       // 结算奖励
       if (rw.gain.stones) p.stones += rw.gain.stones;
-      for (const l of rw.logs) this.pushLog(l, 'good');
+      for (const l of rw.logs) addLog({ text: l, type: 'good' });
       // 掉落入袋：背包满（新种类）则遗失并提示，避免 addItem 返回 0 被忽略而静默丢物
-      for (const it of rw.gain.items) {
-        const { log } = addItemOrLog(p, it.id, it.qty);
-        this.pushLog(log.text, log.type);
-      }
-      if (rw.gain.treasure) {
-        const { log } = addItemOrLog(p, rw.gain.treasure, 1);
-        this.pushLog(log.text, log.type);
-      }
+      for (const it of rw.gain.items) addLog(addItemOrLog(p, it.id, it.qty).log);
+      if (rw.gain.treasure) addLog(addItemOrLog(p, rw.gain.treasure, 1).log);
       if (rw.gain.recipe) {
         try {
           const had = p.recipes.includes(rw.gain.recipe);
           learnRecipeGuard(p, rw.gain.recipe);
-          if (!had) this.pushLog(`意外获得配方【${RECIPE_BY_ID[rw.gain.recipe] ? RECIPE_BY_ID[rw.gain.recipe].name : rw.gain.recipe}】`, 'epic');
+          if (!had) {
+            const rname = RECIPE_BY_ID[rw.gain.recipe] ? RECIPE_BY_ID[rw.gain.recipe].name : rw.gain.recipe;
+            addLog({ text: `意外获得配方【${rname}】`, type: 'epic' });
+          }
         } catch (_) {}
       }
       // 战斗修为奖励
       const xp = Math.round(p.xpMax * 0.05);
       addXp(p, xp);
-      this.pushLog(`战斗胜利！修为 +${xp}。`, 'epic');
+      addLog({ text: `战斗胜利！修为 +${xp}。`, type: 'epic' });
       this.float('胜利！', 'epic');
       playSfx('battle_win');
+      recompute(p);
+      this.closeModal();
+      this.checkAchvAndToast();
+      // 战胜收获弹窗：把本战所得集中呈现，不再只沉到日志条
+      this._showRewardSheet({ title: '战胜收获', emoji: enemy.elite ? '👹' : '🐉', logs: rwLogs });
+      return;
     } else if (result === 'lose') {
       p.stats.deaths += 1;
       const lostStones = Math.floor(p.stones * 0.1);
@@ -821,7 +841,7 @@ export class GameUI {
         h('button', { class: 'btn-primary', disabled: !hasQingxin, onClick: () => this.doTrial({ type: 'pill' }) }, `🧿 清心丹 ×${countItem(p, 'pill_qingxin')}`),
       )];
     } else {
-      const hasTreasure = !!p.equipment;
+      const hasTreasure = hasAnyEquipped(p);
       const hasHeal = hasItem(p, 'pill_huitian') || hasItem(p, 'pill_huitian2');
       foot = [h('div', { class: 'action-grid' },
         h('button', { class: 'btn-danger', onClick: () => this.doTrial({ type: 'endure' }) }, '💥 硬抗'),
@@ -991,17 +1011,28 @@ export class GameUI {
       ),
     );
 
-    // 装备中
-    if (p.equipment) {
-      const tr = ITEMS[p.equipment];
-      c.append(h('div', { class: 'card' },
-        h('h4', null, '装备中'),
-        h('div', { class: 'row' },
-          h('div', { class: 'grow' }, `${tr.emoji} ${tr.name}`, h('div', { class: 'muted' }, treasureStatText(tr))),
-          h('button', { class: 'btn-ghost', onClick: () => { if (!unequip(p)) this.toast('储物袋已满，无法卸下装备', 'bad'); this.afterAction(); } }, '卸下'),
-        ),
-      ));
-    }
+    // 装备槽（攻伐 / 镇御，同类仅一件）：始终展示两槽，未装备则显空态，便于玩家了解槽位体系
+    c.append(h('div', { class: 'card' },
+      h('h4', null, '装备'),
+      h('div', { class: 'equip-slots' },
+        EQUIP_SLOTS.map((sl) => {
+          const eqId = equippedId(p, sl.id);
+          const tr = eqId ? ITEMS[eqId] : null;
+          return h('div', { class: `equip-slot ${tr ? '' : 'empty'}` },
+            h('div', { class: 'row' },
+              h('div', { class: 'grow' },
+                h('div', { class: 'equip-slot__name' }, `${sl.emoji} ${sl.name}`),
+                tr
+                  ? h('div', { class: 'equip-slot__item' }, `${tr.emoji} ${tr.name}`)
+                  : h('div', { class: 'muted' }, '（空）'),
+              ),
+              tr ? h('div', { class: 'muted', style: { textAlign: 'right', whiteSpace: 'nowrap' } }, treasureStatText(tr)) : null,
+              tr ? h('button', { class: 'btn-ghost', style: { flex: 'none' }, onClick: () => { if (!unequip(p, sl.id)) this.toast('储物袋已满，无法卸下', 'bad'); this.afterAction(); } }, '卸下') : null,
+            ),
+          );
+        }),
+      ),
+    ));
 
     const items = distinctItems(p);
     const types = ['pill', 'treasure', 'material', 'misc'];
@@ -1012,7 +1043,7 @@ export class GameUI {
       const grid = h('div', { class: 'item-grid' });
       for (const id of ids) {
         const d = ITEMS[id];
-        grid.appendChild(h('div', { class: `item ${id === p.equipment ? 'equipped' : ''}`, onClick: () => this.showItemDetail(id) },
+        grid.appendChild(h('div', { class: `item ${isEquipped(p, id) ? 'equipped' : ''}`, onClick: () => this.showItemDetail(id) },
           h('div', { class: 'emo' }, d.emoji),
           h('div', { class: 'nm' }, d.name),
           h('div', { class: 'qty' }, `×${countItem(p, id)}`),
@@ -1037,6 +1068,10 @@ export class GameUI {
     const body = [
       h('div', { style: { textAlign: 'center', fontSize: '2.2rem' } }, d.emoji),
       h('h4', { style: { textAlign: 'center' } }, d.name),
+      // 法宝额外标注所属装备槽（攻伐/镇御），同类仅可装备一件
+      d.type === 'treasure' && d.slot
+        ? h('div', { class: 'muted', style: { textAlign: 'center', marginBottom: '0.3rem' } }, `${slotName(d.slot)}法宝 · 同类仅可装备一件`)
+        : null,
       h('div', { class: 'muted', style: { textAlign: 'center', marginBottom: '0.5rem' } }, d.desc),
       h('div', { class: 'shop-effect', style: { textAlign: 'center', marginBottom: '0.4rem' } }, itemEffectText(d)),
       h('div', { class: 'muted', style: { textAlign: 'center' } }, `持有 ×${countItem(p, id)} · 回收 💎${sellPrice(id)}`),
@@ -1047,7 +1082,12 @@ export class GameUI {
       else foot.push(h('div', { class: 'muted', style: { flex: 1, textAlign: 'center', alignSelf: 'center' } }, '此丹需在突破/渡劫时使用'));
     }
     if (d.type === 'treasure') {
-      foot.push(h('button', { class: 'btn-primary', onClick: () => { if (equip(p, id)) { this.closeModal(); this.afterAction(); } else { this.toast('储物袋已满，无法换装（会销毁旧装备）', 'bad'); } } }, id === p.equipment ? '已装备' : '装备'));
+      // 已装备则置灰；否则装备（同类槽位原装备自动回背包）
+      const wearing = isEquipped(p, id);
+      foot.push(h('button', { class: 'btn-primary', disabled: wearing, onClick: () => {
+        if (equip(p, id)) { this.closeModal(); this.afterAction(); }
+        else { this.toast('储物袋已满，无法换装（会销毁旧装备）', 'bad'); }
+      } }, wearing ? '已装备' : '装备'));
     }
     foot.push(h('button', { class: 'btn-ghost', onClick: () => { this.doSell(id); this.closeModal(); } }, '出售'));
     foot.push(h('button', { class: 'btn-ghost', onClick: () => this.closeModal() }, '关闭'));
@@ -1296,17 +1336,25 @@ export class GameUI {
     }
     for (const t of tasks) {
       const done = (t.progress || 0) >= t.goal;
-      const rewardTxt = `💎${t.stones} · 声望 +${t.rep}${(t.tier || 0) >= 3 ? ' · 灵气结晶' : ''}`;
-      c.append(h('div', { class: 'card sect-task' },
+      // 奖励预览：与 claimChallenge 实发一致（高境界额外给灵气结晶），整行呈现，避免与标题/进度条挤在一行
+      const lingQty = (t.tier || 0) >= 3 ? 2 + Math.floor((t.tier || 0) / 2) : 0;
+      const rewardTxt = `💎${t.stones} 灵石 · 声望 +${t.rep}${lingQty ? ` · 灵气结晶×${lingQty}` : ''}`;
+      c.append(h('div', { class: 'card sect-task challenge-card' },
+        // 标题行：图标 + 标题（进度文字置右，短而不挤）
         h('div', { class: 'row' },
           h('div', { class: 'emo' }, t.emoji),
-          h('div', { class: 'grow' },
-            h('div', { class: 'nm' }, `${t.label}（${t.verb} ${t.goal} 次）`),
-            h('div', { class: 'muted', style: { marginTop: '0.1rem' } }, t.desc || ''),
-            bar(t.progress || 0, t.goal, { class: 'xp', label: `${Math.min(t.progress || 0, t.goal)}/${t.goal}` }),
-          ),
-          h('div', { class: 'muted', style: { textAlign: 'right', whiteSpace: 'nowrap' } }, rewardTxt),
+          h('div', { class: 'grow nm' }, t.label),
+          h('div', { class: 'muted', style: { textAlign: 'right', whiteSpace: 'nowrap' } }, `${t.verb} ${t.goal} 次`),
         ),
+        // 说明：整行，独占一行
+        t.desc ? h('div', { class: 'muted', style: { marginTop: '0.25rem' } }, t.desc) : null,
+        // 进度条：整行，不被奖励挤变形
+        h('div', { style: { marginTop: '0.35rem' } },
+          bar(t.progress || 0, t.goal, { class: 'xp', label: `${Math.min(t.progress || 0, t.goal)}/${t.goal}` }),
+        ),
+        // 奖励：独立一行，金色强调
+        h('div', { class: 'challenge-reward' }, h('span', { class: 'k' }, '奖励'), h('span', { class: 'v' }, rewardTxt)),
+        // 操作行：领取 / 放弃
         h('div', { class: 'row', style: { marginTop: '0.4rem' } },
           h('button', { class: done ? 'btn-jade' : 'btn-ghost', style: { flex: 1 }, disabled: !done, onClick: () => this.doClaimChallenge(t.id) }, done ? '领取奖励' : '进行中…'),
           h('button', { class: 'btn-ghost', style: { flex: 'none' }, onClick: () => this.doAbandonChallenge(t.id) }, '放弃'),
@@ -1494,7 +1542,7 @@ export class GameUI {
     const sectTitle = currentSectTitle(p);
     const lv = p.lv || 0;
     // 属性呈现：总数（基础 + 加成汇总），如 攻击 89（69+20）
-    const equipDef = p.equipment ? ITEMS[p.equipment] : null;
+    const equipped = equippedList(p);
 
     const body = [
       h('div', { class: 'char-head' },
@@ -1515,17 +1563,17 @@ export class GameUI {
         kv('宗门', sect ? `${sect.emoji}${sect.name}` : '散修（未入宗门）'),
         kv('宗门称号', sectTitle ? `${sectTitle.emoji} ${sectTitle.name}` : '——'),
       ),
-      // 装备
+      // 装备（攻伐 / 镇御双槽）
       h('div', { class: 'card', style: { marginBottom: '0.6rem' } },
         h('h4', null, '装备'),
-        equipDef
-          ? h('div', { class: 'row' },
-              h('div', { class: 'emo', style: { fontSize: '1.5rem', flex: 'none' } }, equipDef.emoji),
+        equipped.length
+          ? h('div', { class: 'equip-list' }, equipped.map((tr) => h('div', { class: 'row', style: { marginTop: '0.3rem' } },
+              h('div', { class: 'emo', style: { fontSize: '1.5rem', flex: 'none' } }, tr.emoji),
               h('div', { class: 'grow' },
-                h('div', { class: 'nm', style: { fontWeight: 600 } }, equipDef.name),
-                h('div', { class: 'muted', style: { marginTop: '0.1rem' } }, treasureStatText(equipDef)),
+                h('div', { class: 'nm', style: { fontWeight: 600 } }, `${tr.name}`),
+                h('div', { class: 'muted', style: { marginTop: '0.1rem' } }, `${slotName(tr.slot)}法宝 · ${treasureStatText(tr)}`),
               ),
-            )
+            )))
           : h('div', { class: 'muted' }, '尚未装备任何法宝。'),
       ),
       // 已习功法

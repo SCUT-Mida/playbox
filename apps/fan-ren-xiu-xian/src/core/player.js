@@ -62,7 +62,7 @@ export function newPlayer(rng, template) {
   const root = rootDef(t.rootId);
   const bg = BACKGROUNDS[t.bgId] || BACKGROUND_LIST[0];
   const player = {
-    v: 3,
+    v: 5,
     slot: t.slot || 1,
     gender: t.gender || 'male',
     name: t.name || '',
@@ -76,7 +76,7 @@ export function newPlayer(rng, template) {
     hp: 0, mp: 0,
     stones: 50 + Math.floor(r() * 51), // 50~100
     bag: { pill_huitian: 2, herb_qingmu: 3 }, // 新手礼包
-    equipment: null,       // 装备的法宝 id
+    equipment: { weapon: null, armor: null }, // 装备的法宝：按槽位（攻伐/镇御），同类仅一件
     techniques: [],
     titles: [],
     achievements: [],
@@ -150,13 +150,16 @@ export function recompute(player) {
     atk *= 1 + (t.atkPct || 0);
     maxHp *= 1 + (t.hpPct || 0);
   }
-  // 装备加成
+  // 装备加成：攻伐 + 镇御两槽同时生效（同类仅一件，互不冲突）
+  player.equipment = normalizeEquip(player.equipment);
   player.element = null;
-  if (player.equipment && ITEMS[player.equipment]) {
-    const tr = ITEMS[player.equipment];
-    atk += tr.stats.atk || 0;
-    def += tr.stats.def || 0;
-    player.element = tr.stats.el || null;
+  for (const tr of equippedList(player)) {
+    atk += (tr.stats && tr.stats.atk) || 0;
+    def += (tr.stats && tr.stats.def) || 0;
+  }
+  // 五行取自所装备法宝：优先攻伐槽，其次镇御槽
+  for (const id of [player.equipment.weapon, player.equipment.armor]) {
+    if (id && ITEMS[id] && ITEMS[id].stats && ITEMS[id].stats.el) { player.element = ITEMS[id].stats.el; break; }
   }
 
   // 天赋：百分比加成（气血/灵力上限，叠加在基底之上）
@@ -258,11 +261,52 @@ export function removeItem(player, id, qty = 1) {
   return true;
 }
 
-// —— 装备 ——
+// —— 装备（多槽位：攻伐 / 镇御，同类仅一件）——
+// 把任意形态的 equipment 归一化为 { weapon, armor }：
+//  - 新版对象：校验每个槽位确为对应类型的法宝（防损坏档串槽）；
+//  - 旧版单装备字符串：按法宝自身 slot 归入对应槽（向后兼容旧存档）；
+//  - null / 非法值：两槽皆空。
+export function normalizeEquip(e) {
+  if (e && typeof e === 'object' && !Array.isArray(e)) {
+    const valid = (id, slot) => (typeof id === 'string' && ITEMS[id] && ITEMS[id].slot === slot) ? id : null;
+    return { weapon: valid(e.weapon, 'weapon'), armor: valid(e.armor, 'armor') };
+  }
+  if (typeof e === 'string' && ITEMS[e] && ITEMS[e].slot) {
+    return { weapon: ITEMS[e].slot === 'weapon' ? e : null, armor: ITEMS[e].slot === 'armor' ? e : null };
+  }
+  return { weapon: null, armor: null };
+}
+export function equippedList(player) {
+  const e = normalizeEquip(player && player.equipment);
+  const out = [];
+  if (e.weapon && ITEMS[e.weapon]) out.push(ITEMS[e.weapon]);
+  if (e.armor && ITEMS[e.armor]) out.push(ITEMS[e.armor]);
+  return out;
+}
+export function equippedIds(player) {
+  const e = normalizeEquip(player && player.equipment);
+  return [e.weapon, e.armor].filter(Boolean);
+}
+export function equippedId(player, slot) {
+  const e = normalizeEquip(player && player.equipment);
+  return e[slot] || null;
+}
+export function isEquipped(player, treasureId) {
+  const e = normalizeEquip(player && player.equipment);
+  return e.weapon === treasureId || e.armor === treasureId;
+}
+export function hasAnyEquipped(player) {
+  return equippedIds(player).length > 0;
+}
+
+// 装备一件法宝：归入其所属槽位，同槽位原装备回背包（同类仅一件）。
 export function equip(player, treasureId) {
-  if (!ITEMS[treasureId] || ITEMS[treasureId].type !== 'treasure') return false;
+  const def = ITEMS[treasureId];
+  if (!def || def.type !== 'treasure' || !def.slot) return false;
   if (!hasItem(player, treasureId, 1)) return false;
-  const prev = player.equipment;
+  player.equipment = normalizeEquip(player.equipment);
+  const slot = def.slot;
+  const prev = player.equipment[slot] || null;
   // 换装时旧装备需回背包：若旧装备为新种类，且取下当前这件后仍腾不出空位（堆叠中），
   // 则拒绝操作——否则 addItem 返回 0 会销毁旧装备。
   if (prev && !player.bag[prev]) {
@@ -270,17 +314,20 @@ export function equip(player, treasureId) {
     if (!freesSlot && bagFull(player)) return false;
   }
   removeItem(player, treasureId, 1);
-  player.equipment = treasureId;
+  player.equipment[slot] = treasureId;
   if (prev) addItem(player, prev, 1); // 旧装备回背包
   recompute(player);
   return true;
 }
-export function unequip(player) {
-  if (!player.equipment) return false;
-  const prev = player.equipment;
+// 卸下指定槽位的法宝（同类仅一件，故按槽位卸下）。
+export function unequip(player, slot) {
+  if (!slot) return false;
+  player.equipment = normalizeEquip(player.equipment);
+  const prev = player.equipment[slot];
+  if (!prev) return false;
   // 卸下前确认背包能装下（旧装备是新种类且背包已满时拒绝，避免装备被销毁）
   if (!player.bag[prev] && bagFull(player)) return false;
-  player.equipment = null;
+  player.equipment[slot] = null;
   addItem(player, prev, 1);
   recompute(player);
   return true;

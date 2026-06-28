@@ -67,18 +67,19 @@
   background: linear-gradient(180deg, #1c150d, var(--bg-2));
   border-bottom: 1px solid var(--line);
 }
-/* 顶行右侧预留空间，避开落地页悬浮关闭按钮(✕) 与安全区 */
+/* 顶行：头像 / 境界 / 活力 / 灵石 / 工具按钮一律单行排列，不再换行。
+   落地页关闭按钮(✕)已移入外层顶栏，不再压住游戏右上角，故无需为此预留右侧空间。 */
 .frxx .status-row {
-  display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
-  padding-right: max(3rem, env(safe-area-inset-right));
+  display: flex; align-items: center; gap: 0.35rem; flex-wrap: nowrap;
+  padding-right: env(safe-area-inset-right);
 }
-/* 右侧工具组：窄屏放不下时整组换行，确保设置按钮永不被挤出可视区 */
+/* 右侧工具组：与左侧核心信息同处一行，永不换行，确保设置按钮始终可见可达 */
 .frxx .status-tools {
-  display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 0.35rem; flex-wrap: nowrap;
   margin-left: auto; justify-content: flex-end;
 }
 .frxx .avatar-btn {
-  flex: none; width: 34px; height: 34px; padding: 0; border-radius: 50%;
+  flex: none; width: 32px; height: 32px; padding: 0; border-radius: 50%;
   display: flex; align-items: center; justify-content: center; font-size: 18px; line-height: 1;
   background: var(--card-2); border: 1px solid var(--gold-dim); overflow: hidden;
 }
@@ -98,9 +99,9 @@
 .frxx .spacer { flex: 1; min-width: 0; }
 .frxx .stones { font-weight: 600; color: var(--gold); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .frxx .vit-pill {
-  flex: none; font-size: 0.7rem; font-weight: 600; color: var(--jade);
+  flex: none; font-size: 0.68rem; font-weight: 600; color: var(--jade);
   background: rgba(95,208,160,0.12); border: 1px solid rgba(95,208,160,0.3);
-  border-radius: 999px; padding: 0.12rem 0.38rem; font-variant-numeric: tabular-nums; white-space: nowrap;
+  border-radius: 999px; padding: 0.12rem 0.34rem; font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .frxx .vit-pill.low { color: var(--bad); background: rgba(224,107,107,0.12); border-color: rgba(224,107,107,0.3); }
 /* 活力不足时的「闭关静修」醒目横幅 */
@@ -111,9 +112,9 @@
 .frxx .rest-banner h4 { color: var(--bad); }
 .frxx .rest-banner .rest-btn { flex: none; white-space: nowrap; }
 .frxx .icon-btn {
-  flex: none; width: 32px; height: 32px; padding: 0; border-radius: 50%;
+  flex: none; width: 30px; height: 30px; padding: 0; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  background: var(--card); border: 1px solid var(--line); font-size: 15px;
+  background: var(--card); border: 1px solid var(--line); font-size: 14px;
 }
 .frxx .res-bars { display: flex; gap: 0.4rem; margin-top: 0.5rem; }
 .frxx .res-bars .bar { flex: 1; }
@@ -439,6 +440,38 @@
 .frxx .sect-task .bar { margin-top: 0.35rem; height: 12px; }
 .frxx .sect-task.claimed { opacity: 0.55; }
 .frxx .sect-task .emo { font-size: 1.3rem; flex: none; }
+
+/* —— 悬赏挑战卡片：标题 / 说明 / 进度 / 奖励 / 操作各自独占区域，互不挤压 —— */
+.frxx .challenge-card { padding: 0.6rem 0.7rem; }
+.frxx .challenge-card .nm { font-weight: 600; color: var(--text); }
+.frxx .challenge-reward {
+  display: flex; align-items: baseline; gap: 0.4rem; flex-wrap: wrap;
+  margin-top: 0.4rem; padding: 0.3rem 0.5rem; border-radius: 8px;
+  background: rgba(212,168,75,0.10); border: 1px solid rgba(212,168,75,0.28);
+}
+.frxx .challenge-reward .k { font-size: 0.72rem; color: var(--muted); flex: none; }
+.frxx .challenge-reward .v { font-size: 0.8rem; color: var(--gold); font-weight: 600; }
+
+/* —— 装备槽（攻伐 / 镇御，同类仅一件）—— */
+.frxx .equip-slots { display: flex; flex-direction: column; gap: 0.45rem; }
+.frxx .equip-slot {
+  background: var(--card-2); border: 1px solid var(--line); border-radius: 8px; padding: 0.45rem 0.55rem;
+}
+.frxx .equip-slot.empty { border-style: dashed; opacity: 0.7; }
+.frxx .equip-slot__name { font-size: 0.74rem; color: var(--muted); }
+.frxx .equip-slot__item { font-size: 0.88rem; color: var(--text); font-weight: 600; margin-top: 0.1rem; }
+.frxx .equip-list { display: flex; flex-direction: column; gap: 0.1rem; }
+
+/* —— 收获弹窗（探索 / 组队 / 抉择 / 战胜）—— */
+.frxx .reward-box {
+  background: #0a0703; border: 1px solid var(--line); border-radius: 8px;
+  padding: 0.5rem 0.65rem; margin-top: 0.2rem;
+}
+.frxx .reward-box__title { font-size: 0.72rem; color: var(--muted); margin-bottom: 0.3rem; }
+.frxx .reward-box .ln { padding: 2px 0; font-size: 0.84rem; }
+.frxx .reward-box .ln.good { color: var(--good); }
+.frxx .reward-box .ln.bad { color: var(--bad); }
+.frxx .reward-box .ln.epic { color: var(--epic); font-weight: 600; }
 
 /* —— 道友（NPC）—— */
 .frxx .npc-card .nm { font-weight: 600; color: var(--text); }

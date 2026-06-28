@@ -142,12 +142,12 @@ ok(document.querySelector('.status-bar') !== null, '进入后渲染游戏界面'
 // ---------- 9b) 各功能页渲染不报错 ----------
 let renderErr = null;
 try {
-  for (const tab of ['cultivate', 'explore', 'market', 'bag', 'alchemy', 'sect']) {
+  for (const tab of ['cultivate', 'explore', 'market', 'bag', 'alchemy', 'sect', 'npc']) {
     ui.tab = tab;
     ui.renderPanel();
   }
 } catch (e) { renderErr = e; }
-ok(!renderErr, `六大功能页渲染无异常（${renderErr ? renderErr.message : 'ok'}）`);
+ok(!renderErr, `七大功能页渲染无异常（${renderErr ? renderErr.message : 'ok'}）`);
 
 // ---------- 9b1) 坊市商品有介绍 + 可点开详情 ----------
 {
@@ -197,6 +197,52 @@ ok(!renderErr, `六大功能页渲染无异常（${renderErr ? renderErr.message
   rewardBtn.click();
   await sleep(10);
   ok(!!ui.player.sectRewardDate, '领取俸禄后记录当日已领');
+}
+
+// ---------- 9b1d) 宗门悬赏挑战：接取 → 渲染 ----------
+{
+  ui.tab = 'sect'; ui.renderPanel();
+  await sleep(5);
+  ok(/悬赏挑战/.test(document.querySelector('.content')?.textContent || ''), '宗门页展示悬赏挑战区');
+  const acceptBtn = [...document.querySelectorAll('.content button')].find((b) => /接取/.test(b.textContent));
+  ok(acceptBtn && !acceptBtn.disabled, '有可用的「接取挑战」按钮');
+  acceptBtn.click();
+  await sleep(10);
+  ok(Array.isArray(ui.player.challengeTasks) && ui.player.challengeTasks.length === 1, '接取后持有一项挑战');
+  ok(document.querySelectorAll('.sect-task').length >= 1, '挑战以任务卡片形式渲染');
+}
+
+// ---------- 9b1e) 道友（NPC）：寻访结识 → 赠礼 ----------
+{
+  ui.tab = 'npc'; ui.renderPanel();
+  await sleep(5);
+  ok(/云游寻访/.test(document.querySelector('.content')?.textContent || ''), '道友页展示云游寻访');
+  const meetBtn = [...document.querySelectorAll('.content button')].find((b) => /寻访道友/.test(b.textContent));
+  ok(meetBtn && !meetBtn.disabled, '有可用的「寻访道友」按钮');
+  const metCount = Object.values(ui.player.npcs || {}).filter((n) => n && n.met).length;
+  meetBtn.click();
+  await sleep(10);
+  const metCount2 = Object.values(ui.player.npcs || {}).filter((n) => n && n.met).length;
+  ok(metCount2 === metCount + 1, '寻访后结识一位道友');
+  ok(document.querySelector('.npc-card') !== null, '结识后渲染道友卡片');
+  // 打开赠礼选择器
+  const giftBtn = document.querySelector('.npc-card .btn-ghost');
+  ok(!!giftBtn, '道友卡片有赠礼按钮');
+  giftBtn.click();
+  await sleep(10);
+  ok(/赠礼/.test(document.querySelector('.sheet__head .t')?.textContent || ''), '点击赠礼打开选择器');
+  document.querySelector('.sheet__foot .btn-ghost')?.click();
+  await sleep(5);
+}
+
+// ---------- 9b1f) 音效开关按钮存在且可切换 ----------
+{
+  const soundBtn = document.querySelector('.status-row .icon-btn[title="音效开关"]');
+  ok(!!soundBtn, '状态栏有音效开关按钮');
+  const before = soundBtn.textContent;
+  soundBtn.click();
+  await sleep(5);
+  ok(soundBtn.textContent !== before, '点击音效按钮切换图标（🔊/🔇）');
 }
 
 // ---------- 9b2) 损坏境界档不闪退（「点修炼偶发闪退」UI 回归）----------

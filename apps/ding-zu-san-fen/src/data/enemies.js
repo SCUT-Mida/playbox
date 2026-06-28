@@ -59,4 +59,25 @@ export const ENEMIES = {
     name: '蛮王·孟获', hp: 16500, speed: 30, armor: 'HEAVY', dmg: 62, atkCD: 1.0,
     gold: 480, morale: 150, color: 0x9c6b3a, boss: true, leakLives: 8,
   },
+  // —— 扩展关卡首领 ——
+  boss_lvbu: {
+    name: '飞将·吕布', hp: 9200, speed: 34, armor: 'HEAVY', dmg: 50, atkCD: 1.0,
+    gold: 320, morale: 110, color: 0xb08a3a, boss: true, leakLives: 6,
+  },
+  boss_yuanshu: {
+    name: '仲家帝·袁术', hp: 7800, speed: 32, armor: 'HEAVY', dmg: 44, atkCD: 1.1,
+    gold: 280, morale: 100, color: 0xc4a23a, boss: true, leakLives: 5,
+  },
+  boss_machao: {
+    name: '锦马超', hp: 15000, speed: 38, armor: 'PHYSICAL', dmg: 60, atkCD: 0.9,
+    gold: 440, morale: 140, color: 0x8a9ec4, boss: true, leakLives: 7,
+  },
+  boss_sunquan: {
+    name: '吴主·孙权', hp: 15600, speed: 30, armor: 'HEAVY', dmg: 58, atkCD: 1.0,
+    gold: 450, morale: 145, color: 0x3a6f9a, boss: true, leakLives: 8,
+  },
+  boss_simayi: {
+    name: '冢虎·司马懿', hp: 17200, speed: 30, armor: 'MAGIC', dmg: 64, atkCD: 1.0,
+    gold: 480, morale: 150, color: 0x7a5aa0, boss: true, leakLives: 8,
+  },
 };

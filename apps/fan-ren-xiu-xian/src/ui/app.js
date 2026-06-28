@@ -5,6 +5,7 @@
 // ============================================================================
 import '../ui/style.css';
 import { h, clear, bar } from './dom.js';
+import { portraitSVG } from './portrait.js';
 import {
   REALMS, SPIRIT_ROOTS, ACTIVE_CULTIVATE_MP_COST, EXPLORE_MP_COST, EXPLORE_HP_COST,
   VITALITY_COSTS, breakthroughChance, cultivateSpeedMult, passiveXpPerSec, nowSec,
@@ -13,7 +14,7 @@ import { ITEMS, TREASURE_SKILLS } from '../data/items.js';
 import { RECIPE_BY_ID, ALCHEMY_RECIPES, FORGE_BLUEPRINTS } from '../data/recipes.js';
 import { TALENTS, BACKGROUNDS, pickPortrait, portraitDef, qiyunLabel } from '../data/characters.js';
 import {
-  newPlayer, recompute, realmInfo, rootDef, addXp, isXpFull,
+  newPlayer, recompute, realmInfo, rootDef, addXp, isXpFull, xpOverflow,
   equip, unequip, expandBag, bagExpandCost, countItem, hasItem, removeItem, addItemOrLog,
   distinctItems, learnTechnique, upgradeRoot,
   rollCharacter, effectiveQiyun,
@@ -114,7 +115,7 @@ export class GameUI {
     }
     const pt = portraitDef(s.portraitId);
     return h('div', { class: 'slot-card' },
-      h('div', { class: 'slot-portrait' }, pt.emoji),
+      h('div', { class: 'slot-portrait', html: portraitSVG(pt, 48) }),
       h('div', { class: 'slot-meta' },
         h('div', { class: 'slot-name' }, s.name),
         h('div', { class: 'muted' }, `${s.realm}${s.ascended ? ' · 已飞升' : ''}`),
@@ -177,7 +178,7 @@ export class GameUI {
       ),
       h('div', { class: 'create__body' },
         h('div', { class: 'create__portrait' },
-          h('div', { class: `portrait-big ${t.gender}` }, pt.emoji),
+          h('div', { class: `portrait-big ${t.gender}`, html: portraitSVG(pt, 96) }),
           h('div', { class: 'portrait-tag' }, pt.tag),
           h('div', { class: 'gender-toggle' },
             h('button', { class: t.gender === 'male' ? 'active' : '', onClick: () => { this.charTemplate.gender = 'male'; this.charTemplate.portraitId = pickPortrait('male', t.talentIds).id; this.renderCreate(); } }, '♂ 男'),
@@ -301,7 +302,7 @@ export class GameUI {
     const p = this.player;
     const info = realmInfo(p);
     const pt = portraitDef(p.portraitId);
-    this.ui.avatar = h('button', { class: 'avatar-btn', title: '人物', onClick: () => this.showCharacter() }, pt.emoji);
+    this.ui.avatar = h('button', { class: 'avatar-btn', title: '人物', html: portraitSVG(pt, 34), onClick: () => this.showCharacter() });
     this.ui.realmBadge = h('div', { class: 'realm-badge' },
       h('span', { class: 'seal', style: { background: info.realm.color } }, info.realm.short),
       h('span', { class: 'realm-name' }, realmDisplay(info)),
@@ -339,12 +340,18 @@ export class GameUI {
     this.ui.realmBadge.lastChild.textContent = realmDisplay(info);
     // 头像：飞升后切换为仙尊形象
     const pt = portraitDef(p.ascended ? 'pt_ascend' : p.portraitId);
-    this.ui.avatar.textContent = pt.emoji;
+    this.ui.avatar.innerHTML = portraitSVG(pt, 34);
     this.ui.stones.textContent = `💎 ${fmt(p.stones)}`;
     this._setVitality(p);
     this._setBar(this.ui.hpBar, p.hp, p.maxHp, `气血 ${Math.floor(p.hp)}/${p.maxHp}`);
     this._setBar(this.ui.mpBar, p.mp, p.maxMp, `灵力 ${Math.floor(p.mp)}/${p.maxMp}`);
-    this._setBar(this.ui.xpBar, p.xp, p.xpMax, `修为 ${Math.floor(p.xp)}/${p.xpMax}`);
+    // 修为条：满额之外的累积(溢出)会显示出来并高亮，提示这部分会在突破时结转，不再被清零。
+    const overflow = xpOverflow(p);
+    const xpLabel = overflow > 0
+      ? `修为 ${Math.floor(p.xp)}/${p.xpMax}　溢出 +${Math.floor(overflow)}`
+      : `修为 ${Math.floor(p.xp)}/${p.xpMax}`;
+    this._setBar(this.ui.xpBar, p.xp, p.xpMax, xpLabel);
+    this.ui.xpBar.classList.toggle('overflow', overflow > 0);
     // 混沌事件横幅
     const c = chaosActive(p);
     if (c === 'lingchao') this._setChaos('🌊 灵潮爆发中，修炼速度翻倍！', 'lingchao');
@@ -459,7 +466,10 @@ export class GameUI {
       const hasReq = !target.reqItem || hasItem(p, target.reqItem);
 
       const reqLines = [];
-      reqLines.push(xpFull ? line('修为已圆满', true) : line(`修为 ${Math.floor(p.xp)}/${p.xpMax}`, xpFull));
+      const overflow = xpOverflow(p);
+      reqLines.push(xpFull
+        ? line(overflow > 0 ? `修为已圆满（溢出 +${Math.floor(overflow)}，突破时结转）` : '修为已圆满', true)
+        : line(`修为 ${Math.floor(p.xp)}/${p.xpMax}`, xpFull));
       if (reqItemDef) reqLines.push(line(`${reqItemDef.name}：${hasReq ? '已备' : '缺失'}（${reqItemDef.desc}）`, hasReq));
       if (major) reqLines.push(h('div', { class: 'req-line' }, trialLabel(target.trial)));
 
@@ -1031,7 +1041,7 @@ export class GameUI {
 
     const body = [
       h('div', { class: 'char-head' },
-        h('div', { class: `portrait-big ${p.gender}` }, pt.emoji),
+        h('div', { class: `portrait-big ${p.gender}`, html: portraitSVG(pt, 72) }),
         h('div', { class: 'char-id' },
           h('div', { class: 'char-name' }, p.name || '无名修士'),
           h('div', { class: 'muted' }, `${p.gender === 'female' ? '女' : '男'}修 · ${pt.tag}`),

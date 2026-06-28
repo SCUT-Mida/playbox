@@ -186,12 +186,18 @@ export function upgradeRoot(player) {
 }
 
 // —— 修为 ——
+// 溢出可累积：修为超出当前境界所需(满额)后并不作废，而是继续累积，
+// 突破成功时由 advanceRealm 把"满额之外"的修为结转至下一境界，避免闭关成果被清零浪费。
 export function addXp(player, amount) {
   if (amount <= 0) return 0;
-  // 凡人也能积攒引气入体的修为；满后停在最末（需手动突破）
   const before = player.xp;
-  player.xp = Math.min(player.xpMax, player.xp + amount);
+  player.xp = before + amount;
   return player.xp - before;
+}
+
+// 当前溢出的修为（满额之外、可结转的部分）
+export function xpOverflow(player) {
+  return Math.max(0, (player.xp || 0) - (player.xpMax || 0));
 }
 
 export function isXpFull(player) { return player.xp >= player.xpMax; }

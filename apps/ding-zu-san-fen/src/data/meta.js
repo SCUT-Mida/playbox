@@ -4,7 +4,10 @@
 
 import { GENERALS, GENERAL_BY_ID } from './generals.js';
 
-const STORAGE_KEY = 'dzsf_meta_v2';
+const LEGACY_KEY = 'dzsf_meta_v2';        // 旧版单档，首启时迁移至槽 1
+const SLOT_PREFIX = 'dzsf_meta_v2_slot_'; // 多存档槽：每槽一份独立进度（金币/武将/通关）
+const ACTIVE_KEY = 'dzsf_activeslot';     // 当前活跃槽（1..NUM_SLOTS）
+export const NUM_SLOTS = 5;
 
 // 开局默认解锁的武将：仅作为"保底可玩"的最小阵容，覆盖近战/远程/策士三类且跨蜀/魏/吴三国，
 // 不再清一色同国 —— 主力阵容交由玩家用开局金币去点将台抽取（多国、随机）。
@@ -43,8 +46,11 @@ export function starOf(id) {
 // 通关金币奖励（每次通关）+ 首通额外奖励（仅首次）
 // 难度越高奖励越丰厚，引导玩家循序渐进
 export const LEVEL_REWARD = {
-  huangjin: 220, sishui: 250, hulao: 300, xuzhou: 320,
-  guandu: 360, changban: 390, chibi: 430, nanman: 480,
+  huangjin: 220, guangzong: 230,
+  sishui: 250, jieqiao: 265,
+  hulao: 300, puyang: 310, xuzhou: 320, shouchun: 330,
+  guandu: 360, cangting: 370, yecheng: 380, changban: 390, jiangling: 400,
+  chibi: 430, nanjun: 440, tongguan: 455, hefei: 470, dingjunshan: 485, yiling: 500, nanman: 520,
 };
 export const FIRST_CLEAR_BONUS = 150;
 
@@ -59,12 +65,57 @@ function defaults() {
 }
 
 let cache = null;
+let cacheSlot = null;   // 当前 cache 所属槽位；切槽时失效重建
+let activeSlot = null;  // 缓存的活跃槽（与 ACTIVE_KEY 持久化保持一致）
 
 function storageAvailable() {
   try {
     return typeof localStorage !== 'undefined' && localStorage;
   } catch {
     return false;
+  }
+}
+
+function _slotKey(n) { return `${SLOT_PREFIX}${n}`; }
+
+// 当前活跃槽（1..NUM_SLOTS），无记录默认 1
+export function getActiveSlot() {
+  if (activeSlot != null) return activeSlot;
+  if (storageAvailable()) {
+    try {
+      const raw = localStorage.getItem(ACTIVE_KEY);
+      const n = parseInt(raw, 10);
+      activeSlot = (n >= 1 && n <= NUM_SLOTS) ? n : 1;
+    } catch {
+      activeSlot = 1;
+    }
+  } else {
+    activeSlot = 1;
+  }
+  return activeSlot;
+}
+
+export function setActiveSlot(n) {
+  activeSlot = Math.max(1, Math.min(NUM_SLOTS, Math.floor(n) || 1));
+  try {
+    if (storageAvailable()) localStorage.setItem(ACTIVE_KEY, String(activeSlot));
+  } catch {
+    /* noop */
+  }
+  return activeSlot;
+}
+
+// 旧版单档（dzsf_meta_v2）迁移到槽 1（仅首启一次），保证老玩家进度不丢失
+export function migrateLegacy() {
+  if (!storageAvailable()) return;
+  try {
+    const old = localStorage.getItem(LEGACY_KEY);
+    if (old && !localStorage.getItem(_slotKey(1))) {
+      localStorage.setItem(_slotKey(1), old);
+    }
+    if (old) localStorage.removeItem(LEGACY_KEY);
+  } catch {
+    /* noop */
   }
 }
 
@@ -80,11 +131,13 @@ function migrateStars(unlocked, rawStars) {
 }
 
 export function loadMeta() {
-  if (cache) return cache;
+  const slot = getActiveSlot();
+  if (cache && cacheSlot === slot) return cache;
+  migrateLegacy();
   const base = defaults();
   if (storageAvailable()) {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(_slotKey(slot));
       if (raw) {
         const p = JSON.parse(raw);
         // 解锁列表若损坏则回退默认阵容，避免开局无将可用
@@ -97,6 +150,7 @@ export function loadMeta() {
           cleared: Array.isArray(p.cleared) ? p.cleared : base.cleared,
           muted: !!p.muted,
         };
+        cacheSlot = slot;
         return cache;
       }
     } catch {
@@ -104,6 +158,7 @@ export function loadMeta() {
     }
   }
   cache = base;
+  cacheSlot = slot;
   return cache;
 }
 
@@ -111,7 +166,7 @@ export function saveMeta() {
   if (!cache) return;
   if (storageAvailable()) {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(cache));
+      localStorage.setItem(_slotKey(getActiveSlot()), JSON.stringify(cache));
     } catch {
       // 配额/隐私模式写入失败 —— 仍保留内存缓存，本局正常游玩
     }
@@ -122,15 +177,74 @@ export function getMeta() {
   return loadMeta();
 }
 
+// 重置当前活跃槽为新档（保留解锁/金币进度系统的默认开局）
 export function resetMeta() {
   cache = defaults();
+  cacheSlot = getActiveSlot();
   saveMeta();
   return cache;
+}
+
+// —— 多槽 API ——
+// 列出所有槽位的展示用元信息（空槽返回 { slot, empty:true }）
+export function listMetaSlots() {
+  migrateLegacy();
+  const out = [];
+  for (let n = 1; n <= NUM_SLOTS; n++) {
+    let raw = null;
+    try {
+      raw = storageAvailable() ? localStorage.getItem(_slotKey(n)) : null;
+    } catch {
+      raw = null;
+    }
+    if (!raw) { out.push({ slot: n, empty: true }); continue; }
+    try {
+      const p = JSON.parse(raw);
+      const unlocked = Array.isArray(p.unlocked) ? p.unlocked.filter((id) => GENERAL_BY_ID[id]) : [];
+      out.push({
+        slot: n,
+        empty: false,
+        gold: typeof p.gold === 'number' ? p.gold : 0,
+        unlockedCount: unlocked.length,
+        clearedCount: Array.isArray(p.cleared) ? p.cleared.length : 0,
+        totalStars: Object.values(p.stars || {}).reduce((a, s) => a + (s || 0), 0),
+      });
+    } catch {
+      out.push({ slot: n, empty: false, corrupt: true });
+    }
+  }
+  return out;
+}
+
+// 选择（切换）活跃槽：失效缓存并载入该槽进度；空槽返回全新默认进度
+export function selectSlot(n) {
+  setActiveSlot(n);
+  cache = null;
+  cacheSlot = null;
+  return loadMeta();
+}
+
+// 删除某槽存档；若删的是当前活跃槽则重置为默认新档
+export function deleteSlot(n) {
+  try {
+    if (storageAvailable()) localStorage.removeItem(_slotKey(n));
+  } catch {
+    /* noop */
+  }
+  if (getActiveSlot() === n) {
+    cache = defaults();
+    cacheSlot = n;
+    saveMeta();
+  } else if (cacheSlot === n) {
+    cache = null;
+    cacheSlot = null;
+  }
 }
 
 // —— 供测试在隔离环境下重置内存缓存 ——
 export function _resetCache() {
   cache = null;
+  cacheSlot = null;
 }
 
 export function isUnlocked(id) {

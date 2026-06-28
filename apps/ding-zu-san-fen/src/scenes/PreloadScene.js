@@ -28,10 +28,12 @@ export default class PreloadScene extends Phaser.Scene {
     this.tweens.add({
       targets: [title, sub],
       alpha: { from: 0, to: 1 },
-      duration: 400,
+      duration: 200,
       ease: 'Quad.Out',
     });
 
-    this.time.delayedCall(500, () => this.scene.start('MenuScene'));
+    // 无外部资源需加载（全部 Graphics 程序化绘制），仅留极短标题展示即进入存档选择，
+    // 不再人为堆叠 500ms 延迟拖慢"进入游戏"的首屏响应。
+    this.time.delayedCall(150, () => this.scene.start('SlotScene'));
   }
 }

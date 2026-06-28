@@ -7,19 +7,21 @@ import '../ui/style.css';
 import { h, clear, bar } from './dom.js';
 import { portraitSVG } from './portrait.js';
 import {
-  REALMS, SPIRIT_ROOTS, ACTIVE_CULTIVATE_MP_COST, EXPLORE_MP_COST, EXPLORE_HP_COST,
+  REALMS, ACTIVE_CULTIVATE_MP_COST, EXPLORE_MP_COST, EXPLORE_HP_COST,
   VITALITY_COSTS, breakthroughChance, cultivateSpeedMult, passiveXpPerSec, nowSec,
   baseMaxHp, baseMaxMp, baseAtk, baseDef, baseSpirit,
+  rootDescriptor, ageLabel, realmLifespan,
+  isDying, canReincarnate, REINCARNATION_CULT_BONUS,
 } from '../config.js';
 import { ITEMS, TREASURE_SKILLS, EQUIP_SLOTS, slotName } from '../data/items.js';
 import { RECIPE_BY_ID, ALCHEMY_RECIPES, FORGE_BLUEPRINTS } from '../data/recipes.js';
 import { TALENTS, BACKGROUNDS, pickPortrait, portraitDef, qiyunLabel } from '../data/characters.js';
 import {
-  newPlayer, recompute, realmInfo, rootDef, addXp, isXpFull, xpOverflow,
+  newPlayer, recompute, realmInfo, addXp, isXpFull, xpOverflow,
   equip, unequip, expandBag, bagExpandCost, countItem, hasItem, removeItem, addItemOrLog,
   distinctItems, learnTechnique, upgradeRoot,
   equippedList, equippedId, equippedIds, isEquipped, hasAnyEquipped,
-  rollCharacter, effectiveQiyun,
+  rollCharacter, effectiveQiyun, reincarnate,
   rolloverVitality, canAffordVitality, spendVitality, restToNextDay, vitalityDepleted,
 } from '../core/player.js';
 import { activeCultivate, passiveTick } from '../core/cultivate.js';
@@ -135,7 +137,7 @@ export class GameUI {
       h('div', { class: 'slot-portrait', html: portraitSVG(pt, 48) }),
       h('div', { class: 'slot-meta' },
         h('div', { class: 'slot-name' }, s.name),
-        h('div', { class: 'muted' }, `${s.realm}${s.ascended ? ' · 已飞升' : ''}`),
+        h('div', { class: 'muted' }, `${s.realm}${s.reincarnations ? ' · 轮回' : ''}${s.ascended ? ' · 已飞升' : ''} · ${s.age}岁`),
         h('div', { class: 'muted' }, `${timeAgo(s.lastSeen)} · 💎${s.stones}`),
       ),
       h('div', { class: 'slot-actions' },
@@ -179,7 +181,7 @@ export class GameUI {
 
   renderCreate() {
     const t = this.charTemplate;
-    const root = rootDef(t.rootId);
+    const root = rootInfo(t);
     const pt = pickPortrait(t.gender, t.talentIds);
     const qy = (t.qiyun || 0) + sumTalent(t.talentIds, 'qiyunBonus');
     const ql = qiyunLabel(qy);
@@ -202,13 +204,20 @@ export class GameUI {
             h('button', { class: t.gender === 'female' ? 'active' : '', onClick: () => { this.charTemplate.gender = 'female'; this.charTemplate.portraitId = pickPortrait('female', t.talentIds).id; this.renderCreate(); } }, '♀ 女'),
           ),
         ),
-        // 流程① 先随机：灵根 / 气运 / 天赋 / 出身，不满意可反复重随
+        // 流程① 先随机：灵根 / 年龄 / 气运 / 天赋 / 出身，不满意可反复重随
         h('div', { class: 'card' },
           h('div', { class: 'row' },
-            h('div', { class: 'grow' }, h('h4', null, `灵根 · ${root.name}`), h('div', { class: 'muted' }, root.desc)),
+            h('div', { class: 'grow' },
+              h('h4', null, `灵根 · ${root.name}`),
+              h('div', { class: 'muted' }, `${root.desc}${root.displayEls ? ` · 属性：${root.displayEls}` : ''}`),
+            ),
             h('div', { class: 'muted', style: { textAlign: 'right' } }, h('div', null, `修炼 ×${root.mult.toFixed(2)}`), h('div', null, `突破 ${(root.breakBonus >= 0 ? '+' : '')}${Math.round(root.breakBonus * 100)}%`)),
           ),
-          h('div', { class: 'row', style: { marginTop: '0.5rem', alignItems: 'center' } },
+          h('div', { class: 'row', style: { marginTop: '0.4rem', alignItems: 'center' } },
+            h('span', { class: 'k' }, '年龄'),
+            h('span', { class: 'muted grow' }, `${t.age}岁 · 岁月随每月周期增长，境界越高寿元越长；大限将至可轮回重修`),
+          ),
+          h('div', { class: 'row', style: { marginTop: '0.4rem', alignItems: 'center' } },
             h('span', { class: 'k' }, '气运'),
             h('div', { class: 'qiyun-bar' }, h('div', { class: 'qiyun-bar__fill', style: { width: `${qy}%` } })),
             h('span', { class: `qiyun-label ${ql.cls}` }, `${qy} · ${ql.text}`),
@@ -231,7 +240,7 @@ export class GameUI {
       h('div', { class: 'create__foot' },
         h('button', { class: 'btn-primary big-btn', onClick: () => this.confirmCreate() }, '⚡ 开始修仙'),
       ),
-      h('div', { class: 'muted', style: { textAlign: 'center', padding: '0 1rem 1rem' } }, '灵根、天赋、气运、出身皆随机生成；先随机至称心，再取道号入道。'),
+      h('div', { class: 'muted', style: { textAlign: 'center', padding: '0 1rem 1rem' } }, '灵根（等级·组合·属性）、年龄、天赋、气运、出身皆随机生成；先随机至称心，再取道号入道。'),
     );
     this.stage.appendChild(wrap);
     const inp = wrap.querySelector('[data-id="name"]');
@@ -293,7 +302,7 @@ export class GameUI {
     this.refreshStatus();
     this.renderPanel();
     this.startLoop();
-    // 每日活力跨日刷新（仅 Returning 玩家提示）
+    // 每月行动力跨月刷新（仅 Returning 玩家提示）
     this.checkDayRollover(opts.isNew ? false : true);
   }
 
@@ -327,7 +336,8 @@ export class GameUI {
       h('span', { class: 'seal', style: { background: info.realm.color } }, realmTag(info.realm)),
     );
     this.ui.stones = h('span', { class: 'stones' }, `💎 ${fmt(p.stones)}`);
-    this.ui.vitality = h('span', { class: 'vit-pill', title: '每日活力：消耗型行动力，跨日恢复' }, `⚡${Math.floor(p.vitality)}/${p.maxVitality}`);
+    this.ui.age = h('span', { class: 'vit-pill age-pill', title: '年龄：随每月周期增长，境界越高寿元越长；大限将至可轮回重修' }, `🕯️${ageLabel(p)}`);
+    this.ui.vitality = h('span', { class: 'vit-pill', title: '每月行动力：消耗型行动力，跨月恢复' }, `⚡${Math.floor(p.vitality)}/${p.maxVitality}`);
     this.ui.chaosBanner = h('div', { class: 'chaos-banner', style: { display: 'none' } });
     this.ui.soundBtn = h('button', { class: 'icon-btn', title: '音效开关', onClick: () => this.toggleSfx() }, isSfxEnabled() ? '🔊' : '🔇');
 
@@ -341,6 +351,7 @@ export class GameUI {
         this.ui.realmBadge,
         // 右侧工具收拢成一组：窄屏放不下时整组换行，确保设置按钮永不被挤出可视区
         h('div', { class: 'status-tools' },
+          this.ui.age,
           this.ui.vitality,
           this.ui.stones,
           this.ui.soundBtn,
@@ -371,6 +382,10 @@ export class GameUI {
     const pt = portraitDef(p.ascended ? 'pt_ascend' : p.portraitId);
     this.ui.avatar.innerHTML = portraitSVG(pt, 34);
     this.ui.stones.textContent = `💎 ${fmt(p.stones)}`;
+    if (this.ui.age) {
+      this.ui.age.textContent = `🕯️${ageLabel(p)}`;
+      this.ui.age.classList.toggle('dying', isDying(p));
+    }
     this._setVitality(p);
     this._setBar(this.ui.hpBar, p.hp, p.maxHp, `气血 ${Math.floor(p.hp)}/${p.maxHp}`);
     this._setBar(this.ui.mpBar, p.mp, p.maxMp, `灵力 ${Math.floor(p.mp)}/${p.maxMp}`);
@@ -441,9 +456,11 @@ export class GameUI {
   renderPanel() {
     clear(this.content);
     if (this.player.ascended) { this.renderAscended(); return; }
-    // 活力耗尽（连最省的修炼都付不起）时，所有页顶部给出醒目的「进入次日」入口，
-    // 避免玩家活力用尽后无任何行动可做、又找不到次日按钮而死锁卡关。
+    // 活力耗尽（连最省的修炼都付不起）时，所有页顶部给出醒目的「进入次月」入口，
+    // 避免玩家活力用尽后无任何行动可做、又找不到次月按钮而死锁卡关。
     if (this.isVitalityDepleted()) this.content.appendChild(this.renderRestBanner());
+    // 大限将至：寿元耗尽。给出轮回重修入口（或陨落提示）。
+    if (isDying(this.player)) this.content.appendChild(this.renderDeathBanner());
     switch (this.tab) {
       case 'cultivate': this.renderCultivate(); break;
       case 'explore': this.renderExplore(); break;
@@ -460,10 +477,12 @@ export class GameUI {
   // ============ 修炼页 ============
   renderCultivate() {
     const p = this.player;
-    const root = rootDef(p.rootId);
+    const root = rootInfo(p);
     const target = nextTarget(p);
     const speed = passiveXpPerSec(p.tier, cultivateSpeedMult(p));
     const canActive = p.mp >= ACTIVE_CULTIVATE_MP_COST && !p.ascended && canAffordVitality(p, VITALITY_COSTS.cultivate);
+    const lifespan = realmLifespan(p.tier);
+    const dying = isDying(p);
 
     const c = h('div', null);
     c.append(
@@ -472,7 +491,7 @@ export class GameUI {
         h('div', { class: 'row' },
           h('div', { class: 'grow' },
             h('h4', null, `灵根 · ${root.name}`),
-            h('div', { class: 'muted' }, root.desc),
+            h('div', { class: 'muted' }, `${root.desc}${root.displayEls ? ` · 属性：${root.displayEls}` : ''}`),
           ),
           h('div', { class: 'muted', style: { textAlign: 'right' } },
             h('div', null, `修炼 ×${root.mult.toFixed(2)}`),
@@ -482,7 +501,11 @@ export class GameUI {
         h('div', { class: 'stat-grid', style: { marginTop: '0.5rem' } },
           kv('攻击', p.atk), kv('防御', p.def), kv('神识', p.spirit),
           kv('气血上限', p.maxHp), kv('灵力上限', p.maxMp), kv('修炼/秒', speed.toFixed(2)),
+          kv('年龄', ageLabel(p)), kv('寿元', lifespan === Infinity ? '与天同寿' : `${Math.floor(p.age)}/${lifespan}岁`),
         ),
+        dying ? h('div', { class: 'req-line', style: { marginTop: '0.5rem' } },
+          h('span', { class: 'no' }, `☠ 大限将至：寿元已逾${REALMS[p.tier].name}之限，尽早突破延寿，否则需轮回重修。`)
+        ) : null,
       ),
       h('button', {
         class: 'btn-primary big-btn', disabled: !canActive,
@@ -1110,7 +1133,7 @@ export class GameUI {
     }
     else if (e.kind === 'root_upgrade') {
       const up = upgradeRoot(p);
-      this.pushLog(up ? `服下${d.name}，灵根提升为${rootDef(p.rootId).name}！` : '灵根已至极境，洗髓丹无效。', up ? 'epic' : 'normal');
+      this.pushLog(up ? `服下${d.name}，灵根资质提升为${rootInfo(p).name}！` : '灵根已至极境，洗髓丹无效。', up ? 'epic' : 'normal');
     } else if (e.kind === 'revive') { p.hp = p.maxHp; p.mp = p.maxMp; addXp(p, Math.round(p.xpMax * 0.3)); this.pushLog(`服下${d.name}，气血灵力全复，修为回升。`, 'epic'); }
     playSfx('reward');
     this.afterAction();
@@ -1171,7 +1194,7 @@ export class GameUI {
     if (!p.sectId) {
       c.append(h('div', { class: 'card' },
         h('h4', null, '拜入宗门'),
-        h('div', { class: 'muted', style: { marginBottom: '0.5rem' } }, '加入宗门方可接取每日宗门任务、积累声望、凭境界与声望晋升宗门称号，领取每日俸禄与修炼加成。'),
+        h('div', { class: 'muted', style: { marginBottom: '0.5rem' } }, '加入宗门方可接取每月宗门任务、积累声望、凭境界与声望晋升宗门称号，领取每月俸禄与修炼加成。'),
       ));
       for (const s of SECT_LIST) {
         c.append(h('div', { class: 'card sect-card' },
@@ -1190,7 +1213,7 @@ export class GameUI {
       return;
     }
 
-    // 已入宗门：展示宗门 / 称号 / 声望 / 每日任务 / 俸禄
+    // 已入宗门：展示宗门 / 称号 / 声望 / 每月任务 / 俸禄
     const sect = sectDef(p.sectId);
     const title = currentSectTitle(p);
     const prog = titleProgress(p);
@@ -1214,17 +1237,17 @@ export class GameUI {
           ),
     ));
 
-    // 每日宗门任务
+    // 每月宗门任务
     const claimable = (p.sectTasks || []).filter((t) => !t.claimed && (t.progress || 0) >= t.goal).length;
     c.append(
       h('div', { class: 'row', style: { margin: '0.2rem 0 0.4rem', alignItems: 'center' } },
-        h('h4', { class: 'muted', style: { margin: 0 } }, '今日宗门任务'),
+        h('h4', { class: 'muted', style: { margin: 0 } }, '本月宗门任务'),
         h('div', { class: 'spacer' }),
         claimable > 0 ? h('button', { class: 'btn-jade', onClick: () => this.doClaimAllSectTasks() }, `一键领取(+${claimable})`) : null,
       ),
     );
     if (!p.sectTasks || !p.sectTasks.length) {
-      c.append(h('div', { class: 'card muted' }, '今日暂无任务。'));
+      c.append(h('div', { class: 'card muted' }, '本月暂无任务。'));
     } else {
       for (const t of p.sectTasks) {
         const done = (t.progress || 0) >= t.goal;
@@ -1244,21 +1267,21 @@ export class GameUI {
           ),
         ));
       }
-      c.append(h('div', { class: 'muted', style: { textAlign: 'center', margin: '0.3rem 0' } }, '完成修炼 / 探索 / 战斗 / 炼制 / 突破可推进对应任务，每日刷新。'));
+      c.append(h('div', { class: 'muted', style: { textAlign: 'center', margin: '0.3rem 0' } }, '完成修炼 / 探索 / 战斗 / 炼制 / 突破可推进对应任务，每月刷新。'));
     }
 
     // 悬赏挑战（自主领取，难度随境界缩放）
     this._renderSectChallenges(c, p);
 
-    // 每日宗门俸禄
+    // 每月宗门俸禄
     const claimedToday = sectRewardClaimedToday(p);
     const dailyTxt = title && title.daily
       ? `${title.daily.stones ? `💎${title.daily.stones}` : ''}${title.daily.items ? ' ' + title.daily.items.map((it) => `${ITEMS[it.id] ? ITEMS[it.id].name : it.id}×${it.qty}`).join('、') : ''}`
       : '——';
     c.append(h('div', { class: 'card' },
-      h('h4', null, '每日宗门俸禄'),
+      h('h4', null, '每月宗门俸禄'),
       h('div', { class: 'muted', style: { marginBottom: '0.4rem' } }, `按当前称号发放：${dailyTxt}`),
-      h('button', { class: 'btn-primary big-btn', disabled: claimedToday || !title, onClick: () => this.doClaimDailySectReward() }, claimedToday ? '今日已领取' : '🎁 领取俸禄'),
+      h('button', { class: 'btn-primary big-btn', disabled: claimedToday || !title, onClick: () => this.doClaimDailySectReward() }, claimedToday ? '本月已领取' : '🎁 领取俸禄'),
     ));
 
     this.content.appendChild(c);
@@ -1308,7 +1331,7 @@ export class GameUI {
   doClaimDailySectReward() {
     const res = claimDailySectReward(this.player);
     if (!res.ok) { this.toast(res.reason, 'bad'); return; }
-    this.pushLog(`领取${res.title.name}每日俸禄。`, 'epic');
+    this.pushLog(`领取${res.title.name}每月俸禄。`, 'epic');
     for (const l of res.logs) this.pushLog(l.text, l.type);
     this.toast(`俸禄已入帐`, 'epic');
     this.afterAction();
@@ -1463,7 +1486,7 @@ export class GameUI {
           h('button', { class: 'btn-ghost', style: { flex: 1 }, onClick: () => this.showGiftPicker(npc.id) }, '🎁 赠礼'),
           canTeam
             ? h('button', { class: 'btn-jade', style: { flex: 1 }, disabled: !teamOk, onClick: () => this.doTeamExplore(npc.id) },
-                teamed ? '今日已同游' : `🤝 结伴探险（活力 ${TEAM_VITALITY_COST}）`)
+                teamed ? '本月已同游' : `🤝 结伴探险（活力 ${TEAM_VITALITY_COST}）`)
             : h('div', { class: 'muted', style: { flex: 1, textAlign: 'center', alignSelf: 'center' } }, `好感达「${affinityLevel(TEAM_AFFINITY_THRESHOLD).name}」可结伴`),
         ),
       ));
@@ -1532,7 +1555,7 @@ export class GameUI {
   showCharacter() {
     const p = this.player;
     const info = realmInfo(p);
-    const root = rootDef(p.rootId);
+    const root = rootInfo(p);
     const pt = portraitDef(p.ascended ? 'pt_ascend' : p.portraitId);
     const qy = effectiveQiyun(p);
     const ql = qiyunLabel(qy);
@@ -1555,14 +1578,17 @@ export class GameUI {
         ),
       ),
       h('div', { class: 'stat-grid', style: { margin: '0.6rem 0' } },
-        kv('灵根', root.name), kv('气运', `${qy} · ${ql.text}`),
+        kv('灵根', root.name), kv('灵根属性', root.displayEls || '——'),
+        kv('气运', `${qy} · ${ql.text}`), kv('年龄', ageLabel(p)),
+        kv('寿元', realmLifespan(p.tier) === Infinity ? '与天同寿' : `${Math.floor(p.age)}/${realmLifespan(p.tier)}岁`),
         kv('攻击', statText(p.atk, baseAtk(lv))), kv('防御', statText(p.def, baseDef(lv))),
         kv('神识', statText(p.spirit, baseSpirit(lv))), kv('气血上限', statText(p.maxHp, baseMaxHp(lv))),
-        kv('灵力上限', statText(p.maxMp, baseMaxMp(lv))), kv('每日活力', `${Math.floor(p.vitality)}/${p.maxVitality}`),
+        kv('灵力上限', statText(p.maxMp, baseMaxMp(lv))), kv('每月行动力', `${Math.floor(p.vitality)}/${p.maxVitality}`),
         kv('修炼/秒', passiveXpPerSec(p.tier, cultivateSpeedMult(p)).toFixed(2)), kv('出身', `${bg.emoji}${bg.name}`),
         kv('宗门', sect ? `${sect.emoji}${sect.name}` : '散修（未入宗门）'),
         kv('宗门称号', sectTitle ? `${sectTitle.emoji} ${sectTitle.name}` : '——'),
       ),
+      h('div', { class: 'muted', style: { margin: '0.3rem 0 0.2rem' } }, `契合：功法/法宝属性与灵根一致时修炼与攻防额外加成。${rootAffinityHint(p)}`),
       // 装备（攻伐 / 镇御双槽）
       h('div', { class: 'card', style: { marginBottom: '0.6rem' } },
         h('h4', null, '装备'),
@@ -1623,7 +1649,8 @@ export class GameUI {
           h('div', { class: 'muted', style: { marginTop: '0.15rem', fontSize: '0.72rem' } },
             r.trial ? `渡劫：${trialLabel(r.trial)}` : '无需渡劫',
             r.reqItem && ITEMS[r.reqItem] ? ` · 推荐${ITEMS[r.reqItem].name}` : '',
-            ` · 修炼系数 ×${r.speedFactor.toFixed(1)}`),
+            ` · 修炼系数 ×${r.speedFactor.toFixed(1)}`,
+            ` · 寿元 ${r.lifespan == null ? '与天同寿' : r.lifespan + '岁'}`),
         ),
       );
       axis.appendChild(node);
@@ -1798,7 +1825,7 @@ export class GameUI {
       h('div', { class: 'row' },
         h('div', { class: 'grow' },
           h('h4', null, '⚡ 活力不足'),
-          h('div', { class: 'muted', style: { marginTop: '0.2rem' } }, '消耗活力的修行暂不可继续。可「闭关静修」即刻恢复一次活力（每日限一次）；坊市买卖、装备穿脱等仍可进行，亦可静候次日自然回满。'),
+          h('div', { class: 'muted', style: { marginTop: '0.2rem' } }, '消耗活力的修行暂不可继续。可「闭关静修」即刻恢复一次活力（每月限一次）；坊市买卖、装备穿脱等仍可进行，亦可静候次月自然回满。'),
         ),
         h('button', { class: 'btn-jade rest-btn', onClick: () => this.doRestToNextDay() }, '🧘 闭关静修'),
       ),
@@ -1806,9 +1833,9 @@ export class GameUI {
   }
 
   doRestToNextDay() {
-    // restToNextDay 含「每日仅一次 + 须活力耗尽」守卫；被拒（今日已用过）时给出提示而非静默
+    // restToNextDay 含「每月仅一次 + 须活力耗尽」守卫；被拒（本月已用过）时给出提示而非静默
     if (!restToNextDay(this.player)) {
-      this.toast('今日已闭关静修，明日方可再来', 'bad');
+      this.toast('本月已闭关静修，下月方可再来', 'bad');
       return;
     }
     this.pushLog('🧘 你闭关静修，吐纳天地灵气，元气渐复，活力回满。', 'good');
@@ -1816,18 +1843,92 @@ export class GameUI {
     this.afterAction();
   }
 
-  // 跨自然日刷新活力（在线挂机跨过零点时回满）；silent 时不弹提示
+  // 大限将至横幅：寿元耗尽时呈现。仍有轮回次数 → 轮回重修入口；
+  // 否则 → 若尚有更高大境界可突破延寿，给出「去突破延寿」入口（凡人挂机被动攒修为不耗活力，
+  // 总能逐步突破），「重开新篇」降级为非唯一选项，避免误导玩家误清档。
+  renderDeathBanner() {
+    const p = this.player;
+    const can = canReincarnate(p);
+    // 仍可突破至更高大境界即仍可延寿续命（nextTarget 为 null 表示已登顶飞升，无可突破）。
+    const canExtend = !!nextTarget(p);
+    const actions = [];
+    if (can) {
+      actions.push(h('button', { class: 'btn-jade rest-btn', onClick: () => this.confirmReincarnate() }, '♻ 轮回重修'));
+    } else {
+      if (canExtend) actions.push(h('button', { class: 'btn-jade rest-btn', onClick: () => this.goBreakthroughForLife() }, '⚡ 去突破延寿'));
+      actions.push(h('button', { class: 'btn-danger rest-btn', onClick: () => this.confirmReset() }, '🌌 重开新篇'));
+    }
+    const desc = can
+      ? `寿元已逾${REALMS[p.tier].name}之限。可轮回重修一次：境界与修为归零、年龄重置，但携带前世灵根、气运与一项天赋，更获「前世记忆」修炼加成（×${REINCARNATION_CULT_BONUS.toFixed(2)}）。`
+      : (canExtend
+          ? '前世今生寿元皆尽，再无轮回之路。然大道未绝——突破至更高大境界可延寿续命；若决意舍弃此身，亦可重开新篇。'
+          : '前世今生寿元皆尽，再无轮回之路，亦已登仙绝顶。唯余重开新篇，再入红尘。');
+    return h('div', { class: 'card rest-banner death-banner' },
+      h('div', { class: 'row' },
+        h('div', { class: 'grow' },
+          h('h4', null, `☠ 大限将至 · ${ageLabel(p)}`),
+          h('div', { class: 'muted', style: { marginTop: '0.2rem' } }, desc),
+        ),
+        ...actions,
+      ),
+    );
+  }
+
+  // 大限且不可轮回时：跳转修炼页引导突破延寿。修为未满时突破按钮为灰，挂机攒满即点亮。
+  goBreakthroughForLife() {
+    this.tab = 'cultivate';
+    this.buildTabs();
+    this.renderPanel();
+    this.pushLog('⚡ 大限将至，唯突破至更高大境界方可延寿续命。', 'bad');
+    this.toast('去突破延寿', 'bad');
+  }
+
+  confirmReincarnate() {
+    this.showSheet({
+      title: '轮回重修？',
+      body: [
+        h('div', { class: 'muted' }, '大限已至，你将舍去此身，转世重修。'),
+        h('div', { class: 'muted', style: { marginTop: '0.3rem' } }, '境界与修为归零、年龄重置；携带前世灵根档次与属性、气运、一项天赋，并获得「前世记忆」修炼加成。此后你的年龄将标注（轮回）。'),
+      ],
+      foot: [
+        h('button', { class: 'btn-jade', onClick: () => { this.closeModal(); this.doReincarnate(); } }, '♻ 转世重修'),
+        h('button', { class: 'btn-ghost', onClick: () => this.closeModal() }, '再留恋片刻'),
+      ],
+    });
+  }
+
+  doReincarnate() {
+    const p = this.player;
+    if (!reincarnate(p, Math.random)) { this.toast('尚不可轮回重修', 'bad'); return; }
+    this.closeModal();
+    this.log = [];
+    this.pushLog('♻ 天地轮转，你舍去残躯，一缕真灵投入轮回……', 'epic');
+    this.pushLog(`前世记忆尚存，资质（${rootInfo(p).name}）与气运得以延续，自此再踏仙途。`, 'epic');
+    this.toast('轮回重修，再入仙途', 'epic');
+    playSfx('breakthrough');
+    this.buildStatus();
+    this.afterAction();
+  }
+
+  // 跨自然月刷新活力 + 推进年龄（在线挂机跨过月初时）；silent 时不弹提示
   checkDayRollover(notify) {
     if (!this.player || this.screen !== 'game') return;
-    if (rolloverVitality(this.player)) {
-      if (notify) {
-        this.pushLog('🌅 新的一日，活力已回满。', 'good');
-        this.toast('新的一天，活力回满', 'good');
-      }
+    const rolled = rolloverVitality(this.player); // 同时推进年龄并写入 _cycleAgedYears
+    const aged = this.player._cycleAgedYears || 0;
+    if (rolled && notify) {
+      this.pushLog('🌅 新的一月，活力已回满。', 'good');
+      this.toast('新的一月，活力回满', 'good');
+    }
+    if (aged > 0) {
+      this.pushLog(`⏳ 岁月流转，痴长 ${aged} 岁，今已 ${ageLabel(this.player)}。`, 'normal');
+      if (isDying(this.player)) this.pushLog('☠ 寿元将尽，大限将至，须尽早突破延寿或轮回重修。', 'bad');
+    }
+    // 同一轮既回满活力又推进年龄时合并为一次存档（原本 rolled 与 aged 各存一次）。
+    if (rolled || aged > 0) {
       saveGame(this.player);
       this.refreshStatus();
     }
-    // 宗门每日任务跨日刷新（在线跨过零点时；进入游戏由 renderSect 兜底补齐）
+    // 宗门每月任务跨月刷新（在线跨过月初时；进入游戏由 renderSect 兜底补齐）
     dailySectRollover(this.player, Math.random);
   }
 
@@ -1869,6 +1970,24 @@ GameUI.prototype._onVis = function () {
 };
 
 // —— 小工具（模板内）——
+// 由玩家或创角模板派生灵根描述（二者皆含 root: {grade,count,els}）
+function rootInfo(p) {
+  return rootDescriptor((p && p.root) || { grade: 'pseudo', count: 'tri', els: [] });
+}
+// 灵根契合摘要：列出与灵根属性一致的已习功法 / 已装备法宝
+function rootAffinityHint(p) {
+  const els = (p && p.root && p.root.els) || [];
+  if (!els.length) return '';
+  const matched = [];
+  for (const id of (p.techniques || [])) {
+    const t = ITEMS[id];
+    if (t && t.el && els.includes(t.el)) matched.push(`${t.emoji}${t.name}`);
+  }
+  for (const tr of equippedList(p)) {
+    if (tr && tr.stats && tr.stats.el && els.includes(tr.stats.el)) matched.push(`${tr.emoji}${tr.name}`);
+  }
+  return matched.length ? `已契合：${matched.join('、')}` : '尚未装备/习得契合之物。';
+}
 function kv(k, v) { return [h('div', { class: 'k' }, k), h('div', { class: 'v' }, String(v))]; }
 function line(text, ok) { return h('div', { class: 'req-line' }, h('span', { class: ok ? 'ok' : 'no' }, `${ok ? '✓' : '○'} ${text}`)); }
 function typeName(t) { return { pill: '丹药', material: '材料', treasure: '法宝', technique: '功法', misc: '杂物', recipe: '配方' }[t] || t; }

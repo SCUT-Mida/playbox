@@ -2,14 +2,18 @@
 // 玩家状态：创建、衍生属性、背包、装备、灵石、修为等核心数据操作（纯逻辑）
 // ============================================================================
 import {
-  REALMS, SPIRIT_ROOTS, ASCEND_INDEX, globalLevel, xpNeeded,
+  REALMS, ASCEND_INDEX, globalLevel, xpNeeded,
   baseMaxHp, baseMaxMp, baseAtk, baseDef, baseSpirit,
-  MAX_VITALITY, VITALITY_COSTS, vitalityMax, dayKey, nowSec, clamp,
+  MAX_VITALITY, VITALITY_COSTS, vitalityMax, cycleKey, monthsBetween, nowSec, clamp,
   sanitizeRealm,
+  ROOT_GRADES, ROOT_COUNTS, FIVE_ELEMENTS, MUTANT_ELEMENTS,
+  rootGradeDef, rootCountDef, rootDescriptor, rootAffinity, rootFromLegacy,
+  START_AGE_MIN, START_AGE_MAX, YEARS_PER_CYCLE, MAX_REINCARNATIONS, REINCARNATION_CULT_BONUS,
+  isDying, canReincarnate,
 } from '../config.js';
 import { ITEMS } from '../data/items.js';
 import { TALENTS, TALENT_LIST, BACKGROUNDS, BACKGROUND_LIST, pickPortrait } from '../data/characters.js';
-import { weighted, pick } from './rng.js';
+import { weighted, pick, shuffle } from './rng.js';
 
 export const START_BAG_CAPACITY = 15; // 初始储物袋容量（物品种类数）
 
@@ -27,16 +31,36 @@ export function rollTalents(rng) {
   return out;
 }
 
-// 创角模板：性别 + 灵根 + 天赋 + 气运 + 出身 + 形象（不含名字，名字由 UI 单独设定）
+// 创角随机灵根：先掷「等级」档次，再按档次约束掷「组合」与「属性」，保证设定自洽
+// （天/异灵根必为单系且取单属性；伪灵根必为四/五系；异灵根取风雷冰异属性）。
+export function rollRoot(rng) {
+  const r = rng || Math.random;
+  const grade = weighted(r, ROOT_GRADES.map((x) => ({ item: x, weight: x.weight })));
+  let count;
+  if (grade.id === 'tian' || grade.id === 'yi') {
+    count = rootCountDef('single');
+  } else if (grade.id === 'pseudo') {
+    count = weighted(r, [rootCountDef('five'), rootCountDef('four')].map((x) => ({ item: x, weight: x.weight })));
+  } else {
+    // 人/地灵根：四/三/双系（单系留给天/异）
+    count = weighted(r, ROOT_COUNTS.filter((c) => c.id !== 'single').map((x) => ({ item: x, weight: x.weight })));
+  }
+  const pool = grade.special ? MUTANT_ELEMENTS : FIVE_ELEMENTS;
+  const els = shuffle(r, pool).slice(0, count.count).map((e) => e.id);
+  return { grade: grade.id, count: count.id, els };
+}
+
+// 创角模板：性别 + 灵根 + 年龄 + 天赋 + 气运 + 出身 + 形象（不含名字，名字由 UI 单独设定）
 export function rollCharacter(rng) {
   const r = rng || Math.random;
   const gender = r() < 0.5 ? 'male' : 'female';
-  const root = weighted(r, SPIRIT_ROOTS.map((x) => ({ item: x, weight: x.weight })));
+  const root = rollRoot(r);
   const talentIds = rollTalents(r);
   const qiyun = 30 + Math.floor(r() * 71); // 30~100
   const bg = pick(r, BACKGROUND_LIST);
   const portrait = pickPortrait(gender, talentIds);
-  return { gender, rootId: root.id, talentIds, qiyun, bgId: bg.id, portraitId: portrait.id };
+  const age = START_AGE_MIN + Math.floor(r() * (START_AGE_MAX - START_AGE_MIN + 1));
+  return { gender, root, age, talentIds, qiyun, bgId: bg.id, portraitId: portrait.id };
 }
 
 // 读取某项天赋加成的累加值（加算字段）
@@ -59,14 +83,21 @@ export function effectiveQiyun(player) {
 export function newPlayer(rng, template) {
   const r = rng || Math.random;
   const t = template || rollCharacter(r);
-  const root = rootDef(t.rootId);
   const bg = BACKGROUNDS[t.bgId] || BACKGROUND_LIST[0];
+  const root = t.root || rollRoot(r);
+  const age = t.age != null ? t.age : (START_AGE_MIN + Math.floor(r() * (START_AGE_MAX - START_AGE_MIN + 1)));
   const player = {
-    v: 5,
+    v: 6,
     slot: t.slot || 1,
     gender: t.gender || 'male',
     name: t.name || '',
-    rootId: root.id,
+    root: { grade: root.grade, count: root.count, els: (root.els || []).slice() },
+    rootId: root.grade,      // 兼容旧引用（= 等级档次 id）
+    age,                     // 年龄（岁）：随周期（自然月）增长
+    bornKey: cycleKey(),     // 降生周期键
+    lastAgeMonth: cycleKey(),// 上次结算年龄增长的周期键
+    reincarnations: 0,       // 已轮回次数（最多 1）
+    reincarnationBonus: 1,   // 前世记忆修炼加成（轮回后 > 1）
     talentIds: (t.talentIds || []).slice(),
     qiyun: t.qiyun != null ? t.qiyun : 50,
     bgId: bg.id,
@@ -84,10 +115,10 @@ export function newPlayer(rng, template) {
     pity: { explore: 0 },
     chaos: null,
     bagCapacity: START_BAG_CAPACITY,
-    vitality: 0,            // 每日活力（recompute 后置满）
+    vitality: 0,            // 每月行动力（recompute 后置满）
     maxVitality: MAX_VITALITY,
-    lastVitalityDate: '',
-    restUsedDate: '',       // 「闭关静修」兜底上次使用的日期键（每日仅一次）
+    lastVitalityDate: '',   // 周期键（自然月 YYYY-MM）
+    restUsedDate: '',       // 「闭关静修」兜底上次使用的周期键（每月仅一次）
     // 宗门系统（v3）：未入宗门时 sectId=null，相关字段保持空值
     sectId: null,
     sectRep: 0,
@@ -105,7 +136,7 @@ export function newPlayer(rng, template) {
   recompute(player);
   player.maxVitality = vitalityMax(player);
   player.vitality = player.maxVitality;
-  player.lastVitalityDate = dayKey();
+  player.lastVitalityDate = cycleKey();
   player.hp = player.maxHp;
   player.mp = player.maxMp;
   return player;
@@ -128,9 +159,14 @@ export function recompute(player) {
   player.lv = lv;
   player.xpMax = xpNeeded(lv);
 
-  const root = rootDef(player.rootId);
-  player.rootMult = root.mult;
-  player.rootBonus = root.breakBonus;
+  // 灵根：由三轴 { grade, count, els } 派生修炼倍率与突破加成。
+  // 旧版/损坏档缺 root 时由 rootId 兜底映射，杜绝后续 rootAffinity 取不到 root。
+  if (!player.root || !player.root.grade) player.root = rootFromLegacy(player.rootId);
+  player.root.els = Array.isArray(player.root.els) ? player.root.els : [];
+  const rootDesc = rootDescriptor(player.root);
+  player.rootMult = rootDesc.mult;
+  player.rootBonus = rootDesc.breakBonus;
+  player.rootId = player.root.grade; // 兼容旧引用
 
   let maxHp = baseMaxHp(lv);
   let maxMp = baseMaxMp(lv);
@@ -150,12 +186,15 @@ export function recompute(player) {
     atk *= 1 + (t.atkPct || 0);
     maxHp *= 1 + (t.hpPct || 0);
   }
-  // 装备加成：攻伐 + 镇御两槽同时生效（同类仅一件，互不冲突）
+  // 装备加成：攻伐 + 镇御两槽同时生效（同类仅一件，互不冲突）。
+  // 法宝属性与灵根契合时，其攻防额外按契合度放大（不同属性灵根，效果不完全一致）。
   player.equipment = normalizeEquip(player.equipment);
   player.element = null;
   for (const tr of equippedList(player)) {
-    atk += (tr.stats && tr.stats.atk) || 0;
-    def += (tr.stats && tr.stats.def) || 0;
+    const s = (tr && tr.stats) || {};
+    const aff = rootAffinity(player.root, s.el);
+    atk += (s.atk || 0) * aff;
+    def += (s.def || 0) * aff;
   }
   // 五行取自所装备法宝：优先攻伐槽，其次镇御槽
   for (const id of [player.equipment.weapon, player.equipment.armor]) {
@@ -183,16 +222,58 @@ export function recompute(player) {
   return player;
 }
 
+// 灵根等级档次查表（向后兼容入口；新版三轴灵根请用 rootDescriptor）。
 export function rootDef(id) {
-  return SPIRIT_ROOTS.find((r) => r.id === id) || SPIRIT_ROOTS[0];
+  return ROOT_GRADES.find((g) => g.id === id) || ROOT_GRADES[0];
 }
 
-// 灵根提升一档（洗髓丹），返回是否提升
+// 灵根「等级」提升一档（洗髓丹）：资质更上一层。升入天/异灵根时精纯为单系。
 export function upgradeRoot(player) {
-  const idx = SPIRIT_ROOTS.findIndex((r) => r.id === player.rootId);
-  if (idx < 0 || idx >= SPIRIT_ROOTS.length - 1) return false;
-  player.rootId = SPIRIT_ROOTS[idx + 1].id;
+  if (!player.root || !player.root.grade) player.root = rootFromLegacy(player.rootId);
+  const idx = ROOT_GRADES.findIndex((g) => g.id === player.root.grade);
+  if (idx < 0 || idx >= ROOT_GRADES.length - 1) return false;
+  const next = ROOT_GRADES[idx + 1];
+  player.root.grade = next.id;
+  if (next.id === 'tian' || next.id === 'yi') {
+    player.root.count = 'single';
+    if (next.special) {
+      player.root.els = [MUTANT_ELEMENTS[0].id]; // 雷灵根
+    } else {
+      const five = (player.root.els || []).find((e) => FIVE_ELEMENTS.some((f) => f.id === e));
+      player.root.els = [five || 'metal'];
+    }
+  }
   recompute(player);
+  return true;
+}
+
+// 轮回重修：大限将至（年龄 ≥ 当前境界寿元）时可重修一次。境界/修为归零、年龄重置，
+// 但携带部分前世资质（灵根档次与属性、气运、一项天赋、称号/成就留存），
+// 并获得「前世记忆」修炼加成；此后年龄属性前标注（轮回）。
+export function reincarnate(player, rng) {
+  if (!canReincarnate(player)) return false;
+  const r = rng || Math.random;
+  player.reincarnations = (player.reincarnations || 0) + 1;
+  // 携带：灵根（保持前世档次与属性）、气运、首个天赋、称号与成就（生平履历）
+  player.talentIds = (player.talentIds || []).slice(0, 1);
+  // 重置：境界、修为、年龄
+  player.tier = 0;
+  player.sub = 0;
+  player.xp = 0;
+  player.age = START_AGE_MIN + Math.floor(r() * (START_AGE_MAX - START_AGE_MIN + 1));
+  player.bornKey = cycleKey();
+  player.lastAgeMonth = cycleKey();
+  // 前世记忆修炼加成
+  player.reincarnationBonus = REINCARNATION_CULT_BONUS;
+  player.hp = 0; player.mp = 0;
+  recompute(player);
+  // 截断天赋后须以新天赋集重算活力上限，否则 vitality 会被赋成截断前的「陈旧上限」
+  // （vitalityMax 逐项累加 t.maxVitBonus，依赖 talentIds）。与 newPlayer / restToNextDay 同款写法。
+  player.maxVitality = vitalityMax(player);
+  player.vitality = player.maxVitality;
+  player.lastVitalityDate = cycleKey();
+  player.hp = player.maxHp;
+  player.mp = player.maxMp;
   return true;
 }
 
@@ -386,17 +467,35 @@ export function realmInfo(player) {
   return { realm, subName: realm.subs[sub], majorName: realm.name };
 }
 
-// —— 每日活力（活力周期：跨自然日时回满）——
-// 返回是否发生了「新一天」刷新（供 UI 弹提示）
+// —— 周期刷新（自然月）：回满活力 + 推进年龄 ——
+// 跨越自然月时 vitality 回满；同时按跨越的自然月数推进年龄（YEARS_PER_CYCLE 岁/月）。
+// 返回是否发生「新周期」刷新（供 UI 弹提示）。_cycleAgedYears 为本次增长的岁数（非持久态）。
 export function rolloverVitality(player) {
-  const today = dayKey();
-  if (player.lastVitalityDate !== today) {
-    player.lastVitalityDate = today;
+  const cur = cycleKey();
+  let rolled = false;
+  if (player.lastVitalityDate !== cur) {
+    player.lastVitalityDate = cur;
     player.maxVitality = vitalityMax(player);
     player.vitality = player.maxVitality;
-    return true;
+    rolled = true;
   }
-  return false;
+  // 年龄推进：按自上次记月以来的自然月数增长
+  let aged = 0;
+  const from = player.lastAgeMonth || player.bornKey || cur;
+  if (from !== cur) {
+    const months = monthsBetween(from, cur);
+    if (months > 0) {
+      aged = months * YEARS_PER_CYCLE;
+      player.age = (player.age || 0) + aged;
+      // 仅在前拨（months > 0）时推进记月点；时钟回拨时保持原值，
+      // 否则回拨后再前拨会以更早的月份为基准，造成年龄「超算」。
+      player.lastAgeMonth = cur;
+    }
+  } else if (!player.lastAgeMonth) {
+    player.lastAgeMonth = cur;
+  }
+  player._cycleAgedYears = aged;
+  return rolled;
 }
 export function canAffordVitality(player, cost) { return (player.vitality || 0) >= cost; }
 export function spendVitality(player, cost) {
@@ -413,15 +512,15 @@ export function vitalityDepleted(player) {
 }
 
 // 主动「闭关静修」：活力耗尽时的兜底入口，避免玩家无任何行动可做而被卡死。
-// 【平衡守卫】每个自然日仅可触发一次（与 rolloverVitality「每日仅回满一次」对齐），
-// 杜绝「花光活力→回满→再花光→再回满」的无限刷取，守住每日活力上限这道进度门。
-// 须真正处于活力耗尽态才会消耗当日额度。注意：不改动 lastSeen，故不影响离线修炼结算。
+// 【平衡守卫】每个自然月周期仅可触发一次（与 rolloverVitality「每月仅回满一次」对齐），
+// 杜绝「花光活力→回满→再花光→再回满」的无限刷取，守住每月行动力上限这道进度门。
+// 须真正处于活力耗尽态才会消耗当月额度。注意：不改动 lastSeen，故不影响离线修炼结算。
 export function restToNextDay(player) {
-  const today = dayKey();
-  if (player.restUsedDate === today) return false; // 当日已用过：拒绝，杜绝无限刷活力
-  if (!vitalityDepleted(player)) return false;     // 未耗尽时不消耗当日额度
+  const cur = cycleKey();
+  if (player.restUsedDate === cur) return false; // 当月已用过：拒绝，杜绝无限刷活力
+  if (!vitalityDepleted(player)) return false;   // 未耗尽时不消耗当月额度
   player.maxVitality = vitalityMax(player);
   player.vitality = player.maxVitality;
-  player.restUsedDate = today;
+  player.restUsedDate = cur;
   return true;
 }

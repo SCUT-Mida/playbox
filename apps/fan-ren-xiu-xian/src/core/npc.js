@@ -4,7 +4,7 @@
 // 沿用 sect 的注入模式，避免 config↔npc 循环依赖。
 // ============================================================================
 import {
-  dayKey, _registerCompanionBonus, EXPLORE_MP_COST, EXPLORE_HP_COST, xpNeeded, clamp,
+  cycleKey, _registerCompanionBonus, EXPLORE_MP_COST, EXPLORE_HP_COST, xpNeeded, clamp,
 } from '../config.js';
 import {
   NPCS, NPC_LIST, npcDef, AFFINITY_LEVELS, affinityLevel, nextAffinityLevel,
@@ -117,7 +117,7 @@ export function canTeamUp(player, npcId) {
 // 今日是否已与此道友结伴（每道友每日限一次，守住奖励上限）
 export function teamedToday(player, npcId) {
   const st = npcState(player, npcId);
-  return !!(st && st.teamedDate === dayKey());
+  return !!(st && st.teamedDate === cycleKey());
 }
 
 // 结伴探险：消耗灵力/气血/活力，奖励随境界与道友 teamMult 大幅放大。
@@ -175,7 +175,7 @@ export function teamExplore(player, npcId, rng) {
   const st = player.npcs[npcId];
   const affGain = 2 + Math.floor(r() * 2);
   st.aff = (st.aff || 0) + affGain;
-  st.teamedDate = dayKey();
+  st.teamedDate = cycleKey();
 
   // 上报宗门「外出探索」任务
   recordSectActivity(player, 'explore');

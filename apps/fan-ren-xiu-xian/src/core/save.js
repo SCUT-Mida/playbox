@@ -7,7 +7,7 @@
 import { recompute } from './player.js';
 import {
   OFFLINE_CAP_HOURS, OFFLINE_EFFICIENCY, passiveXpPerSec, cultivateSpeedMult, nowSec,
-  vitalityMax,
+  vitalityMax, cycleKey, rootFromLegacy, START_AGE_MIN,
 } from '../config.js';
 
 const NUM_SLOTS = 5;
@@ -60,7 +60,13 @@ export function saveGame(player) {
     if (player) player.slot = slot;
     setActiveSlot(slot);
     player.lastSeen = nowSec();
-    if (storage) storage.setItem(slotKey(slot), JSON.stringify(player));
+    if (storage) {
+      // 剔除瞬态字段（本次周期增长的 _cycleAgedYears），避免泄漏进持久层：
+      // 它在 checkDayRollover 中读完即弃，下次 rolloverVitality 会重新写入。
+      const persist = { ...player };
+      delete persist._cycleAgedYears;
+      storage.setItem(slotKey(slot), JSON.stringify(persist));
+    }
     return true;
   } catch (_) { return false; }
 }
@@ -131,6 +137,8 @@ function slotMeta(p, n) {
     tier,
     lv: p.lv || 0,
     stones: Math.floor(p.stones || 0),
+    age: p.age || 0,
+    reincarnations: p.reincarnations || 0,
     ascended: !!p.ascended,
     lastSeen: p.lastSeen || 0,
     createdAt: p.createdAt || 0,
@@ -200,6 +208,15 @@ function migrate(player) {
   if (player.maxVitality == null) player.maxVitality = vitalityMax(player);
   if (!player.lastVitalityDate) player.lastVitalityDate = '';
   if (!player.restUsedDate) player.restUsedDate = '';
+  // v6：灵根三轴化 + 年龄 / 寿元 / 轮回
+  if (!player.root || !player.root.grade) player.root = rootFromLegacy(player.rootId);
+  if (!Array.isArray(player.root.els)) player.root.els = [];
+  if (player.rootId == null) player.rootId = player.root.grade;
+  if (!Number.isFinite(player.age)) player.age = START_AGE_MIN;
+  if (!player.bornKey) player.bornKey = cycleKey();
+  if (!player.lastAgeMonth) player.lastAgeMonth = cycleKey();
+  if (!Number.isFinite(player.reincarnations)) player.reincarnations = 0;
+  if (!player.reincarnationBonus) player.reincarnationBonus = 1;
   // v3：宗门系统（未入宗门时 sectId 保持 null）
   if (player.sectId == null) player.sectId = null;
   if (player.sectRep == null) player.sectRep = 0;

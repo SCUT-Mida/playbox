@@ -59,7 +59,17 @@ export default class UIScene extends Phaser.Scene {
     this.input.on('pointermove', (p) => this._onMove(p));
     this.input.on('pointerup', (p) => this._onUp(p));
 
-    this.gameScene.events.on('state', (s) => this._onState(s));
+    // 监听 GameScene 的状态广播。务必在 UIScene 关闭时解绑：
+    // GameScene.create() 内会立即 _emitState（见其第 81 行，早于 launch('UIScene')）。
+    // 若不解绑，"进入下一关/返回主菜单"重启 GameScene 时，上一局遗留的监听会在
+    // 本场景已被 stop、文本(livesText 等)已销毁的瞬间被触发，setColor→updateText
+    // 会在 null 画布上 drawImage 抛错并整局卡死——这正是"结算按钮点了没反应"的根因。
+    this._onStateHandler = (s) => this._onState(s);
+    this.gameScene.events.on('state', this._onStateHandler);
+    this.events.once('shutdown', () => {
+      if (this.gameScene && this.gameScene.events) this.gameScene.events.off('state', this._onStateHandler);
+      this._onStateHandler = null;
+    });
     // 初次拉取一次状态
     this._onState(this._collectState());
   }
@@ -761,6 +771,9 @@ export default class UIScene extends Phaser.Scene {
 
   // ---------------- 状态刷新 ----------------
   _onState(s) {
+    // 双保险：场景已被 stop（重启过渡期）时仍可能收到过期 state 事件，此时文本已销毁，
+    // 直接忽略，避免在销毁的文本上 setText/setColor 触发 drawImage null 崩溃。
+    if (!this.scene.isActive()) return;
     this.lastState = s;
     this.livesText.setText(String(s.lives));
     if (s.lives <= 3) this.livesText.setColor('#ff8a78');

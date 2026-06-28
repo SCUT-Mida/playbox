@@ -83,8 +83,10 @@ export default class GameScene extends Phaser.Scene {
     // 启动 UI 层
     this.scene.launch('UIScene');
 
-    // 事件：UIScene 通知部署/操作时统一从这里改状态
-    this.events.on('shutdown', () => this._cleanup());
+    // 事件：UIScene 通知部署/操作时统一从这里改状态。
+    // 用 once：GameScene 实例在 scene.start 重启时会被复用、events 复用，
+    // 用 .on 会在每次 create() 累积一份 shutdown 监听，导致 _cleanup 被重复调用。
+    this.events.once('shutdown', () => this._cleanup());
   }
 
   // ---------------- 棋盘渲染 ----------------

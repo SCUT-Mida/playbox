@@ -3,7 +3,12 @@ import {
   REALMS, SPIRIT_ROOTS, ASCEND_INDEX, globalLevel, fromGlobalLevel, xpNeeded, MAX_GLOBAL_LEVEL,
   passiveXpPerSec, breakthroughChance, computeDamage, counterMult, clamp,
   cultivateSpeedMult,
-  PITTY_THRESHOLD, PITTY_BOOST, dayKey,
+  PITTY_THRESHOLD, PITTY_BOOST, dayKey, cycleKey, monthKey, monthsBetween,
+  ROOT_GRADES, ROOT_COUNTS, FIVE_ELEMENTS, MUTANT_ELEMENTS,
+  rootDescriptor, rootAffinity, rootGradeDef, rootCountDef, elDef, rootFromLegacy,
+  realmLifespan, isDying, canReincarnate, ageLabel,
+  START_AGE_MIN, START_AGE_MAX, YEARS_PER_CYCLE, MAX_REINCARNATIONS, REINCARNATION_CULT_BONUS,
+  ROOT_AFFINITY_MATCH,
 } from '../src/config.js';
 import { ITEMS, TREASURE_SKILLS } from '../src/data/items.js';
 import { makeEnemy } from '../src/data/enemies.js';
@@ -11,7 +16,7 @@ import { EVENTS, eligibleEvents } from '../src/data/events.js';
 import {
   newPlayer, recompute, addXp, isXpFull, addItem, removeItem, countItem, hasItem,
   equip, unequip, expandBag, bagExpandCost, upgradeRoot, distinctItems, realmInfo, START_BAG_CAPACITY,
-  restToNextDay, vitalityDepleted,
+  restToNextDay, vitalityDepleted, rolloverVitality, rollRoot, reincarnate,
 } from '../src/core/player.js';
 import { activeCultivate, passiveTick } from '../src/core/cultivate.js';
 import { rollExplore, applyReward, chaosActive } from '../src/core/explore.js';
@@ -82,13 +87,20 @@ ok(p.stones >= 50, '初始灵石 >= 50');
 ok(p.bagCapacity === START_BAG_CAPACITY, '初始容量');
 ok(hasItem(p, 'pill_huitian', 2), '新手礼包含 2 回血丹');
 
-// 灵根提升
-const rootBefore = p.rootId;
+// 灵根三轴化：root = { grade, count, els }，年龄随机
+ok(p.root && ROOT_GRADES.some((g) => g.id === p.root.grade), '灵根含 grade 档次');
+ok(p.root.els.length === rootCountDef(p.root.count).count, '灵根属性数 = 组合数');
+ok(p.root.els.every((e) => elDef(e)), '灵根属性均合法');
+ok(Number.isFinite(p.age) && p.age >= START_AGE_MIN && p.age <= START_AGE_MAX, `年龄在起始区间 (${p.age})`);
+ok(rootDescriptor(p.root).mult === p.rootMult, 'rootMult 来自 rootDescriptor');
+
+// 灵根提升（等级档次 +1）
+const rootBefore = p.root.grade;
 const up = upgradeRoot(p);
-const idxBefore = SPIRIT_ROOTS.findIndex((s) => s.id === rootBefore);
-ok(up === (idxBefore < SPIRIT_ROOTS.length - 1), 'upgradeRoot 在未满时提升');
-// 升到顶后不再升
-p.rootId = SPIRIT_ROOTS[SPIRIT_ROOTS.length - 1].id; recompute(p);
+const idxBefore = ROOT_GRADES.findIndex((g) => g.id === rootBefore);
+ok(up === (idxBefore < ROOT_GRADES.length - 1), 'upgradeRoot 在未满时提升');
+// 升到顶后不再升：直接置 root.grade 为最高档
+p.root = { grade: ROOT_GRADES[ROOT_GRADES.length - 1].id, count: 'single', els: ['thunder'] }; recompute(p);
 ok(upgradeRoot(p) === false, '灵根满级后 upgradeRoot 返回 false');
 
 // 修为 / 突破前置
@@ -391,10 +403,10 @@ ok(SECT_TASK_POOL.length >= 3, '宗门任务池 >= 3');
   const all = claimAllSectTasks(q);
   ok(all.ok && all.count === q.sectTasks.length && all.rep > 0, '一键领取全部已完成任务');
   ok(q.sectTasks.every((t) => t.claimed), '全部任务标记已领');
-  // 跨日刷新：篡改日期后 ensureSectTasks/dailySectRollover 应重置
-  q.sectTaskDate = '1970-01-01';
-  ok(dailySectRollover(q, makeRng(5)) === true, '跨日触发任务刷新');
-  ok(q.sectTaskDate === dayKey() && q.sectTasks.every((t) => !t.claimed && t.progress === 0), '刷新后任务归零且日期更新');
+  // 跨月刷新：篡改周期键后 ensureSectTasks/dailySectRollover 应重置
+  q.sectTaskDate = '1970-01';
+  ok(dailySectRollover(q, makeRng(5)) === true, '跨月触发任务刷新');
+  ok(q.sectTaskDate === cycleKey() && q.sectTasks.every((t) => !t.claimed && t.progress === 0), '刷新后任务归零且周期键更新');
 }
 // 每日俸禄：按当前称号发放，每日仅一次
 {
@@ -441,7 +453,7 @@ console.log('— restToNextDay (once per day) —');
   ok(vitalityDepleted(q) === true, '活力为 0 时判定为耗尽');
   ok(restToNextDay(q) === true, '首次「闭关静修」成功');
   ok(q.vitality === q.maxVitality, '闭关后活力回满');
-  ok(q.restUsedDate === dayKey(), '记录当日已用');
+  ok(q.restUsedDate === cycleKey(), '记录当月已用');
   // 玩家再次把活力花光后，试图当日无限刷 —— 必须被守卫拒绝
   q.vitality = 0;
   ok(vitalityDepleted(q) === true, '再次耗尽');
@@ -695,6 +707,161 @@ try {
   playSfx('click');    // 开关切换/还原过程中均不抛错
 } catch (e) { sfxCrash = true; }
 ok(!sfxCrash, '音效模块在无 AudioContext 环境全程不抛异常');
+
+// ---------- 灵根三轴（等级 × 组合 × 属性）----------
+console.log('— spirit root axes —');
+ok(ROOT_GRADES.length === 5, '5 个等级档次（伪/人/地/天/异）');
+ok(ROOT_COUNTS.length === 5, '5 种组合（五/四/三/双/单）');
+ok(FIVE_ELEMENTS.length === 5 && MUTANT_ELEMENTS.length >= 3, '五行 5 + 异属性 >= 3');
+ok(rootCountDef('single').count === 1 && rootCountDef('five').count === 5, '组合数映射');
+ok(SPIRIT_ROOTS === ROOT_GRADES, 'SPIRIT_ROOTS 为 ROOT_GRADES 别名（向后兼容）');
+// rollRoot 自洽：天/异必单系；异必取异属性；伪必四/五系
+{
+  let tianSingle = true, yiMutant = true, pseudoMulti = true;
+  for (let i = 0; i < 300; i++) {
+    const root = rollRoot(makeRng(i));
+    const g = rootGradeDef(root.grade);
+    ok(root.els.length === rootCountDef(root.count).count, `rollRoot 属性数 = 组合数 (${i})`);
+    ok(root.els.every((e) => elDef(e)), `rollRoot 属性合法 (${i})`);
+    if (g.id === 'tian') tianSingle = tianSingle && root.count === 'single';
+    if (g.id === 'yi') yiMutant = yiMutant && root.count === 'single' && root.els.every((e) => MUTANT_ELEMENTS.some((m) => m.id === e));
+    if (g.id === 'pseudo') pseudoMulti = pseudoMulti && (root.count === 'five' || root.count === 'four');
+  }
+  ok(tianSingle, '天灵根必为单系');
+  ok(yiMutant, '异灵根必为单系且取异属性');
+  ok(pseudoMulti, '伪灵根必为四/五系');
+}
+// descriptor 数值
+{
+  const d = rootDescriptor({ grade: 'di', count: 'dual', els: ['metal', 'wood'] });
+  ok(near(d.mult, rootGradeDef('di').mult * rootCountDef('dual').focusMult), 'rootMult = grade.mult × count.focusMult');
+  ok(d.breakBonus === rootGradeDef('di').breakBonus, 'breakBonus 取自档次');
+  ok(/木/.test(d.elNames) && /金/.test(d.elNames), 'descriptor 含属性名');
+}
+// 契合度
+ok(rootAffinity({ els: ['wood'] }, 'wood') === ROOT_AFFINITY_MATCH, '契合：根含属性 → 加成');
+ok(rootAffinity({ els: ['wood'] }, 'fire') === 1, '不契合 → 中性');
+ok(rootAffinity({ els: [] }, 'wood') === 1, '无属性根 → 中性');
+ok(rootAffinity(null, 'wood') === 1, '无 root → 中性');
+// 旧版 rootId 迁移映射
+ok(rootFromLegacy('heaven').grade === 'tian', '旧 heaven → 新 tian');
+ok(rootFromLegacy('mutant').grade === 'yi', '旧 mutant → 新 yi');
+ok(rootFromLegacy('dual').count === 'dual', '旧 dual → 新 dual');
+
+// ---------- 灵根契合影响修炼与装备 ----------
+console.log('— root affinity effects —');
+{
+  // 木灵根 + 玄木功(木系) → 修炼倍率含契合加成
+  const q = newPlayer(() => 0);
+  q.root = { grade: 'di', count: 'dual', els: ['wood', 'water'] }; recompute(q);
+  q.techniques = [];
+  const base = cultivateSpeedMult(q);
+  q.techniques = ['gongfa_xuanmu']; recompute(q); // 木系功法，契合
+  const withMatch = cultivateSpeedMult(q);
+  ok(withMatch > base, '契合功法提升修炼速度');
+  // 雷灵根 + 同木系功法 → 不契合，无额外加成（低于契合态）
+  q.root = { grade: 'di', count: 'single', els: ['thunder'] }; recompute(q);
+  const noMatch = cultivateSpeedMult(q);
+  ok(noMatch < withMatch, '不契合时无契合加成（修炼倍率低于契合态）');
+}
+{
+  // 装备契合：金属灵根装备金属飞剑，攻击加成被契合度放大
+  const q = newPlayer(() => 0);
+  q.root = { grade: 'di', count: 'single', els: ['metal'] }; recompute(q);
+  addItem(q, 'fabao_feijian', 1); // 飞剑：金属
+  const atkBefore = q.atk;
+  equip(q, 'fabao_feijian');
+  const gainAff = q.atk - atkBefore;
+  // 木灵根装备同一金属飞剑：不契合，加成更小
+  const q2 = newPlayer(() => 0);
+  q2.root = { grade: 'di', count: 'single', els: ['wood'] }; recompute(q2);
+  const atkBefore2 = q2.atk;
+  q2.equipment = { weapon: 'fabao_feijian', armor: null }; recompute(q2);
+  const gainNoAff = q2.atk - atkBefore2;
+  ok(gainAff > gainNoAff, '契合法宝攻防加成大于不契合（效果不完全一致）');
+}
+
+// ---------- 每月周期 / 年龄 / 寿元 ----------
+console.log('— monthly cycle / age / lifespan —');
+ok(/^\d{4}-\d{2}$/.test(monthKey()), 'monthKey 格式 YYYY-MM');
+ok(cycleKey() === monthKey(), 'cycleKey 即 monthKey');
+ok(monthsBetween('2024-01', '2024-04') === 3, 'monthsBetween 同年 3 月');
+ok(monthsBetween('2023-12', '2025-02') === 14, 'monthsBetween 跨年 14 月');
+ok(monthsBetween('2024-05', '2024-01') === 0, 'monthsBetween 逆序兜底 0');
+// 寿元随境界递增；飞升无量寿
+{
+  let mono = true, prev = 0;
+  for (let t = 0; t < ASCEND_INDEX; t++) {
+    const ls = realmLifespan(t);
+    if (ls < prev) mono = false;
+    prev = ls;
+  }
+  ok(mono, '寿元随境界递增');
+  ok(realmLifespan(ASCEND_INDEX) === Infinity, '飞升无量寿');
+}
+// isDying / canReincarnate
+{
+  const q = newPlayer(() => 0);
+  ok(isDying(q) === false, '年少未到大限');
+  q.age = realmLifespan(q.tier);
+  ok(isDying(q) === true, '年龄达寿元 → 大限将至');
+  ok(canReincarnate(q) === true, '可轮回重修');
+  q.ascended = true;
+  ok(isDying(q) === false, '已飞升不判大限');
+}
+// rolloverVitality 跨月推进年龄 + 回满活力
+{
+  const q = newPlayer(() => 0);
+  const age0 = q.age;
+  q.lastVitalityDate = '1970-01'; q.lastAgeMonth = '1970-01'; // 模拟很久以前
+  const rolled = rolloverVitality(q);
+  ok(rolled === true, '跨月刷新活力');
+  ok(q.age > age0, '跨月后年龄增长');
+  ok(q.vitality === q.maxVitality, '活力回满');
+}
+
+// ---------- 轮回重修 ----------
+console.log('— reincarnation —');
+{
+  const q = newPlayer(() => 0);
+  q.root = { grade: 'tian', count: 'single', els: ['fire'] };
+  q.qiyun = 88;
+  q.talentIds = ['tal_wuxing', 'tal_tiegu'];
+  q.tier = 3; q.sub = 2; recompute(q); q.xp = 9999;
+  ok(canReincarnate(q) === false, '未到大限不可轮回');
+  ok(reincarnate(q, makeRng(1)) === false, '未到大限 reincarnate 返回 false');
+  q.age = realmLifespan(q.tier) + 10; // 大限
+  ok(canReincarnate(q) === true, '大限将至可轮回');
+  ok(reincarnate(q, makeRng(1)) === true, '轮回重修成功');
+  ok(q.reincarnations === 1, '轮回次数 +1');
+  ok(q.tier === 0 && q.sub === 0, '境界归零');
+  ok(q.xp === 0, '修为归零');
+  ok(q.reincarnationBonus === REINCARNATION_CULT_BONUS, '获得前世记忆修炼加成');
+  ok(q.root.grade === 'tian' && q.root.els.includes('fire'), '携带前世灵根档次与属性');
+  ok(q.qiyun === 88, '携带前世气运');
+  ok(q.talentIds.length === 1, '携带一项天赋');
+  ok(/（轮回）/.test(ageLabel(q)), '年龄标注（轮回）');
+  ok(q.age <= START_AGE_MAX, '年龄重置为年少');
+  ok(cultivateSpeedMult(q) > q.rootMult, '前世记忆使修炼倍率 > rootMult');
+  // 再度大限：已用尽轮回次数
+  q.age = realmLifespan(q.tier) + 10;
+  ok(canReincarnate(q) === false, '已轮回过，再无轮回次数');
+  ok(reincarnate(q, makeRng(2)) === false, '用尽轮回后 reincarnate 返回 false');
+}
+
+// ---------- 旧版存档迁移（rootId → 三轴灵根 + 年龄）----------
+console.log('— save migration (legacy rootId) —');
+{
+  const old = newPlayer(() => 0);
+  old.rootId = 'mutant';          // 旧版混轴 id
+  delete old.root; delete old.age; delete old.bornKey; delete old.lastAgeMonth;
+  delete old.reincarnations; delete old.reincarnationBonus;
+  const loaded = importSave(exportSave(old));
+  ok(loaded && loaded.root && loaded.root.grade === 'yi', '旧版 mutant 存档迁移为异灵根(yi)');
+  ok(Number.isFinite(loaded.age), '迁移补齐年龄');
+  ok(loaded.reincarnations === 0 && loaded.reincarnationBonus === 1, '迁移补齐 reincarnations/bonus');
+  ok(loaded.rootMult > 0, '迁移后 rootMult 有效');
+}
 
 console.log(`\n结果: ${pass} 通过, ${fail} 失败`);
 process.exit(fail ? 1 : 0);

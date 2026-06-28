@@ -66,11 +66,12 @@ export const TREASURE_SKILLS = {
 };
 
 // ── 功法（学习后被动生效，可叠加）─────────────────────────────────────────────
+// el：功法所属属性（金木水火土 / 风雷冰）。与灵根属性契合时修炼/突破额外加成。
 const TECHNIQUES = {
-  gongfa_changchun: { id: 'gongfa_changchun', name: '长春功',   type: 'technique', emoji: '📖', price: 180,  desc: '基础吐纳之法，修炼速度 +10%。', cultivate: 1.10, breakBonus: 0.00, atkPct: 0,    hpPct: 0    },
-  gongfa_xuanmu:    { id: 'gongfa_xuanmu',    name: '玄木功',   type: 'technique', emoji: '📖', price: 360,  desc: '木系功法，修炼 +15%、突破 +3%。', cultivate: 1.15, breakBonus: 0.03, atkPct: 0,    hpPct: 0.05 },
-  gongfa_leiting:   { id: 'gongfa_leiting',   name: '雷霆诀',   type: 'technique', emoji: '📖', price: 520,  desc: '雷系杀伐之术，攻击 +18%。',      cultivate: 1.00, breakBonus: 0.00, atkPct: 0.18, hpPct: 0    },
-  gongfa_taiyi:     { id: 'gongfa_taiyi',     name: '太乙仙诀', type: 'technique', emoji: '📜', price: 1500, desc: '顶级功法，修炼 +25%、突破 +5%。', cultivate: 1.25, breakBonus: 0.05, atkPct: 0.10, hpPct: 0.10 },
+  gongfa_changchun: { id: 'gongfa_changchun', name: '长春功',   type: 'technique', emoji: '📖', price: 180,  desc: '基础吐纳之法，修炼速度 +10%。',         cultivate: 1.10, breakBonus: 0.00, atkPct: 0,    hpPct: 0,    el: null      },
+  gongfa_xuanmu:    { id: 'gongfa_xuanmu',    name: '玄木功',   type: 'technique', emoji: '📖', price: 360,  desc: '木系功法，修炼 +15%、突破 +3%。',        cultivate: 1.15, breakBonus: 0.03, atkPct: 0,    hpPct: 0.05, el: 'wood'   },
+  gongfa_leiting:   { id: 'gongfa_leiting',   name: '雷霆诀',   type: 'technique', emoji: '📖', price: 520,  desc: '雷系杀伐之术，攻击 +18%。',             cultivate: 1.00, breakBonus: 0.00, atkPct: 0.18, hpPct: 0,    el: 'thunder' },
+  gongfa_taiyi:     { id: 'gongfa_taiyi',     name: '太乙仙诀', type: 'technique', emoji: '📜', price: 1500, desc: '顶级功法，修炼 +25%、突破 +5%。',       cultivate: 1.25, breakBonus: 0.05, atkPct: 0.10, hpPct: 0.10, el: null      },
 };
 
 // ── 杂物 ────────────────────────────────────────────────────────────────────

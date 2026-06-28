@@ -5,7 +5,7 @@
 // 称号提供的修炼加成通过懒注册注入 config.cultivateSpeedMult，避免 config↔sect 循环依赖
 // （沿用 config 对 items/techniques 的 _register 模式）。
 // ============================================================================
-import { dayKey, clamp, _registerSectBonus } from '../config.js';
+import { cycleKey, clamp, _registerSectBonus } from '../config.js';
 import { SECTS, SECT_TITLES, SECT_TASK_POOL, CHALLENGE_TEMPLATES, MAX_ACTIVE_CHALLENGES } from '../data/sect.js';
 import { addStones, addItemOrLog } from './player.js';
 
@@ -57,9 +57,9 @@ export function joinSect(player, sectId, rng) {
   if (!SECTS[sectId]) return false;
   player.sectId = sectId;
   if (!player.sectRep) player.sectRep = 0;
-  if (!Array.isArray(player.sectTasks) || player.sectTaskDate !== dayKey()) {
+  if (!Array.isArray(player.sectTasks) || player.sectTaskDate !== cycleKey()) {
     player.sectTasks = rollDailySectTasks(rng || Math.random);
-    player.sectTaskDate = dayKey();
+    player.sectTaskDate = cycleKey();
   }
   return true;
 }
@@ -85,7 +85,7 @@ export function rollDailySectTasks(rng) {
 // 跨日刷新宗门任务（在线挂机跨过零点时）。返回是否刷新了任务。
 export function dailySectRollover(player, rng) {
   if (!player || !player.sectId) return false;
-  const today = dayKey();
+  const today = cycleKey();
   if (player.sectTaskDate !== today) {
     player.sectTasks = rollDailySectTasks(rng || Math.random);
     player.sectTaskDate = today;
@@ -97,9 +97,9 @@ export function dailySectRollover(player, rng) {
 // 进入游戏 / 打开宗门页时确保任务就绪（已入宗但任务为空或日期过期则补齐）
 export function ensureSectTasks(player, rng) {
   if (!player || !player.sectId) return false;
-  if (!Array.isArray(player.sectTasks) || player.sectTaskDate !== dayKey()) {
+  if (!Array.isArray(player.sectTasks) || player.sectTaskDate !== cycleKey()) {
     player.sectTasks = rollDailySectTasks(rng || Math.random);
-    player.sectTaskDate = dayKey();
+    player.sectTaskDate = cycleKey();
     return true;
   }
   return false;
@@ -220,7 +220,7 @@ export function abandonChallenge(player, taskId) {
 
 // 今日是否已领宗门俸禄
 export function sectRewardClaimedToday(player) {
-  return !!(player && player.sectRewardDate === dayKey());
+  return !!(player && player.sectRewardDate === cycleKey());
 }
 
 // 领取每日宗门俸禄（按当前称号发放，每日一次）
@@ -236,6 +236,6 @@ export function claimDailySectReward(player) {
     const r = addItemOrLog(player, it.id, it.qty);
     logs.push(r.log);
   }
-  player.sectRewardDate = dayKey();
+  player.sectRewardDate = cycleKey();
   return { ok: true, title, logs };
 }

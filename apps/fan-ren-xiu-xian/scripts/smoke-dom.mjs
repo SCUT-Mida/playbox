@@ -136,11 +136,11 @@ ui.doActiveCultivate();
 await sleep(5);
 ok(ui.player.vitality === 100 - vitCost, `主动修炼消耗活力（剩 ${ui.player.vitality}）`);
 
-// ---------- 7b) 活力耗尽 → 顶部「进入次日」横幅 → 回满 ----------
+// ---------- 7b) 活力耗尽 → 顶部「进入次月」横幅 → 回满 ----------
 ui.player.vitality = 0;
 ui.renderPanel();
-ok(document.querySelector('.rest-banner') !== null, '活力耗尽时渲染「进入次日」横幅');
-ok(document.querySelector('.rest-btn') !== null, '横幅含「进入次日」按钮');
+ok(document.querySelector('.rest-banner') !== null, '活力耗尽时渲染「进入次月」横幅');
+ok(document.querySelector('.rest-btn') !== null, '横幅含「进入次月」按钮');
 document.querySelector('.rest-btn').click();
 await sleep(5);
 ok(ui.player.vitality === ui.player.maxVitality, `点击「进入次日」后活力回满（${ui.player.vitality}/${ui.player.maxVitality}）`);
@@ -227,8 +227,8 @@ ok(!renderErr, `七大功能页渲染无异常（${renderErr ? renderErr.message
   ok(!/散修/.test(subAfterJoin), `入宗后姓名下方不再显示散修（实际「${subAfterJoin}」）`);
   document.querySelector('.sheet__foot .btn-ghost').click();
   await sleep(5);
-  ok(/今日宗门任务/.test(document.querySelector('.content')?.textContent || ''), '入宗后展示今日宗门任务');
-  ok(/每日宗门俸禄/.test(document.querySelector('.content')?.textContent || ''), '入宗后展示每日俸禄');
+  ok(/本月宗门任务/.test(document.querySelector('.content')?.textContent || ''), '入宗后展示本月宗门任务');
+  ok(/每月宗门俸禄/.test(document.querySelector('.content')?.textContent || ''), '入宗后展示每月俸禄');
   // 领取记名弟子俸禄
   const rewardBtn = [...document.querySelectorAll('.content button')].find((b) => /领取俸禄/.test(b.textContent));
   ok(rewardBtn && !rewardBtn.disabled, '俸禄按钮可领取');
@@ -322,6 +322,41 @@ await sleep(5);
 document.querySelectorAll('.sheet__foot .btn-danger')[0]?.click(); // 确认删除
 await sleep(10);
 ok(document.querySelectorAll('.slot-card')[0].classList.contains('empty'), '删除后槽 1 变空');
+
+// ---------- 11) 年龄徽丸 + 大限将至 → 轮回重修 ----------
+// 重新建号，验证状态栏年龄徽丸、大限横幅、轮回重修全流程
+ui.destroy();
+await sleep(10);
+ui = createGame(document.getElementById('game-container'));
+watchToasts();
+await sleep(10);
+document.querySelectorAll('.slot-card')[0].querySelector('.btn-primary').click(); // 空槽 → 创角
+await sleep(10);
+ui.charName = '轮回人';
+document.querySelector('[data-id="name"]')?.dispatchEvent(new window.Event('input'));
+ui.confirmCreate();
+await sleep(10);
+// 状态栏含年龄徽丸，且创角档案/修炼页含灵根属性与年龄
+ok(/🕯️/.test(document.querySelector('.age-pill')?.textContent || ''), `状态栏渲染年龄徽丸（${document.querySelector('.age-pill')?.textContent}）`);
+ui.tab = 'cultivate'; ui.renderPanel();
+ok(/年龄/.test(document.querySelector('.content')?.textContent || ''), '修炼页展示年龄');
+ok(/灵根属性|属性：/.test(document.querySelector('.content')?.textContent || '') || /灵根 · /.test(document.querySelector('.content')?.textContent || ''), '修炼页展示灵根（含属性）');
+// 模拟大限将至：寿元耗尽 → 顶部出现轮回横幅
+ui.player.age = 9999; ui.player.tier = 0; ui.afterAction();
+await sleep(5);
+ok(document.querySelector('.death-banner') !== null, '大限将至时渲染轮回横幅');
+const lunhuiBtn = [...document.querySelectorAll('.death-banner button')].find((b) => /轮回重修/.test(b.textContent));
+ok(!!lunhuiBtn, '横幅含「轮回重修」按钮');
+lunhuiBtn.click();
+await sleep(10);
+// 确认弹窗 → 转世重修
+const confirmBtn = [...document.querySelectorAll('.sheet__foot button')].find((b) => /转世重修/.test(b.textContent));
+ok(!!confirmBtn, '弹出轮回确认弹窗');
+confirmBtn.click();
+await sleep(10);
+ok(ui.player.tier === 0 && ui.player.reincarnations === 1, `轮回后境界归零、轮回次数=1（tier=${ui.player.tier}）`);
+ok(/（轮回）/.test(document.querySelector('.age-pill')?.textContent || ''), `年龄徽丸标注（轮回）（${document.querySelector('.age-pill')?.textContent}）`);
+ok(document.querySelector('.death-banner') === null, '轮回后大限横幅消失（已重置年龄）');
 
 ui.destroy();
 console.log(`\n结果: ${pass} 通过, ${fail} 失败`);

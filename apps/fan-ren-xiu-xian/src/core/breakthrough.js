@@ -3,7 +3,7 @@
 // ============================================================================
 import { REALMS, ASCEND_INDEX, breakthroughChance, clamp } from '../config.js';
 import {
-  recompute, fullHeal, isXpFull, addXp, removeItem, hasItem, addStones,
+  recompute, fullHeal, isXpFull, addXp, xpOverflow, removeItem, hasItem, addStones,
   grantTitle, grantAchievement,
 } from './player.js';
 import { chance } from './rng.js';
@@ -182,10 +182,13 @@ export function trialRespond(trial, player, action, rng) {
 
 // 突破成功：晋升境界 + 奖励
 export function advanceRealm(player, target) {
+  // 先记下"满额之外"累积的修为（闭关溢出），晋升后结转至下一境界，不再清零浪费。
+  const carry = xpOverflow(player);
   player.tier = target.tier;
   player.sub = target.sub;
-  player.xp = 0;
   recompute(player);
+  // 结转溢出修为：新一境界同样允许溢出，故按上限兜底即可。
+  player.xp = Math.min(player.xpMax, Math.max(0, carry));
   fullHeal(player);
   player.stats.breakthroughs += 1;
   player.stats.breakthroughStreak += 1;

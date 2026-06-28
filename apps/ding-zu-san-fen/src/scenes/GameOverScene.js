@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { COLORS } from '../config.js';
-import { LEVELS } from '../data/levels.js';
+import { LEVELS, LEVEL_LIST } from '../data/levels.js';
 import { grantLevelClear } from '../data/meta.js';
 import audio from '../audio/Audio.js';
 
@@ -25,16 +25,22 @@ export default class GameOverScene extends Phaser.Scene {
       this.time.delayedCall(520, () => audio.play('coin'));
     }
 
-    // 半透明遮罩
+    // 半透明遮罩（拦截下层点击）
     const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.55);
     overlay.setDepth(90);
+    overlay.setInteractive();
 
     const win = result === 'win';
-    const panel = this.add.container(width / 2, height / 2);
-    panel.setDepth(91);
-
+    const cx = width / 2;
+    const cy = height / 2;
     const pw = 560;
-    const ph = 420;
+    const ph = 470;
+
+    // —— 结算面板（纯视觉，仅做入场动画；交互按钮独立置于其上）——
+    const panel = this.add.container(cx, cy);
+    panel.setDepth(91);
+    this._panel = panel;
+
     const g = this.add.graphics();
     g.fillStyle(0x4a3c2a, 1);
     g.fillRoundedRect(-pw / 2, -ph / 2, pw, ph, 18);
@@ -80,26 +86,6 @@ export default class GameOverScene extends Phaser.Scene {
       }).setOrigin(0.5));
     }
 
-    this._button(panel, -130, 90, 220, 64, '再 战 一 局', COLORS.gold, () => {
-      audio.play('click');
-      const levelKey = this.registry.get('levelKey');
-      this.scene.stop('GameOverScene');
-      this.scene.stop('UIScene');
-      // GameScene 此时处于 pause 态：直接 restart 暂停中的场景在某些情况下不会恢复 update，
-      // 故显式 stop（彻底关闭、清掉 pause 标记）后再以全新对局 start，
-      // 其 create() 会重新 launch UIScene。
-      this.scene.stop('GameScene');
-      this.scene.start('GameScene', { levelKey });
-    });
-
-    this._button(panel, 130, 90, 220, 64, '返回主菜单', 0x6b5a40, () => {
-      audio.play('click');
-      this.scene.stop('GameOverScene');
-      this.scene.stop('UIScene');
-      this.scene.stop('GameScene');
-      this.scene.start('MenuScene');
-    });
-
     panel.setScale(0.8);
     panel.setAlpha(0);
     this.tweens.add({
@@ -109,10 +95,86 @@ export default class GameOverScene extends Phaser.Scene {
       duration: 280,
       ease: 'Back.Out',
     });
+
+    // —— 操作按钮（场景级独立交互区，绝对坐标 + 深度高于遮罩）——
+    // 历史教训：把命中区作为面板(container)子节点、再对面板做 scale 入场补间时，
+    // 缩放期间命中区与可见按钮会错位，导致「点不到」。这里改用与 RosterScene /
+    // GachaScene 一致的可控写法：命中区是场景级独立对象、不随面板缩放，任意时刻点击都能命中。
+    this._btnZones = [];
+
+    if (win) {
+      // 是否存在下一关
+      const idx = LEVEL_LIST.indexOf(levelKey);
+      const hasNext = idx >= 0 && idx < LEVEL_LIST.length - 1;
+      if (hasNext) {
+        const nextLv = LEVELS[LEVEL_LIST[idx + 1]];
+        // 下一关名提示（面板局部坐标：位于奖励框与主按钮之间）
+        panel.add(this.add.text(0, 44, `下一战：${nextLv.name}`, {
+          fontFamily: '"PingFang SC",sans-serif', fontSize: '14px', color: '#cdb888',
+        }).setOrigin(0.5));
+        // 主按钮：进入下一关
+        this._mkButton(cx, cy + 92, 360, 64, '进 入 下 一 关', COLORS.gold, () => {
+          audio.play('click');
+          this._gotoLevel(LEVEL_LIST[idx + 1]);
+        });
+        // 次按钮：再战 / 返回
+        this._mkButton(cx - 120, cy + 172, 224, 58, '再 战 一 局', 0x6b5a40, () => {
+          audio.play('click');
+          this._gotoLevel(levelKey);
+        });
+        this._mkButton(cx + 120, cy + 172, 224, 58, '返回主菜单', 0x6b5a40, () => {
+          audio.play('click');
+          this._gotoMenu();
+        });
+      } else {
+        // 已是最后一关：再战 + 返回
+        this._mkButton(cx - 130, cy + 150, 220, 64, '再 战 一 局', COLORS.gold, () => {
+          audio.play('click');
+          this._gotoLevel(levelKey);
+        });
+        this._mkButton(cx + 130, cy + 150, 220, 64, '返回主菜单', 0x6b5a40, () => {
+          audio.play('click');
+          this._gotoMenu();
+        });
+      }
+    } else {
+      // 失败：再战 + 返回
+      this._mkButton(cx - 130, cy + 150, 220, 64, '再 战 一 局', COLORS.gold, () => {
+        audio.play('click');
+        this._gotoLevel(levelKey);
+      });
+      this._mkButton(cx + 130, cy + 150, 220, 64, '返回主菜单', 0x6b5a40, () => {
+        audio.play('click');
+        this._gotoMenu();
+      });
+    }
   }
 
-  _button(parent, x, y, w, h, label, color, onClick) {
-    const cont = this.add.container(x, y);
+  // 切换到指定关卡（全新对局）：彻底关闭三层场景后以 start 重建 GameScene
+  _gotoLevel(key) {
+    this.registry.set('levelKey', key);
+    this._teardown();
+    this.scene.start('GameScene', { levelKey: key });
+  }
+
+  _gotoMenu() {
+    this._teardown();
+    this.scene.start('MenuScene');
+  }
+
+  _teardown() {
+    if (this._btnZones) {
+      this._btnZones.forEach((z) => z.destroy());
+      this._btnZones = [];
+    }
+    this.scene.stop('GameOverScene');
+    this.scene.stop('UIScene');
+    this.scene.stop('GameScene');
+  }
+
+  // 绝对坐标按钮：视觉容器（无交互）+ 场景级命中区（深度 92，高于遮罩 90）
+  _mkButton(absX, absY, w, h, label, color, onClick) {
+    const cont = this.add.container(absX, absY).setDepth(92);
     const g = this.add.graphics();
     g.fillStyle(0x000000, 0.3);
     g.fillRoundedRect(-w / 2 + 2, -h / 2 + 3, w, h, 12);
@@ -127,19 +189,20 @@ export default class GameOverScene extends Phaser.Scene {
       color: '#2c2418',
       fontStyle: 'bold',
     }).setOrigin(0.5));
-    // 命中区作为 panel 的子节点：与按钮视觉共用同一变换（缩放/位移）。
-    // panel 入场时 scale 由 0.8 弹到 1（Back.Out），若命中区是独立的场景级对象，
-    // 它会固定在最终绝对坐标、而视觉随 panel 缩放移动，二者在动画期间错位，
-    // 玩家点到可见按钮却落空 → 「再战一局/返回主菜单」点不动。挂在 panel 下后
-    // 命中区始终贴着视觉中心，任意时刻点击都能命中。
-    const zone = this.add.zone(x, y, w, h).setInteractive({ useHandCursor: true });
+    cont.setAlpha(0);
+    this.tweens.add({ targets: cont, alpha: 1, duration: 200, delay: 160 });
+
+    const zone = this.add.zone(absX, absY, w, h)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(93);
     zone.on('pointerover', () => cont.setScale(1.04));
     zone.on('pointerout', () => cont.setScale(1));
-    zone.on('pointerdown', () => {
+    zone.on('pointerdown', (p) => {
+      p.event.stopPropagation();
       this.tweens.add({ targets: cont, scale: 0.94, duration: 70, yoyo: true });
       this.time.delayedCall(80, onClick);
     });
-    parent.add(cont);
-    parent.add(zone);
+    this._btnZones.push(zone);
+    return cont;
   }
 }

@@ -240,6 +240,337 @@ export const LEVELS = {
       [{ enemy: 'elephant', count: 2, interval: 3, start: 0 }, { enemy: 'shield', count: 8, interval: 1.2, start: 3 }, { enemy: 'warlock', count: 8, interval: 1.0, start: 6 }, { enemy: 'boss_menghuo', count: 1, interval: 1, start: 12 }],
     ],
   },
+
+  // —— 扩展关卡（补足三国历史脉络至 20 关，难度沿用 1~5 分级、按 LEVEL_LIST 顺序单调不降）——
+  // guangzong · 广宗之战（★1，黄巾主力，张角授首）
+  guangzong: {
+  key: 'guangzong',
+  name: '广宗之战',
+  subtitle: '黄巾主力 · 张角授首',
+  difficulty: 1,
+  startGold: 320,
+  startLives: 12,
+  bgTone: 0x3a3326,
+  path: [
+    [4, 0], [4, 3], [2, 3], [2, 7], [6, 7], [6, 10], [4, 10], [4, 13],
+  ],
+  roadSlots: [
+    4, 1, 4, 2, 2, 5, 2, 6, 4, 7, 6, 8, 6, 9, 4, 12,
+  ],
+  waves: [
+    [{ enemy: 'yellowturban', count: 8, interval: 1.1, start: 0 }],
+    [{ enemy: 'shu_soldier', count: 6, interval: 1.0, start: 0 }, { enemy: 'scout', count: 4, interval: 0.7, start: 2 }],
+    [{ enemy: 'cavalry', count: 4, interval: 1.4, start: 0 }, { enemy: 'yellowturban', count: 8, interval: 0.9, start: 2 }],
+    [{ enemy: 'warlock', count: 3, interval: 1.6, start: 0 }, { enemy: 'shu_soldier', count: 8, interval: 0.9, start: 2 }],
+    [{ enemy: 'cavalry', count: 6, interval: 1.0, start: 0 }, { enemy: 'scout', count: 8, interval: 0.5, start: 3 }],
+    [{ enemy: 'shield', count: 4, interval: 1.8, start: 0 }, { enemy: 'warlock', count: 3, interval: 1.4, start: 3 }, { enemy: 'boss_zhangjiao', count: 1, interval: 1, start: 8 }],
+  ],
+},
+
+// jieqiao · 界桥之战（★2，公孙瓒白马义从 vs 袁绍）
+jieqiao: {
+  key: 'jieqiao',
+  name: '界桥之战',
+  subtitle: '白马义从 · 弩阵交锋',
+  difficulty: 2,
+  startGold: 340,
+  startLives: 12,
+  bgTone: 0x38302a,
+  path: [
+    [1, 0], [1, 3], [7, 3], [7, 6], [3, 6], [3, 9], [6, 9], [6, 13],
+  ],
+  roadSlots: [
+    1, 1, 1, 2, 4, 3, 7, 4, 5, 6, 3, 7, 5, 9, 6, 12,
+  ],
+  waves: [
+    [{ enemy: 'yellowturban', count: 8, interval: 1.1, start: 0 }],
+    [{ enemy: 'shu_soldier', count: 8, interval: 1.0, start: 0 }, { enemy: 'scout', count: 4, interval: 0.7, start: 2 }],
+    [{ enemy: 'cavalry', count: 6, interval: 1.0, start: 0 }, { enemy: 'yellowturban', count: 6, interval: 0.8, start: 2 }],
+    [{ enemy: 'warlock', count: 4, interval: 1.4, start: 0 }, { enemy: 'scout', count: 6, interval: 0.6, start: 2 }],
+    [{ enemy: 'shield', count: 4, interval: 1.6, start: 0 }, { enemy: 'cavalry', count: 6, interval: 1.0, start: 3 }],
+    [{ enemy: 'warlock', count: 5, interval: 1.2, start: 0 }, { enemy: 'shu_soldier', count: 10, interval: 0.6, start: 2 }],
+    [{ enemy: 'shield', count: 5, interval: 1.4, start: 0 }, { enemy: 'cavalry', count: 5, interval: 1.2, start: 3 }, { enemy: 'elephant', count: 1, interval: 1, start: 7 }],
+  ],
+},
+
+// puyang · 濮阳之战（★3，曹操 vs 吕布，飞将逞威）
+puyang: {
+  key: 'puyang',
+  name: '濮阳之战',
+  subtitle: '飞将逞威 · 火夜突围',
+  difficulty: 3,
+  startGold: 380,
+  startLives: 12,
+  bgTone: 0x39302a,
+  path: [
+    [3, 0], [3, 2], [6, 2], [6, 5], [1, 5], [1, 8], [6, 8], [6, 11], [3, 11], [3, 13],
+  ],
+  roadSlots: [
+    3, 1, 6, 3, 4, 5, 2, 5, 1, 7, 3, 8, 6, 9, 4, 11, 3, 12,
+  ],
+  waves: [
+    [{ enemy: 'yellowturban', count: 10, interval: 0.9, start: 0 }],
+    [{ enemy: 'cavalry', count: 6, interval: 1.0, start: 0 }, { enemy: 'scout', count: 6, interval: 0.6, start: 2 }],
+    [{ enemy: 'shu_soldier', count: 10, interval: 0.8, start: 0 }, { enemy: 'warlock', count: 3, interval: 1.8, start: 3 }],
+    [{ enemy: 'shield', count: 5, interval: 1.6, start: 0 }, { enemy: 'cavalry', count: 6, interval: 1.0, start: 4 }],
+    [{ enemy: 'warlock', count: 5, interval: 1.2, start: 0 }, { enemy: 'scout', count: 10, interval: 0.5, start: 2 }],
+    [{ enemy: 'shaman', count: 2, interval: 2.0, start: 0 }, { enemy: 'cavalry', count: 8, interval: 0.8, start: 2 }, { enemy: 'shu_soldier', count: 8, interval: 0.7, start: 4 }],
+    [{ enemy: 'cavalry', count: 8, interval: 0.8, start: 0 }, { enemy: 'shield', count: 5, interval: 1.5, start: 3 }, { enemy: 'boss_lvbu', count: 1, interval: 1, start: 10 }],
+  ],
+},
+
+// shouchun · 寿春之战（★3，曹操刘备合讨僭越称帝的袁术）
+shouchun: {
+  key: 'shouchun',
+  name: '寿春之战',
+  subtitle: '仲家僭号 · 拔城讨逆',
+  difficulty: 3,
+  startGold: 390,
+  startLives: 12,
+  bgTone: 0x36302a,
+  path: [
+    [5, 0], [5, 3], [2, 3], [2, 6], [6, 6], [6, 9], [3, 9], [3, 13],
+  ],
+  roadSlots: [
+    5, 1, 4, 3, 2, 4, 4, 6, 6, 7, 5, 9, 3, 10, 3, 11, 3, 12,
+  ],
+  waves: [
+    [{ enemy: 'shu_soldier', count: 10, interval: 0.9, start: 0 }],
+    [{ enemy: 'cavalry', count: 6, interval: 1.0, start: 0 }, { enemy: 'scout', count: 6, interval: 0.6, start: 2 }],
+    [{ enemy: 'yellowturban', count: 10, interval: 0.8, start: 0 }, { enemy: 'warlock', count: 3, interval: 1.6, start: 3 }],
+    [{ enemy: 'shield', count: 5, interval: 1.6, start: 0 }, { enemy: 'cavalry', count: 6, interval: 1.0, start: 3 }],
+    [{ enemy: 'shaman', count: 2, interval: 2.0, start: 0 }, { enemy: 'shu_soldier', count: 10, interval: 0.7, start: 2 }],
+    [{ enemy: 'warlock', count: 5, interval: 1.2, start: 0 }, { enemy: 'cavalry', count: 8, interval: 0.8, start: 2 }, { enemy: 'scout', count: 8, interval: 0.5, start: 4 }],
+    [{ enemy: 'shield', count: 6, interval: 1.4, start: 0 }, { enemy: 'warlock', count: 4, interval: 1.4, start: 3 }, { enemy: 'boss_yuanshu', count: 1, interval: 1, start: 9 }],
+  ],
+},
+
+// cangting · 仓亭之战（★4，曹操再破袁绍余部）
+cangting: {
+  key: 'cangting',
+  name: '仓亭之战',
+  subtitle: '十面埋伏 · 袁氏覆灭',
+  difficulty: 4,
+  startGold: 400,
+  startLives: 12,
+  bgTone: 0x35302a,
+  path: [
+    [2, 0], [2, 2], [6, 2], [6, 4], [1, 4], [1, 7], [7, 7], [7, 10], [4, 10], [4, 13],
+  ],
+  roadSlots: [
+    2, 1, 4, 2, 6, 3, 1, 5, 3, 7, 7, 8, 6, 10, 4, 11,
+  ],
+  waves: [
+    [{ enemy: 'shu_soldier', count: 8, interval: 1.0, start: 0 }],
+    [{ enemy: 'cavalry', count: 6, interval: 1.0, start: 0 }, { enemy: 'scout', count: 6, interval: 0.6, start: 2 }],
+    [{ enemy: 'shield', count: 5, interval: 1.6, start: 0 }, { enemy: 'warlock', count: 4, interval: 1.4, start: 2 }],
+    [{ enemy: 'cavalry', count: 10, interval: 0.8, start: 0 }, { enemy: 'shu_soldier', count: 8, interval: 0.7, start: 4 }],
+    [{ enemy: 'warlock', count: 6, interval: 1.2, start: 0 }, { enemy: 'scout', count: 10, interval: 0.4, start: 2 }],
+    [{ enemy: 'shaman', count: 2, interval: 2.0, start: 0 }, { enemy: 'cavalry', count: 8, interval: 0.8, start: 3 }],
+    [{ enemy: 'shield', count: 6, interval: 1.3, start: 0 }, { enemy: 'warlock', count: 5, interval: 1.2, start: 3 }, { enemy: 'cavalry', count: 8, interval: 0.7, start: 6 }],
+    [{ enemy: 'shield', count: 7, interval: 1.3, start: 0 }, { enemy: 'warlock', count: 5, interval: 1.2, start: 3 }, { enemy: 'boss_yuanshao', count: 1, interval: 1, start: 11 }],
+  ],
+},
+
+// yecheng · 邺城之战（★4，曹操克邺、平定河北）
+yecheng: {
+  key: 'yecheng',
+  name: '邺城之战',
+  subtitle: '决水灌城 · 平定河北',
+  difficulty: 4,
+  startGold: 410,
+  startLives: 12,
+  bgTone: 0x352e26,
+  path: [
+    [4, 0], [4, 2], [1, 2], [1, 5], [7, 5], [7, 8], [2, 8], [2, 11], [5, 11], [5, 13],
+  ],
+  roadSlots: [
+    4, 1, 1, 3, 3, 5, 7, 6, 5, 8, 3, 8, 2, 9, 4, 11,
+  ],
+  waves: [
+    [{ enemy: 'cavalry', count: 8, interval: 0.9, start: 0 }],
+    [{ enemy: 'shu_soldier', count: 10, interval: 0.8, start: 0 }, { enemy: 'scout', count: 6, interval: 0.6, start: 2 }],
+    [{ enemy: 'shield', count: 5, interval: 1.5, start: 0 }, { enemy: 'warlock', count: 4, interval: 1.4, start: 2 }],
+    [{ enemy: 'cavalry', count: 8, interval: 0.8, start: 0 }, { enemy: 'shaman', count: 2, interval: 2.0, start: 3 }],
+    [{ enemy: 'warlock', count: 6, interval: 1.1, start: 0 }, { enemy: 'scout', count: 10, interval: 0.45, start: 2 }],
+    [{ enemy: 'shield', count: 6, interval: 1.2, start: 0 }, { enemy: 'cavalry', count: 8, interval: 0.8, start: 3 }],
+    [{ enemy: 'warlock', count: 6, interval: 1.0, start: 0 }, { enemy: 'shaman', count: 3, interval: 1.8, start: 3 }, { enemy: 'shu_soldier', count: 10, interval: 0.6, start: 6 }],
+    [{ enemy: 'cavalry', count: 10, interval: 0.8, start: 0 }, { enemy: 'shield', count: 6, interval: 1.3, start: 3 }, { enemy: 'boss_yuanshao', count: 1, interval: 1, start: 11 }],
+  ],
+},
+
+// jiangling · 江陵之战（★4，周瑜关羽鏖战曹仁）
+jiangling: {
+  key: 'jiangling',
+  name: '江陵之战',
+  subtitle: '鏖战江陵 · 曹仁坚守',
+  difficulty: 4,
+  startGold: 420,
+  startLives: 13,
+  bgTone: 0x342c26,
+  path: [
+    [3, 0], [3, 3], [6, 3], [6, 6], [1, 6], [1, 9], [6, 9], [6, 12], [3, 12], [3, 13],
+  ],
+  roadSlots: [
+    3, 1, 5, 3, 6, 4, 4, 6, 1, 7, 3, 9, 6, 10, 6, 11, 4, 12,
+  ],
+  waves: [
+    [{ enemy: 'cavalry', count: 10, interval: 0.8, start: 0 }],
+    [{ enemy: 'warlock', count: 5, interval: 1.0, start: 0 }, { enemy: 'scout', count: 8, interval: 0.5, start: 2 }],
+    [{ enemy: 'shield', count: 6, interval: 1.4, start: 0 }, { enemy: 'cavalry', count: 8, interval: 0.8, start: 3 }],
+    [{ enemy: 'shaman', count: 2, interval: 2.0, start: 0 }, { enemy: 'shu_soldier', count: 10, interval: 0.6, start: 2 }],
+    [{ enemy: 'warlock', count: 6, interval: 1.0, start: 0 }, { enemy: 'cavalry', count: 10, interval: 0.7, start: 2 }],
+    [{ enemy: 'shield', count: 6, interval: 1.2, start: 0 }, { enemy: 'scout', count: 12, interval: 0.4, start: 3 }],
+    [{ enemy: 'warlock', count: 6, interval: 1.0, start: 0 }, { enemy: 'shaman', count: 3, interval: 1.8, start: 3 }, { enemy: 'cavalry', count: 8, interval: 0.7, start: 6 }],
+    [{ enemy: 'cavalry', count: 10, interval: 0.7, start: 0 }, { enemy: 'shield', count: 6, interval: 1.3, start: 3 }, { enemy: 'boss_caofleet', count: 1, interval: 1, start: 11 }],
+  ],
+},
+
+// nanjun · 南郡之战（★5，周瑜力战曹仁，苦战经年）
+nanjun: {
+  key: 'nanjun',
+  name: '南郡之战',
+  subtitle: '苦战南郡 · 虎臣破城',
+  difficulty: 5,
+  startGold: 420,
+  startLives: 14,
+  bgTone: 0x332a2a,
+  path: [
+    [4, 0], [4, 2], [7, 2], [7, 5], [1, 5], [1, 9], [6, 9], [6, 12], [3, 12], [3, 13],
+  ],
+  roadSlots: [
+    4, 1, 6, 2, 7, 3, 5, 5, 1, 7, 1, 8, 3, 9, 6, 10, 6, 11,
+  ],
+  waves: [
+    [{ enemy: 'cavalry', count: 10, interval: 0.8, start: 0 }],
+    [{ enemy: 'warlock', count: 6, interval: 1.0, start: 0 }, { enemy: 'scout', count: 10, interval: 0.4, start: 2 }],
+    [{ enemy: 'shield', count: 6, interval: 1.4, start: 0 }, { enemy: 'cavalry', count: 10, interval: 0.7, start: 3 }],
+    [{ enemy: 'warlock', count: 8, interval: 0.9, start: 0 }, { enemy: 'shu_soldier', count: 12, interval: 0.5, start: 2 }],
+    [{ enemy: 'shield', count: 8, interval: 1.2, start: 0 }, { enemy: 'cavalry', count: 12, interval: 0.6, start: 3 }],
+    [{ enemy: 'warlock', count: 8, interval: 0.9, start: 0 }, { enemy: 'shaman', count: 3, interval: 1.8, start: 3 }, { enemy: 'scout', count: 12, interval: 0.4, start: 5 }],
+    [{ enemy: 'shield', count: 8, interval: 1.1, start: 0 }, { enemy: 'warlock', count: 6, interval: 1.0, start: 3 }, { enemy: 'cavalry', count: 10, interval: 0.6, start: 6 }],
+    [{ enemy: 'cavalry', count: 12, interval: 0.7, start: 0 }, { enemy: 'shield', count: 8, interval: 1.3, start: 3 }, { enemy: 'boss_caofleet', count: 1, interval: 1, start: 12 }],
+  ],
+},
+
+// tongguan · 潼关之战（★5，曹操割须弃袍，西凉锦马超）
+tongguan: {
+  key: 'tongguan',
+  name: '潼关之战',
+  subtitle: '割须弃袍 · 西凉铁骑',
+  difficulty: 5,
+  startGold: 430,
+  startLives: 14,
+  bgTone: 0x322a2a,
+  path: [
+    [1, 0], [1, 3], [7, 3], [7, 6], [2, 6], [2, 9], [6, 9], [6, 12], [4, 12], [4, 13],
+  ],
+  roadSlots: [
+    1, 1, 4, 3, 7, 4, 5, 6, 3, 6, 2, 7, 4, 9, 6, 10, 6, 11,
+  ],
+  waves: [
+    [{ enemy: 'cavalry', count: 12, interval: 0.7, start: 0 }],
+    [{ enemy: 'scout', count: 14, interval: 0.45, start: 0 }, { enemy: 'cavalry', count: 6, interval: 0.9, start: 2 }],
+    [{ enemy: 'shield', count: 6, interval: 1.2, start: 0 }, { enemy: 'cavalry', count: 10, interval: 0.7, start: 3 }],
+    [{ enemy: 'warlock', count: 8, interval: 0.9, start: 0 }, { enemy: 'scout', count: 12, interval: 0.4, start: 2 }],
+    [{ enemy: 'cavalry', count: 12, interval: 0.6, start: 0 }, { enemy: 'shu_soldier', count: 10, interval: 0.6, start: 3 }],
+    [{ enemy: 'shield', count: 8, interval: 1.1, start: 0 }, { enemy: 'warlock', count: 6, interval: 1.0, start: 3 }, { enemy: 'scout', count: 12, interval: 0.4, start: 5 }],
+    [{ enemy: 'cavalry', count: 12, interval: 0.6, start: 0 }, { enemy: 'shaman', count: 3, interval: 1.8, start: 3 }, { enemy: 'warlock', count: 6, interval: 1.0, start: 6 }],
+    [{ enemy: 'cavalry', count: 12, interval: 0.6, start: 0 }, { enemy: 'shield', count: 8, interval: 1.2, start: 3 }, { enemy: 'boss_machao', count: 1, interval: 1, start: 12 }],
+  ],
+},
+
+// hefei · 合肥之战（★5，张辽威震逍遥津）
+hefei: {
+  key: 'hefei',
+  name: '合肥之战',
+  subtitle: '威震逍遥 · 八百破十万',
+  difficulty: 5,
+  startGold: 430,
+  startLives: 14,
+  bgTone: 0x31292a,
+  path: [
+    [4, 0], [4, 3], [1, 3], [1, 7], [7, 7], [7, 10], [3, 10], [3, 13],
+  ],
+  roadSlots: [
+    4, 1, 3, 3, 1, 4, 3, 7, 5, 7, 7, 8, 5, 10, 3, 11, 3, 12,
+  ],
+  waves: [
+    [{ enemy: 'cavalry', count: 10, interval: 0.8, start: 0 }],
+    [{ enemy: 'warlock', count: 6, interval: 1.0, start: 0 }, { enemy: 'scout', count: 12, interval: 0.4, start: 2 }],
+    [{ enemy: 'shield', count: 8, interval: 1.2, start: 0 }, { enemy: 'cavalry', count: 10, interval: 0.7, start: 3 }],
+    [{ enemy: 'shu_soldier', count: 12, interval: 0.6, start: 0 }, { enemy: 'shaman', count: 3, interval: 1.8, start: 3 }],
+    [{ enemy: 'warlock', count: 8, interval: 0.9, start: 0 }, { enemy: 'cavalry', count: 12, interval: 0.6, start: 2 }],
+    [{ enemy: 'shield', count: 8, interval: 1.1, start: 0 }, { enemy: 'scout', count: 14, interval: 0.4, start: 3 }],
+    [{ enemy: 'warlock', count: 8, interval: 0.9, start: 0 }, { enemy: 'shaman', count: 3, interval: 1.6, start: 3 }, { enemy: 'cavalry', count: 10, interval: 0.6, start: 6 }],
+    [{ enemy: 'cavalry', count: 12, interval: 0.6, start: 0 }, { enemy: 'shield', count: 8, interval: 1.2, start: 3 }, { enemy: 'boss_sunquan', count: 1, interval: 1, start: 12 }],
+  ],
+},
+
+// dingjunshan · 定军山之战（★5，黄忠怒斩夏侯渊）
+dingjunshan: {
+  key: 'dingjunshan',
+  name: '定军山之战',
+  subtitle: '宝刀未老 · 怒斩夏侯',
+  difficulty: 5,
+  startGold: 440,
+  startLives: 14,
+  bgTone: 0x2f2c28,
+  path: [
+    [3, 0], [3, 2], [6, 2], [6, 5], [2, 5], [2, 8], [6, 8], [6, 11], [4, 11], [4, 13],
+  ],
+  roadSlots: [
+    3, 1, 5, 2, 6, 3, 4, 5, 2, 6, 4, 8, 6, 9, 6, 10, 5, 11,
+  ],
+  waves: [
+    [{ enemy: 'cavalry', count: 12, interval: 0.7, start: 0 }],
+    [{ enemy: 'warlock', count: 8, interval: 0.9, start: 0 }, { enemy: 'scout', count: 12, interval: 0.4, start: 2 }],
+    [{ enemy: 'shield', count: 8, interval: 1.1, start: 0 }, { enemy: 'shaman', count: 3, interval: 1.8, start: 3 }],
+    [{ enemy: 'elephant', count: 2, interval: 2.5, start: 0 }, { enemy: 'shu_soldier', count: 12, interval: 0.6, start: 2 }],
+    [{ enemy: 'warlock', count: 8, interval: 0.9, start: 0 }, { enemy: 'cavalry', count: 12, interval: 0.6, start: 2 }],
+    [{ enemy: 'shield', count: 8, interval: 1.1, start: 0 }, { enemy: 'warlock', count: 6, interval: 1.0, start: 3 }, { enemy: 'cavalry', count: 10, interval: 0.6, start: 6 }],
+    [{ enemy: 'cavalry', count: 12, interval: 0.6, start: 0 }, { enemy: 'shaman', count: 3, interval: 1.6, start: 3 }, { enemy: 'scout', count: 12, interval: 0.4, start: 6 }],
+    [{ enemy: 'elephant', count: 2, interval: 3, start: 0 }, { enemy: 'shield', count: 8, interval: 1.2, start: 3 }, { enemy: 'boss_caofleet', count: 1, interval: 1, start: 12 }],
+  ],
+},
+
+// yiling · 夷陵之战（★5，陆逊火烧连营七百里）
+yiling: {
+  key: 'yiling',
+  name: '夷陵之战',
+  subtitle: '火烧连营 · 七百里烟',
+  difficulty: 5,
+  startGold: 440,
+  startLives: 14,
+  bgTone: 0x302828,
+  path: [
+    [2, 0], [2, 3], [7, 3], [7, 6], [1, 6], [1, 9], [6, 9], [6, 12], [3, 12], [3, 13],
+  ],
+  roadSlots: [
+    2, 1, 4, 3, 6, 3, 7, 4, 5, 6, 3, 6, 1, 7, 3, 9, 6, 10, 6, 11,
+  ],
+  waves: [
+    [{ enemy: 'cavalry', count: 12, interval: 0.7, start: 0 }],
+    [{ enemy: 'warlock', count: 8, interval: 0.9, start: 0 }, { enemy: 'scout', count: 12, interval: 0.4, start: 2 }],
+    [{ enemy: 'shield', count: 8, interval: 1.1, start: 0 }, { enemy: 'cavalry', count: 12, interval: 0.6, start: 3 }],
+    [{ enemy: 'warlock', count: 10, interval: 0.8, start: 0 }, { enemy: 'shu_soldier', count: 12, interval: 0.5, start: 2 }],
+    [{ enemy: 'shaman', count: 3, interval: 1.8, start: 0 }, { enemy: 'cavalry', count: 12, interval: 0.6, start: 2 }],
+    [{ enemy: 'shield', count: 8, interval: 1.1, start: 0 }, { enemy: 'warlock', count: 8, interval: 1.0, start: 3 }, { enemy: 'scout', count: 12, interval: 0.4, start: 5 }],
+    [{ enemy: 'elephant', count: 2, interval: 2.5, start: 0 }, { enemy: 'cavalry', count: 12, interval: 0.6, start: 3 }, { enemy: 'warlock', count: 6, interval: 1.0, start: 6 }],
+    [{ enemy: 'cavalry', count: 12, interval: 0.6, start: 0 }, { enemy: 'shield', count: 8, interval: 1.2, start: 3 }, { enemy: 'boss_simayi', count: 1, interval: 1, start: 12 }],
+  ],
+  },
 };
 
-export const LEVEL_LIST = ['huangjin', 'sishui', 'hulao', 'xuzhou', 'guandu', 'changban', 'chibi', 'nanman'];
+export const LEVEL_LIST = [
+  // ★ ~ ★★ 入门
+  'huangjin', 'guangzong',
+  'sishui', 'jieqiao',
+  // ★★★ 进阶
+  'hulao', 'puyang', 'xuzhou', 'shouchun',
+  // ★★★★ 挑战
+  'guandu', 'cangting', 'yecheng', 'changban', 'jiangling',
+  // ★★★★★ 决战
+  'chibi', 'nanjun', 'tongguan', 'hefei', 'dingjunshan', 'yiling', 'nanman',
+];
+

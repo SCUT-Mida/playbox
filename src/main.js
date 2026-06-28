@@ -70,6 +70,16 @@ app.innerHTML = `
 
 // 渲染展品卡片
 const exhibitList = document.getElementById('exhibit-list')
+const prefetched = new Set()
+// 预取某展品的代码分片（动态 import 结果会被打包器缓存）：
+// 在玩家悬停/聚焦卡片时就后台拉取，等真正点击时 import() 已就绪，首屏近乎秒开。
+function prefetch(def) {
+  if (!def || prefetched.has(def.key)) return
+  prefetched.add(def.key)
+  // loader() 返回动态 import 的 Promise，其异步 rejection 无法被同步 try/catch 捕获，
+  // 必须用 .catch() 兜底，否则预取失败会变成 unhandled rejection。
+  def.loader().catch(() => { /* 预取失败不影响后续正常点击加载 */ })
+}
 for (const g of GAMES) {
   const card = document.createElement('article')
   card.className = 'card card--exhibit'
@@ -87,8 +97,15 @@ for (const g of GAMES) {
       <span class="play-btn__label">开始游戏</span>
     </button>
   `
+  // 悬停 / 聚焦 / 触摸开始时预取，缩短点击后的等待
+  card.addEventListener('pointerenter', () => prefetch(g), { once: true })
+  card.addEventListener('focusin', () => prefetch(g), { once: true })
+  card.addEventListener('touchstart', () => prefetch(g), { once: true, passive: true })
   exhibitList.appendChild(card)
 }
+// 不在首屏后一次性预取全部展品——那会拉取所有代码分片，实质抵消代码分割，
+// 并制造首屏后的带宽/内存峰值。改为只依赖上方「悬停 / 聚焦 / 触摸」这种用户意图驱动的预取，
+// 真正点击时再 import()（已有 loading 占位），分片按需加载。
 
 const overlay = document.getElementById('game-overlay')
 const mount = document.getElementById('game-mount')

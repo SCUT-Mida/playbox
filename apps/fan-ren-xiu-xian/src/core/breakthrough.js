@@ -7,6 +7,7 @@ import {
   grantTitle, grantAchievement,
 } from './player.js';
 import { chance } from './rng.js';
+import { recordSectActivity } from './sect.js';
 
 // 下一个突破目标；返回 null 表示已飞升（到顶）
 export function nextTarget(player) {
@@ -192,6 +193,7 @@ export function advanceRealm(player, target) {
   fullHeal(player);
   player.stats.breakthroughs += 1;
   player.stats.breakthroughStreak += 1;
+  recordSectActivity(player, 'breakthrough'); // 宗门任务：完成突破 +1
   // 奖励：灵石 + 偶得配方/称号
   const reward = Math.round(30 * (player.tier + 1) * (1 + player.sub * 0.3));
   addStones(player, reward);

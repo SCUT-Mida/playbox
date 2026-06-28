@@ -12,6 +12,7 @@ import {
   addStones, addXp, addItem, addItemOrLog, learnTechnique, learnRecipe, grantTitle,
   upgradeRoot, bagFull, removeItem, hasItem, effectiveQiyun,
 } from './player.js';
+import { recordSectActivity } from './sect.js';
 import { ITEMS } from '../data/items.js';
 
 // 执行一次探索：返回 { encounter, scene } 或 { error }
@@ -43,6 +44,7 @@ export function rollExplore(player, rng) {
   player.stats.exploreCount += 1;
   if (event.rare) player.pity.explore = 0;
   else player.pity.explore = pity + 1;
+  recordSectActivity(player, 'explore'); // 宗门任务：外出探索 +1
 
   return { encounter, scene, sceneName: SCENE_NAMES[scene] };
 }

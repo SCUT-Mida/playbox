@@ -2,6 +2,7 @@
 import {
   REALMS, SPIRIT_ROOTS, ASCEND_INDEX, globalLevel, fromGlobalLevel, xpNeeded, MAX_GLOBAL_LEVEL,
   passiveXpPerSec, breakthroughChance, computeDamage, counterMult, clamp,
+  cultivateSpeedMult,
   PITTY_THRESHOLD, PITTY_BOOST, dayKey,
 } from '../src/config.js';
 import { ITEMS, TREASURE_SKILLS } from '../src/data/items.js';
@@ -20,8 +21,14 @@ import {
   startMajorTrial, trialRespond, advanceRealm, failMajor,
 } from '../src/core/breakthrough.js';
 import { tryAlchemy, tryForge, hasMaterials, successRate } from '../src/core/alchemy.js';
-import { rollMarket, buyItem, sellItem, sellPrice } from '../src/core/market.js';
+import { rollMarket, buyItem, sellItem, sellPrice, shopBlurb, itemEffectText } from '../src/core/market.js';
 import { ACHIEVEMENTS, checkAchievements } from '../src/core/achievements.js';
+import { SECTS, SECT_TITLES, SECT_TASK_POOL } from '../src/data/sect.js';
+import {
+  joinSect, sectDef, currentSectTitle, nextSectTitle, titleProgress,
+  ensureSectTasks, dailySectRollover, recordSectActivity, claimSectTask, claimAllSectTasks,
+  claimDailySectReward, sectRewardClaimedToday, sectCultivateBonus, rollDailySectTasks,
+} from '../src/core/sect.js';
 import {
   hasSave, loadGame, saveGame, clearSave, exportSave, importSave, computeOffline, _setStorage,
 } from '../src/core/save.js';
@@ -259,6 +266,136 @@ const sp = sellPrice('herb_qingmu');
 ok(sp > 0, '出售价 > 0');
 const sl = sellItem(p, 'herb_qingmu', 1);
 ok(sl.ok && sl.gain === sp, '出售结算');
+
+// ---------- 坊市商品介绍 ----------
+console.log('— market blurb —');
+ok(typeof itemEffectText(ITEMS.pill_huitian) === 'string' && itemEffectText(ITEMS.pill_huitian).includes('40'), '回血丹效果文案含恢复量');
+ok(itemEffectText(ITEMS.fabao_feijian).includes('攻'), '法宝效果文案含攻击');
+ok(itemEffectText(ITEMS.gongfa_changchun).includes('修炼'), '功法效果文案含修炼');
+ok(typeof shopBlurb(ITEMS.pill_huitian) === 'string' && shopBlurb(ITEMS.pill_huitian).length > 0, 'shopBlurb 非空');
+// 每个货架条目都带「介绍文案 desc」
+{
+  const q = newPlayer(() => 0); q.stones = 9999;
+  const mk = rollMarket(q, makeRng(2));
+  ok(mk.entries.every((e) => typeof e.desc === 'string' && e.desc.length > 0), '货架商品均带介绍文案');
+  ok(mk.entries.every((e) => Number.isFinite(e.basePrice)), '货架商品均带基础价（涨跌提示用）');
+}
+
+// ---------- 宗门系统 ----------
+console.log('— sect —');
+ok(Object.keys(SECTS).length >= 3, '宗门数量 >= 3');
+ok(SECT_TITLES.length >= 5, '宗门称号阶 >= 5');
+ok(SECT_TASK_POOL.length >= 3, '宗门任务池 >= 3');
+// 称号门槛单调递增（境界/声望皆不降）
+{
+  let mono = true;
+  for (let i = 1; i < SECT_TITLES.length; i++) {
+    const a = SECT_TITLES[i - 1], b = SECT_TITLES[i];
+    if (b.minTier < a.minTier || b.minRep < a.minRep) mono = false;
+  }
+  ok(mono, '宗门称号门槛自下而上单调递增');
+}
+// 记名弟子门槛 0/0：未入宗门时无称号，入宗门即至少记名弟子
+{
+  const q = newPlayer(() => 0);
+  ok(currentSectTitle(q) === null, '未入宗门：无宗门称号');
+  ok(sectCultivateBonus(q) === 1, '未入宗门：修炼加成 = 1');
+  ok(joinSect(q, 'sect_qingyun', makeRng(1)) === true, '加入青云宗成功');
+  ok(q.sectId === 'sect_qingyun', 'sectId 已记录');
+  ok(Array.isArray(q.sectTasks) && q.sectTasks.length > 0, '入宗即生成当日任务');
+  const t = currentSectTitle(q);
+  ok(t && t.id === 'st_jiming', '凡人入宗即记名弟子');
+  ok(sectCultivateBonus(q) > 1, '入宗后修炼加成 > 1');
+}
+// 称号需「境界 + 声望」双达标：高声望但低境界仍卡在低阶
+{
+  const q = newPlayer(() => 0); joinSect(q, 'sect_qingyun', makeRng(1));
+  q.sectRep = 99999; // 声望爆表
+  ok(currentSectTitle(q).id === 'st_jiming', '凡人即便声望爆表，仍只是记名弟子（境界不足）');
+  q.tier = 2; // 筑基
+  ok(currentSectTitle(q).id === 'st_neimen', '筑基+高声望 → 内门弟子');
+  q.tier = 3;
+  ok(currentSectTitle(q).id === 'st_zhenchuan', '结丹+高声望 → 真传弟子');
+  ok(nextSectTitle(q) && nextSectTitle(q).id === 'st_zhanglao', '下一阶为护法长老');
+  // 到顶
+  q.tier = 9;
+  ok(nextSectTitle(q) === null && currentSectTitle(q).id === 'st_zongzhu', '飞升+满声望 → 一代宗主（到顶）');
+}
+// 活动上报推进任务 + 领取声望
+{
+  const q = newPlayer(() => 0); joinSect(q, 'sect_danxia', makeRng(0));
+  // 制造一个 cultivate 任务并灌满
+  const ct = q.sectTasks.find((t) => t.type === 'cultivate');
+  if (ct) {
+    ok(recordSectActivity(q, 'cultivate', ct.goal) === true, '上报修炼活动推进任务');
+    ok(ct.progress === ct.goal, '任务进度已满');
+    ok(recordSectActivity(q, 'cultivate', 10) === true, '超额上报被钳制（仍返回 changed）');
+    ok(ct.progress === ct.goal, '进度不超 goal');
+    const r = claimSectTask(q, ct.id);
+    ok(r.ok === true && r.rep > 0, '领取任务奖励得声望');
+    ok(ct.claimed === true, '任务标记已领');
+    ok(claimSectTask(q, ct.id).ok === false, '重复领取被拒');
+  }
+  // 未达标任务不可领
+  const other = q.sectTasks.find((t) => !t.claimed);
+  if (other) ok(claimSectTask(q, other.id).ok === false, '未完成任务不可领取');
+}
+// 各系统真正上报活动（接入回归）
+{
+  const q = newPlayer(() => 0); joinSect(q, 'sect_qingyun', makeRng(3));
+  // 强制保证存在一个修炼任务，使断言确定而非依赖随机抽取
+  q.sectTasks = [{ id: 't_cultivate', type: 'cultivate', label: '吐纳修行', emoji: '🧘', verb: '完成主动修炼', goal: 6, rep: 15, progress: 0, claimed: false }];
+  q.tier = 1; recompute(q); q.mp = q.maxMp; q.hp = q.maxHp; q.vitality = q.maxVitality;
+  activeCultivate(q, () => 0.9); // 主动修炼应上报 cultivate
+  ok(q.sectTasks[0].progress === 1, '主动修炼推进宗门修炼任务');
+}
+{
+  const q = newPlayer(() => 0); joinSect(q, 'sect_wanjian', makeRng(4));
+  q.sectTasks = [{ id: 't_breakthrough', type: 'breakthrough', label: '冲破瓶颈', emoji: '🌟', verb: '完成突破', goal: 1, rep: 35, progress: 0, claimed: false }];
+  q.tier = 1; recompute(q); q.xp = q.xpMax; q.hp = q.maxHp;
+  // 凡人→炼气为无考验的小境界突破；极低 rng 下 success 判定通过，触发 advanceRealm
+  for (let i = 0; i < 50 && q.sectTasks[0].progress === 0; i++) {
+    const r = attemptMinorBreakthrough(q, false, () => 0.0);
+    if (!r.success) q.xp = q.xpMax; // 失败后补满再试
+  }
+  ok(q.sectTasks[0].progress === 1, '突破成功推进宗门突破任务');
+}
+// 一键领取 + 跨日刷新
+{
+  const q = newPlayer(() => 0); joinSect(q, 'sect_qingyun', makeRng(2));
+  for (const t of q.sectTasks) t.progress = t.goal; // 全部灌满
+  const all = claimAllSectTasks(q);
+  ok(all.ok && all.count === q.sectTasks.length && all.rep > 0, '一键领取全部已完成任务');
+  ok(q.sectTasks.every((t) => t.claimed), '全部任务标记已领');
+  // 跨日刷新：篡改日期后 ensureSectTasks/dailySectRollover 应重置
+  q.sectTaskDate = '1970-01-01';
+  ok(dailySectRollover(q, makeRng(5)) === true, '跨日触发任务刷新');
+  ok(q.sectTaskDate === dayKey() && q.sectTasks.every((t) => !t.claimed && t.progress === 0), '刷新后任务归零且日期更新');
+}
+// 每日俸禄：按当前称号发放，每日仅一次
+{
+  const q = newPlayer(() => 0); joinSect(q, 'sect_qingyun', makeRng(6));
+  ok(sectRewardClaimedToday(q) === false, '入宗当日尚未领俸禄');
+  const r = claimDailySectReward(q);
+  ok(r.ok === true && r.title.id === 'st_jiming', '领取记名弟子俸禄');
+  ok(sectRewardClaimedToday(q) === true, '领取后标记当日已领');
+  ok(claimDailySectReward(q).ok === false, '当日二次领取被拒');
+}
+// 宗门修炼加成已注入 cultivateSpeedMult（懒注册链路回归）
+{
+  const q = newPlayer(() => 0);
+  const before = cultivateSpeedMult(q);
+  joinSect(q, 'sect_qingyun', makeRng(7));
+  recompute(q);
+  ok(cultivateSpeedMult(q) > before, '入宗后 cultivateSpeedMult 提升（懒注册生效）');
+}
+// 转宗保留声望
+{
+  const q = newPlayer(() => 0); joinSect(q, 'sect_qingyun', makeRng(1));
+  q.sectRep = 300;
+  joinSect(q, 'sect_wanjian', makeRng(1));
+  ok(q.sectId === 'sect_wanjian' && q.sectRep === 300, '转宗保留声望');
+}
 
 // ---------- 成就 ----------
 console.log('— achievements —');

@@ -200,6 +200,12 @@ function migrate(player) {
   if (player.maxVitality == null) player.maxVitality = vitalityMax(player);
   if (!player.lastVitalityDate) player.lastVitalityDate = '';
   if (!player.restUsedDate) player.restUsedDate = '';
+  // v3：宗门系统（未入宗门时 sectId 保持 null）
+  if (player.sectId == null) player.sectId = null;
+  if (player.sectRep == null) player.sectRep = 0;
+  if (!Array.isArray(player.sectTasks)) player.sectTasks = [];
+  if (!player.sectTaskDate) player.sectTaskDate = '';
+  if (!player.sectRewardDate) player.sectRewardDate = '';
   if (player.slot == null) player.slot = 1;
   return player;
 }

@@ -5,6 +5,7 @@ import { clamp } from '../config.js';
 import { ALCHEMY_RECIPES, FORGE_BLUEPRINTS, RECIPE_BY_ID } from '../data/recipes.js';
 import { ITEMS } from '../data/items.js';
 import { removeItem, hasItem, addItemOrLog, addStones, grantAchievement, countItem, talentAlchemyBonus } from './player.js';
+import { recordSectActivity } from './sect.js';
 import { chance } from './rng.js';
 
 // 是否拥有配方所需全部材料
@@ -46,6 +47,7 @@ export function tryAlchemy(player, recipeId, rng) {
   if (r < 0.2) { quality = 'low'; qty = 1; }
   else if (r > 0.8) { quality = 'high'; qty = 2; }
   player.stats.alchemyOk += 1;
+  recordSectActivity(player, 'craft'); // 宗门任务：成功炼丹 +1
   const { added, log: addLog } = addItemOrLog(player, recipe.out, qty);
   const name = ITEMS[recipe.out] ? ITEMS[recipe.out].name : recipe.out;
   // 背包满且为新种类时产物无法入袋：提示遗失，避免“成功炼制 0 ×”的静默丢物
@@ -75,6 +77,7 @@ export function tryForge(player, blueprintId, rng) {
   }
   const r = (rng || Math.random)();
   const quality = r > 0.8 ? 'high' : r < 0.2 ? 'low' : 'normal';
+  recordSectActivity(player, 'craft'); // 宗门任务：成功炼器 +1
   const { added, log: addLog } = addItemOrLog(player, bp.out, 1);
   const name = ITEMS[bp.out] ? ITEMS[bp.out].name : bp.out;
   // 背包满且为新种类时法宝无法入袋：提示遗失，避免“神兵出炉”却凭空消失

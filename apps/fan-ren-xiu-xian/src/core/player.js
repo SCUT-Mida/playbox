@@ -62,7 +62,7 @@ export function newPlayer(rng, template) {
   const root = rootDef(t.rootId);
   const bg = BACKGROUNDS[t.bgId] || BACKGROUND_LIST[0];
   const player = {
-    v: 2,
+    v: 3,
     slot: t.slot || 1,
     gender: t.gender || 'male',
     name: t.name || '',
@@ -88,6 +88,12 @@ export function newPlayer(rng, template) {
     maxVitality: MAX_VITALITY,
     lastVitalityDate: '',
     restUsedDate: '',       // 「闭关静修」兜底上次使用的日期键（每日仅一次）
+    // 宗门系统（v3）：未入宗门时 sectId=null，相关字段保持空值
+    sectId: null,
+    sectRep: 0,
+    sectTasks: [],
+    sectTaskDate: '',
+    sectRewardDate: '',
     stats: { battlesWon: 0, breakthroughs: 0, alchemyFails: 0, alchemyOk: 0, lowHpWins: 0, breakthroughStreak: 0, exploreCount: 0, deaths: 0 },
     createdAt: nowSec(),
     lastSeen: 0,

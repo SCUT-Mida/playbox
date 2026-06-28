@@ -71,6 +71,7 @@ export function itemEffectText(def) {
   if (def.type === 'pill') {
     if (def.effect && def.effect.kind === 'heal_hp') return `（恢复 ${Math.round(def.effect.pct * 100)}% 气血）`;
     if (def.effect && def.effect.kind === 'heal_mp') return `（恢复 ${Math.round(def.effect.pct * 100)}% 灵力）`;
+    if (def.effect && def.effect.kind === 'restore_vitality') return `（回复 ${def.effect.amount} 点活力）`;
     if (def.role === 'break_boost') return '（突破时服，成功率 +20%）';
     return '';
   }

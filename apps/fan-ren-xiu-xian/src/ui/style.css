@@ -439,3 +439,14 @@
 .frxx .sect-task .bar { margin-top: 0.35rem; height: 12px; }
 .frxx .sect-task.claimed { opacity: 0.55; }
 .frxx .sect-task .emo { font-size: 1.3rem; flex: none; }
+
+/* —— 道友（NPC）—— */
+.frxx .npc-card .nm { font-weight: 600; color: var(--text); }
+.frxx .npc-aff { margin-top: 0.4rem; }
+.frxx .gift-item { /* 与 .item 同源，额外标记喜好 */ }
+.frxx .gift-item.liked { border-color: var(--jade); box-shadow: 0 0 0 1px rgba(95,208,160,0.4); }
+.frxx .gift-item .tag { position: absolute; top: 2px; left: 4px; font-size: 0.6rem; color: #06241a; background: var(--jade); border-radius: 4px; padding: 0 3px; font-weight: 600; }
+
+/* 7 个 Tab 时收紧一点，保证图标+双字标签不挤压 */
+.frxx .tab-bar .tab { padding: 0.28rem 0; }
+.frxx .tab-bar .tab .ic { font-size: 1.1rem; }

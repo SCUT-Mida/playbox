@@ -94,6 +94,8 @@ export function newPlayer(rng, template) {
     sectTasks: [],
     sectTaskDate: '',
     sectRewardDate: '',
+    challengeTasks: [],     // 悬赏挑战（v4）：自主领取，难度随境界缩放
+    npcs: {},               // 道友系统（v4）：npcId → { met, aff, teamedDate }
     stats: { battlesWon: 0, breakthroughs: 0, alchemyFails: 0, alchemyOk: 0, lowHpWins: 0, breakthroughStreak: 0, exploreCount: 0, deaths: 0 },
     createdAt: nowSec(),
     lastSeen: 0,

@@ -206,6 +206,9 @@ function migrate(player) {
   if (!Array.isArray(player.sectTasks)) player.sectTasks = [];
   if (!player.sectTaskDate) player.sectTaskDate = '';
   if (!player.sectRewardDate) player.sectRewardDate = '';
+  // v4：悬赏挑战 + 道友（NPC）系统
+  if (!Array.isArray(player.challengeTasks)) player.challengeTasks = [];
+  if (!player.npcs || typeof player.npcs !== 'object') player.npcs = {};
   if (player.slot == null) player.slot = 1;
   return player;
 }

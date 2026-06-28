@@ -23,12 +23,19 @@ import {
 import { tryAlchemy, tryForge, hasMaterials, successRate } from '../src/core/alchemy.js';
 import { rollMarket, buyItem, sellItem, sellPrice, shopBlurb, itemEffectText } from '../src/core/market.js';
 import { ACHIEVEMENTS, checkAchievements } from '../src/core/achievements.js';
-import { SECTS, SECT_TITLES, SECT_TASK_POOL } from '../src/data/sect.js';
+import { SECTS, SECT_LIST, SECT_TITLES, SECT_TASK_POOL, CHALLENGE_TEMPLATES, MAX_ACTIVE_CHALLENGES } from '../src/data/sect.js';
 import {
   joinSect, sectDef, currentSectTitle, nextSectTitle, titleProgress,
   ensureSectTasks, dailySectRollover, recordSectActivity, claimSectTask, claimAllSectTasks,
   claimDailySectReward, sectRewardClaimedToday, sectCultivateBonus, rollDailySectTasks,
+  acceptChallenge, claimChallenge, abandonChallenge, activeChallengeCount, scaleChallenge,
 } from '../src/core/sect.js';
+import { NPC_LIST, NPCS, npcDef, affinityLevel, TEAM_AFFINITY_THRESHOLD, MEET_VITALITY_COST, TEAM_VITALITY_COST } from '../src/data/npcs.js';
+import {
+  meetNpc, giftNpc, canTeamUp, teamedToday, teamExplore,
+  meetableNpcs, metNpcs, getAffinity, isMet, companionCultivateBonus,
+} from '../src/core/npc.js';
+import { playSfx, isSfxEnabled, setSfxEnabled } from '../src/core/sfx.js';
 import {
   hasSave, loadGame, saveGame, clearSave, exportSave, importSave, computeOffline, _setStorage,
 } from '../src/core/save.js';
@@ -509,6 +516,168 @@ ok(REALMS[7].subs.length >= 4, '合体期子层 >= 4');
 ok(REALMS[8].subs.length >= 4, '大乘期子层 >= 4');
 // 子层扩张后，全局等级映射仍自洽：每个境界末位 +1 恰为下一境界首位
 ok(globalLevel(2, REALMS[2].subs.length - 1) + 1 === globalLevel(3, 0), '筑基末位 +1 = 结丹首位（映射自洽）');
+
+// ---------- 商店活力回复商品 ----------
+console.log('— vitality pills —');
+ok(ITEMS.pill_peiyuan && ITEMS.pill_peiyuan.effect.kind === 'restore_vitality', '培元丹：回复活力效果');
+ok(ITEMS.pill_lingjiu && ITEMS.pill_lingjiu.effect.amount === 60, '百草灵酒：回复 60 活力');
+ok(ITEMS.pill_xiancha && ITEMS.pill_xiancha.effect.amount === 100, '玉髓仙茶：回复 100 活力');
+ok(itemEffectText(ITEMS.pill_peiyuan).includes('活力'), '活力丹效果文案含「活力」');
+// 坊市会随机上架活力丹（属 PILL_LIST）
+{
+  const seen = new Set();
+  for (let i = 0; i < 50; i++) {
+    const q = newPlayer(() => 0); q.stones = 9999;
+    for (const e of rollMarket(q, makeRng(i)).entries) seen.add(e.id);
+  }
+  ok(['pill_peiyuan', 'pill_lingjiu', 'pill_xiancha'].some((id) => seen.has(id)), '坊市多次刷新会出现活力丹');
+}
+
+// ---------- 宗门扩充至 10+ ----------
+console.log('— sects (10+) —');
+ok(Object.keys(SECTS).length >= 10, `宗门数量 >= 10（实际 ${Object.keys(SECTS).length}）`);
+ok(SECT_LIST.length === Object.keys(SECTS).length, 'SECT_LIST 与 SECTS 数量一致');
+// 每个宗门字段完整且 cultMult 合理
+for (const s of Object.values(SECTS)) {
+  ok(typeof s.name === 'string' && typeof s.emoji === 'string' && s.cultMult >= 1, `${s.id}: 字段完整`);
+}
+// 每日宗门任务增至 5 个
+{
+  const q = newPlayer(() => 0); joinSect(q, 'sect_qingyun', makeRng(1));
+  ok((q.sectTasks || []).length === Math.min(5, SECT_TASK_POOL.length), `每日宗门任务抽 5 个（实际 ${q.sectTasks.length}）`);
+}
+
+// ---------- 悬赏挑战（自主领取，难度随境界）----------
+console.log('— sect challenges —');
+ok(CHALLENGE_TEMPLATES.length >= 4, '挑战模板 >= 4');
+ok(MAX_ACTIVE_CHALLENGES >= 1, '挑战上限常量存在');
+// 缩放：境界越高，目标与奖励越大
+{
+  const lo = scaleChallenge(CHALLENGE_TEMPLATES[0], 0);
+  const hi = scaleChallenge(CHALLENGE_TEMPLATES[0], 6);
+  ok(hi.goal >= lo.goal && hi.rep > lo.rep && hi.stones > lo.stones, '挑战随境界放大（目标/声望/灵石）');
+}
+// 未入宗门不可接取
+{
+  const q = newPlayer(() => 0);
+  ok(acceptChallenge(q, makeRng(0)).ok === false, '未入宗门不可接取挑战');
+}
+// 接取 → 上报推进 → 领取（声望+灵石）；超上限拒绝
+{
+  const q = newPlayer(() => 0); joinSect(q, 'sect_qingyun', makeRng(2));
+  q.stones = 0;
+  const a = acceptChallenge(q, makeRng(0));
+  ok(a.ok === true && activeChallengeCount(q) === 1, '接取一项挑战');
+  const ch = q.challengeTasks[0];
+  // 上报对应活动推进挑战（与每日任务共用 recordSectActivity）
+  recordSectActivity(q, ch.type, ch.goal);
+  ok(ch.progress === ch.goal, '上报活动推进挑战进度');
+  const c = claimChallenge(q, ch.id);
+  ok(c.ok === true && c.stones > 0 && q.stones === c.stones, '领取挑战得灵石');
+  ok(activeChallengeCount(q) === 0, '领取后挑战从列表移除');
+  // 未完成不可领
+  const a2 = acceptChallenge(q, makeRng(1)); ok(a2.ok, '再次接取');
+  ok(claimChallenge(q, a2.task.id).ok === false, '未完成挑战不可领取');
+  ok(abandonChallenge(q, a2.task.id) === true && activeChallengeCount(q) === 0, '放弃挑战成功');
+  // 上限守卫
+  acceptChallenge(q, makeRng(2)); acceptChallenge(q, makeRng(3));
+  ok(activeChallengeCount(q) === MAX_ACTIVE_CHALLENGES, `接取至上限 ${MAX_ACTIVE_CHALLENGES}`);
+  ok(acceptChallenge(q, makeRng(4)).ok === false, '超过上限拒绝接取');
+}
+
+// ---------- NPC 好感度系统 ----------
+console.log('— npc affinity —');
+ok(NPC_LIST.length >= 6, `NPC 数量 >= 6（实际 ${NPC_LIST.length}）`);
+// 未结识：无道友，加成 1
+{
+  const q = newPlayer(() => 0);
+  ok(metNpcs(q).length === 0, '初始未结识任何道友');
+  ok(companionCultivateBonus(q) === 1, '无道友时修炼加成 = 1');
+  ok(meetableNpcs(q).length > 0, '凡人期也有可结识道友');
+}
+// 寻访结识（消耗活力）
+{
+  const q = newPlayer(() => 0); q.vitality = q.maxVitality;
+  const before = q.vitality;
+  const r = meetNpc(q, makeRng(1));
+  ok(r.ok === true && r.npc, '寻访结识一位道友');
+  ok(q.vitality === before - MEET_VITALITY_COST, '寻访消耗活力');
+  ok(isMet(q, r.npc.id) && getAffinity(q, r.npc.id) > 0, '结识后标记 met 且有初始好感');
+  ok(metNpcs(q).length === 1, '已结识列表 +1');
+  // 活力不足不可寻访
+  q.vitality = 0;
+  ok(meetNpc(q, makeRng(2)).ok === false, '活力不足不可寻访');
+}
+// 赠礼提升好感（喜好物增益更高）
+{
+  const q = newPlayer(() => 0); q.vitality = q.maxVitality;
+  const m = meetNpc(q, makeRng(3));
+  const npc = m.npc;
+  addItem(q, npc.liked, 3);
+  addItem(q, 'herb_qingmu', 3);
+  const aff0 = getAffinity(q, npc.id);
+  const liked = giftNpc(q, npc.id, npc.liked, makeRng(0));
+  const aff1 = getAffinity(q, npc.id);
+  ok(liked.ok && liked.liked === true && aff1 > aff0, '赠喜好物提升好感');
+  ok(countItem(q, npc.liked) === 2, '赠礼消耗 1 件物品');
+  const plain = giftNpc(q, npc.id, 'herb_qingmu', makeRng(0));
+  const aff2 = getAffinity(q, npc.id);
+  ok(plain.ok && aff2 > aff1, '赠普通物也提升好感');
+  // 好感等级递进
+  ok(affinityLevel(0).id === 'af0' && affinityLevel(50).min <= 50, '好感等级映射');
+}
+// 高好感道友提供修炼加成（懒注入 cultivateSpeedMult）
+{
+  const q = newPlayer(() => 0); q.vitality = q.maxVitality;
+  const before = cultivateSpeedMult(q);
+  const m = meetNpc(q, makeRng(4));
+  // 灌注好感至「莫逆之交」(>=80)
+  q.npcs[m.npc.id].aff = 90;
+  recompute(q);
+  ok(companionCultivateBonus(q) > 1, '莫逆之交道友提供修炼加成');
+  ok(cultivateSpeedMult(q) > before, '高好感道友使 cultivateSpeedMult 提升（懒注册生效）');
+}
+
+// ---------- NPC 组队探险 ----------
+console.log('— npc team explore —');
+{
+  const q = newPlayer(() => 0); q.tier = 2; recompute(q);
+  q.hp = q.maxHp; q.mp = q.maxMp; q.vitality = q.maxVitality;
+  // 好感不足不可组队
+  const m = meetNpc(q, makeRng(5));
+  ok(canTeamUp(q, m.npc.id) === false, '好感不足时不可组队');
+  ok(teamExplore(q, m.npc.id, makeRng(0)).error, '好感不足组队被拒');
+  // 提升好感至可组队
+  q.npcs[m.npc.id].aff = TEAM_AFFINITY_THRESHOLD;
+  ok(canTeamUp(q, m.npc.id) === true, '好感达标可组队');
+  const vit0 = q.vitality; const mp0 = q.mp;
+  const res = teamExplore(q, m.npc.id, makeRng(1));
+  ok(!res.error && res.encounter && res.encounter.kind === 'instant', '组队探险返回 instant 事件');
+  ok(q.vitality === vit0 - TEAM_VITALITY_COST, '组队消耗活力');
+  ok(q.mp < mp0, '组队消耗灵力');
+  // 奖励更丰盛：结算后灵石/修为增加
+  const stonesBefore = q.stones; const xpBefore = q.xp;
+  applyReward(q, res.encounter.result, makeRng(0));
+  ok(q.stones > stonesBefore && q.xp > xpBefore, '组队探险收益入账');
+  // 每日每道友限一次
+  ok(teamedToday(q, m.npc.id) === true, '标记今日已同游');
+  ok(teamExplore(q, m.npc.id, makeRng(2)).error, '同日二次组队被拒');
+}
+
+// ---------- 音效系统（Node 环境安全降级）----------
+console.log('— sfx (graceful no-op without AudioContext) —');
+let sfxCrash = false;
+try {
+  playSfx('cultivate');   // 无 AudioContext：静默 no-op，不抛错
+  playSfx('unknown_name');
+  ok(typeof isSfxEnabled() === 'boolean', 'isSfxEnabled 返回布尔');
+  const prev = isSfxEnabled();
+  setSfxEnabled(!prev);
+  ok(isSfxEnabled() === !prev, 'setSfxEnabled 切换开关');
+  setSfxEnabled(prev); // 还原
+  playSfx('click');    // 开关切换/还原过程中均不抛错
+} catch (e) { sfxCrash = true; }
+ok(!sfxCrash, '音效模块在无 AudioContext 环境全程不抛异常');
 
 console.log(`\n结果: ${pass} 通过, ${fail} 失败`);
 process.exit(fail ? 1 : 0);

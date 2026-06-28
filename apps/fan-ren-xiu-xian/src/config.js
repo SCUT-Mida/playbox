@@ -113,6 +113,7 @@ export function cultivateSpeedMult(player) {
   for (const id of player.titles) m *= titleCultivateMult(id);
   for (const id of player.techniques) m *= techniqueDef(id).cultivate || 1;
   if (_SECT_BONUS_FN) m *= _SECT_BONUS_FN(player) || 1; // 宗门 + 宗门称号加成
+  if (_COMPANION_BONUS_FN) m *= _COMPANION_BONUS_FN(player) || 1; // 道友（高好感）加成
   if (player.chaos && player.chaos.speedBoostUntil > nowSec()) m *= 2;
   return m;
 }
@@ -203,6 +204,10 @@ export function _registerTechniques(techs) { _TECHNIQUES = techs; }
 // （沿用 items/techniques 的懒注册模式）。未注册时默认 1（无加成）。
 let _SECT_BONUS_FN = null;
 export function _registerSectBonus(fn) { _SECT_BONUS_FN = fn; }
+// 道友（NPC 高好感）修炼加成懒注册：由 core/npc.js 注入，避免 config↔npc 循环依赖。
+// 未注册时默认 1（无加成）。
+let _COMPANION_BONUS_FN = null;
+export function _registerCompanionBonus(fn) { _COMPANION_BONUS_FN = fn; }
 export function itemDef(id) { return (_ITEMS && _ITEMS[id]) || null; }
 export function techniqueDef(id) { return (_TECHNIQUES && _TECHNIQUES[id]) || { cultivate: 1, breakBonus: 0 }; }
 export function titleCultivateMult(id) {

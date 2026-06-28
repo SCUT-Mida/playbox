@@ -14,6 +14,10 @@ const PILLS = {
   pill_qingxin:  { id: 'pill_qingxin',  name: '清心丹',   type: 'pill', emoji: '🧿', price: 70,  desc: '渡心魔时服用，当轮必过。',  role: 'heart_pass' },
   pill_xisui:    { id: 'pill_xisui',    name: '洗髓丹',   type: 'pill', emoji: '🟢', price: 240, desc: '重塑灵根，随机提升一档资质。', effect: { kind: 'root_upgrade' } },
   pill_fuhun:    { id: 'pill_fuhun',    name: '回魂丹',   type: 'pill', emoji: '💫', price: 200, desc: '战败后服用，找回损失的修为。', effect: { kind: 'revive' } },
+  // 回复活力的丹药/灵饮（坊市常售，补充每日行动力）
+  pill_peiyuan:  { id: 'pill_peiyuan',  name: '培元丹',   type: 'pill', emoji: '🟢', price: 50,  desc: '温养元气，回复 30 点活力。',     effect: { kind: 'restore_vitality', amount: 30 } },
+  pill_lingjiu:  { id: 'pill_lingjiu',  name: '百草灵酒', type: 'pill', emoji: '🍶', price: 110, desc: '灵药酿就，回复 60 点活力。',     effect: { kind: 'restore_vitality', amount: 60 } },
+  pill_xiancha:  { id: 'pill_xiancha',  name: '玉髓仙茶', type: 'pill', emoji: '🍵', price: 220, desc: '仙人遗方，回复 100 点活力。',    effect: { kind: 'restore_vitality', amount: 100 } },
   // 境界突破所需/推荐丹药（突破时消耗，提供成功率与渡劫助力）
   pill_zhuji:    { id: 'pill_zhuji',    name: '筑基丹',   type: 'pill', emoji: '🟣', price: 150, desc: '筑基所需，稳固根基。',   role: 'break_zhuji' },
   pill_jiedan:   { id: 'pill_jiedan',   name: '结丹丹',   type: 'pill', emoji: '🟣', price: 300, desc: '结丹所需，凝聚金丹。',   role: 'break_jiedan' },

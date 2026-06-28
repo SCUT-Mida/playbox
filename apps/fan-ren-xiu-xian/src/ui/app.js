@@ -30,16 +30,23 @@ import {
 import { tryAlchemy, tryForge, hasMaterials, successRate } from '../core/alchemy.js';
 import { rollMarket, buyItem, sellItem, sellPrice, itemEffectText } from '../core/market.js';
 import { ACHIEVEMENTS, TITLES, checkAchievements } from '../core/achievements.js';
-import { SECTS, SECT_LIST, SECT_TITLES } from '../data/sect.js';
+import { SECTS, SECT_LIST, SECT_TITLES, CHALLENGE_TEMPLATES, MAX_ACTIVE_CHALLENGES } from '../data/sect.js';
 import {
   joinSect, sectDef, currentSectTitle, titleProgress,
   ensureSectTasks, dailySectRollover, claimSectTask, claimAllSectTasks,
   claimDailySectReward, sectRewardClaimedToday, sectCultivateBonus,
+  acceptChallenge, claimChallenge, abandonChallenge, activeChallengeCount,
 } from '../core/sect.js';
 import {
   saveGame, clearSave, exportSave, importSave, computeOffline,
   listSlots, loadSlot, saveSlot, deleteSlot, getActiveSlot, setActiveSlot, migrateLegacy,
 } from '../core/save.js';
+import { playSfx, isSfxEnabled, setSfxEnabled } from '../core/sfx.js';
+import { NPC_LIST, npcDef, affinityLevel, AFFINITY_LEVELS, TEAM_AFFINITY_THRESHOLD, MEET_VITALITY_COST, TEAM_VITALITY_COST } from '../data/npcs.js';
+import {
+  meetNpc, giftNpc, canTeamUp, teamedToday, teamExplore,
+  metNpcs, meetableNpcs, curAffinityLevel, affinityProgress, getAffinity, isMet, companionCultivateBonus,
+} from '../core/npc.js';
 
 const TABS = [
   { key: 'cultivate', icon: '🧘', label: '修炼' },
@@ -48,6 +55,7 @@ const TABS = [
   { key: 'bag', icon: '🎒', label: '背包' },
   { key: 'alchemy', icon: '⚗️', label: '炼丹' },
   { key: 'sect', icon: '🏯', label: '宗门' },
+  { key: 'npc', icon: '🤝', label: '道友' },
 ];
 
 export class GameUI {
@@ -319,6 +327,7 @@ export class GameUI {
     this.ui.stones = h('span', { class: 'stones' }, `💎 ${fmt(p.stones)}`);
     this.ui.vitality = h('span', { class: 'vit-pill', title: '每日活力：消耗型行动力，跨日恢复' }, `⚡${Math.floor(p.vitality)}/${p.maxVitality}`);
     this.ui.chaosBanner = h('div', { class: 'chaos-banner', style: { display: 'none' } });
+    this.ui.soundBtn = h('button', { class: 'icon-btn', title: '音效开关', onClick: () => this.toggleSfx() }, isSfxEnabled() ? '🔊' : '🔇');
 
     this.ui.hpBar = bar(p.hp, p.maxHp, { class: 'hp', label: `气血 ${Math.floor(p.hp)}/${p.maxHp}` });
     this.ui.mpBar = bar(p.mp, p.maxMp, { class: 'mp', label: `灵力 ${Math.floor(p.mp)}/${p.maxMp}` });
@@ -331,6 +340,7 @@ export class GameUI {
         h('div', { class: 'spacer' }),
         this.ui.vitality,
         this.ui.stones,
+        this.ui.soundBtn,
         h('button', { class: 'icon-btn', title: '成就与称号', onClick: () => this.showAchievements() }, '🏆'),
         h('button', { class: 'icon-btn', title: '设置 / 存档', onClick: () => this.showSettings() }, '⚙️'),
       ),
@@ -338,6 +348,12 @@ export class GameUI {
       h('div', { class: 'xp-wrap' }, this.ui.xpBar),
       this.ui.chaosBanner,
     );
+  }
+
+  toggleSfx() {
+    const on = setSfxEnabled(!isSfxEnabled());
+    if (this.ui.soundBtn) this.ui.soundBtn.textContent = on ? '🔊' : '🔇';
+    this.toast(on ? '音效已开启' : '音效已关闭', 'normal');
   }
 
   refreshStatus() {
@@ -431,6 +447,7 @@ export class GameUI {
       case 'bag': this.renderBag(); break;
       case 'alchemy': this.renderAlchemy(); break;
       case 'sect': this.renderSect(); break;
+      case 'npc': this.renderNpc(); break;
     }
   }
 
@@ -510,17 +527,19 @@ export class GameUI {
 
   doActiveCultivate() {
     const p = this.player;
-    if (!canAffordVitality(p, VITALITY_COSTS.cultivate)) { this.toast('活力不足，明日恢复', 'bad'); return; }
+    if (!canAffordVitality(p, VITALITY_COSTS.cultivate)) { this.toast('活力不足，明日恢复', 'bad'); playSfx('error'); return; }
     const res = activeCultivate(p, Math.random);
-    if (!res.ok) { this.toast(res.reason, 'bad'); return; }
+    if (!res.ok) { this.toast(res.reason, 'bad'); playSfx('error'); return; }
     spendVitality(p, VITALITY_COSTS.cultivate);
     if (res.epiphany) {
       this.float(`顿悟！+${res.xp}`, 'epic');
       this.pushLog(`✨ 顿悟！修为 +${res.xp}`, 'epic');
       this.statusEl.classList.add('flash-gold');
       setTimeout(() => this.statusEl.classList.remove('flash-gold'), 500);
+      playSfx('epiphany');
     } else {
       this.float(`+${res.xp}`, 'good');
+      playSfx('cultivate');
     }
     this.afterAction();
   }
@@ -545,10 +564,10 @@ export class GameUI {
 
   doMinorBreakthrough(useTupo) {
     const res = attemptMinorBreakthrough(this.player, useTupo, Math.random);
-    if (!res.ok) { this.toast(res.reason, 'bad'); return; }
+    if (!res.ok) { this.toast(res.reason, 'bad'); playSfx('error'); return; }
     for (const l of res.log) this.pushLog(l, res.success ? 'epic' : 'bad');
-    if (res.success) { this.float('突破成功！', 'epic'); this.toast(`迈入${realmInfo(this.player).majorName}${realmInfo(this.player).subName}！`, 'epic'); }
-    else { this.float('突破失败', 'bad'); }
+    if (res.success) { this.float('突破成功！', 'epic'); this.toast(`迈入${realmInfo(this.player).majorName}${realmInfo(this.player).subName}！`, 'epic'); playSfx('breakthrough'); }
+    else { this.float('突破失败', 'bad'); playSfx('fail'); }
     this.afterAction();
   }
 
@@ -584,11 +603,12 @@ export class GameUI {
 
   doExplore() {
     const p = this.player;
-    if (!canAffordVitality(p, VITALITY_COSTS.explore)) { this.toast('活力不足，明日恢复', 'bad'); return; }
+    if (!canAffordVitality(p, VITALITY_COSTS.explore)) { this.toast('活力不足，明日恢复', 'bad'); playSfx('error'); return; }
     const res = rollExplore(p, Math.random);
-    if (res.error) { this.toast(res.error, 'bad'); this.rerender(); return; }
+    if (res.error) { this.toast(res.error, 'bad'); playSfx('error'); this.rerender(); return; }
     spendVitality(p, VITALITY_COSTS.explore);
     this.pushLog(`你前往${res.sceneName}探索……`, 'normal');
+    playSfx('explore');
     this.encounter = res.encounter;
     this.sceneName = res.sceneName;
     this.openEncounter();
@@ -615,6 +635,7 @@ export class GameUI {
         const logs = applyReward(this.player, e.result, Math.random);
         for (const l of logs) this.pushLog(l.text, l.type);
         this.checkAchvAndToast();
+        playSfx('reward');
         this.closeModal();
         this.afterAction();
       } }, '收下')],
@@ -707,6 +728,7 @@ export class GameUI {
     const res = battleStep(this.battle.state, p, action, Math.random);
     for (const l of res.logs) this.battle.state.log.push(l);
     this.refreshStatus();
+    playSfx('battle_hit');
     if (res.over) {
       this.finishBattle(res.result);
       return;
@@ -747,6 +769,7 @@ export class GameUI {
       addXp(p, xp);
       this.pushLog(`战斗胜利！修为 +${xp}。`, 'epic');
       this.float('胜利！', 'epic');
+      playSfx('battle_win');
     } else if (result === 'lose') {
       p.stats.deaths += 1;
       const lostStones = Math.floor(p.stones * 0.1);
@@ -756,6 +779,7 @@ export class GameUI {
       p.xp = Math.max(0, p.xp - xpLoss);
       this.pushLog(`战败！损失 ${lostStones} 灵石与部分修为，被逐回安全之地。`, 'bad');
       this.toast('战败重伤……', 'bad');
+      playSfx('battle_lose');
     } else {
       this.pushLog('你脱离了战斗。', 'normal');
     }
@@ -828,10 +852,12 @@ export class GameUI {
         this.pushLog(`渡劫功成！迈入${realmInfo(this.player).majorName}${realmInfo(this.player).subName}。获得 ${adv.stones} 灵石。`, 'epic');
         this.float(t.kind === 'ascend' ? '白日飞升！' : '渡劫成功！', 'epic');
         this.toast(`突破至${realmInfo(this.player).majorName}！`, 'epic');
+        playSfx('breakthrough');
       } else {
         failMajor(this.player, t.kind);
         this.pushLog('渡劫失败，修为折损，需重整旗鼓。', 'bad');
         this.toast('渡劫失败……', 'bad');
+        playSfx('fail');
       }
       this.trial = null;
       this.closeModal();
@@ -904,6 +930,7 @@ export class GameUI {
     if (!res.ok) { this.toast(res.reason, 'bad'); this.afterAction(); return; }
     if (res.learned) this.pushLog(`习得/获得【${entry.name}】（花费 ${res.cost} 灵石）。`, 'epic');
     else this.pushLog(`购入 ${res.qty} × ${entry.name}（花费 ${res.cost} 灵石）。`, 'normal');
+    playSfx('reward');
     this.afterAction();
   }
 
@@ -911,6 +938,7 @@ export class GameUI {
     const res = sellItem(this.player, id, 1);
     if (!res.ok) return;
     this.pushLog(`售出 ${res.qty} × ${ITEMS[id].name}（得 ${res.gain} 灵石）。`, 'normal');
+    playSfx('click');
     this.afterAction();
   }
 
@@ -1031,10 +1059,17 @@ export class GameUI {
     const e = d.effect;
     if (e.kind === 'heal_hp') { p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * e.pct)); this.pushLog(`服下${d.name}，恢复气血。`, 'good'); }
     else if (e.kind === 'heal_mp') { p.mp = Math.min(p.maxMp, p.mp + Math.round(p.maxMp * e.pct)); this.pushLog(`服下${d.name}，恢复灵力。`, 'good'); }
+    else if (e.kind === 'restore_vitality') {
+      const before = p.vitality || 0;
+      p.vitality = Math.min(p.maxVitality, before + (e.amount || 0));
+      const got = Math.round(p.vitality - before);
+      this.pushLog(`服下${d.name}，回复 ${got} 点活力（${Math.floor(p.vitality)}/${p.maxVitality}）。`, 'good');
+    }
     else if (e.kind === 'root_upgrade') {
       const up = upgradeRoot(p);
       this.pushLog(up ? `服下${d.name}，灵根提升为${rootDef(p.rootId).name}！` : '灵根已至极境，洗髓丹无效。', up ? 'epic' : 'normal');
     } else if (e.kind === 'revive') { p.hp = p.maxHp; p.mp = p.maxMp; addXp(p, Math.round(p.xpMax * 0.3)); this.pushLog(`服下${d.name}，气血灵力全复，修为回升。`, 'epic'); }
+    playSfx('reward');
     this.afterAction();
   }
 
@@ -1169,6 +1204,9 @@ export class GameUI {
       c.append(h('div', { class: 'muted', style: { textAlign: 'center', margin: '0.3rem 0' } }, '完成修炼 / 探索 / 战斗 / 炼制 / 突破可推进对应任务，每日刷新。'));
     }
 
+    // 悬赏挑战（自主领取，难度随境界缩放）
+    this._renderSectChallenges(c, p);
+
     // 每日宗门俸禄
     const claimedToday = sectRewardClaimedToday(p);
     const dailyTxt = title && title.daily
@@ -1233,6 +1271,69 @@ export class GameUI {
     this.afterAction();
   }
 
+  // —— 悬赏挑战渲染 + 接取 / 领取 / 放弃 ——
+  _renderSectChallenges(c, p) {
+    const tasks = Array.isArray(p.challengeTasks) ? p.challengeTasks : [];
+    const active = tasks.length;
+    c.append(
+      h('div', { class: 'row', style: { margin: '0.4rem 0 0.4rem', alignItems: 'center' } },
+        h('h4', { class: 'muted', style: { margin: 0 } }, `悬赏挑战（难度随境界提升）`),
+        h('div', { class: 'spacer' }),
+        h('span', { class: 'muted', style: { whiteSpace: 'nowrap' } }, `${active}/${MAX_ACTIVE_CHALLENGES}`),
+        h('button', {
+          class: 'btn-ghost', style: { flex: 'none' },
+          disabled: active >= MAX_ACTIVE_CHALLENGES,
+          onClick: () => this.doAcceptChallenge(),
+        }, '＋ 接取'),
+      ),
+    );
+    if (!active) {
+      c.append(h('div', { class: 'card muted' }, '尚未接取挑战。挑战奖励丰厚（灵石 + 声望，高境界额外给物品），可随时接取或放弃。'));
+      return;
+    }
+    for (const t of tasks) {
+      const done = (t.progress || 0) >= t.goal;
+      const rewardTxt = `💎${t.stones} · 声望 +${t.rep}${(t.tier || 0) >= 3 ? ' · 灵气结晶' : ''}`;
+      c.append(h('div', { class: 'card sect-task' },
+        h('div', { class: 'row' },
+          h('div', { class: 'emo' }, t.emoji),
+          h('div', { class: 'grow' },
+            h('div', { class: 'nm' }, `${t.label}（${t.verb} ${t.goal} 次）`),
+            h('div', { class: 'muted', style: { marginTop: '0.1rem' } }, t.desc || ''),
+            bar(t.progress || 0, t.goal, { class: 'xp', label: `${Math.min(t.progress || 0, t.goal)}/${t.goal}` }),
+          ),
+          h('div', { class: 'muted', style: { textAlign: 'right', whiteSpace: 'nowrap' } }, rewardTxt),
+        ),
+        h('div', { class: 'row', style: { marginTop: '0.4rem' } },
+          h('button', { class: done ? 'btn-jade' : 'btn-ghost', style: { flex: 1 }, disabled: !done, onClick: () => this.doClaimChallenge(t.id) }, done ? '领取奖励' : '进行中…'),
+          h('button', { class: 'btn-ghost', style: { flex: 'none' }, onClick: () => this.doAbandonChallenge(t.id) }, '放弃'),
+        ),
+      ));
+    }
+  }
+
+  doAcceptChallenge() {
+    const res = acceptChallenge(this.player, Math.random);
+    if (!res.ok) { this.toast(res.reason, 'bad'); return; }
+    this.pushLog(`接取悬赏挑战「${res.task.label}」（${res.task.verb} ${res.task.goal} 次）。`, 'normal');
+    playSfx('click');
+    this.afterAction();
+  }
+  doClaimChallenge(taskId) {
+    const res = claimChallenge(this.player, taskId);
+    if (!res.ok) { this.toast(res.reason, 'bad'); return; }
+    this.pushLog(`完成悬赏挑战「${res.task.label}」！`, 'epic');
+    for (const l of res.logs) this.pushLog(l.text, l.type);
+    this.float(`声望 +${res.rep}`, 'good');
+    playSfx('reward');
+    this.afterAction();
+  }
+  doAbandonChallenge(taskId) {
+    if (!abandonChallenge(this.player, taskId)) return;
+    this.pushLog('放弃了一项悬赏挑战。', 'normal');
+    this.afterAction();
+  }
+
   // 宗门称号进阶一览（境界 + 声望双门槛）
   showSectTitleLadder() {
     const p = this.player;
@@ -1252,6 +1353,128 @@ export class GameUI {
       );
     });
     this.showSheet({ title: '宗门称号阶', body, foot: [h('button', { class: 'btn-ghost', onClick: () => this.closeModal() }, '关闭')] });
+  }
+
+  // ============ 道友（NPC 好感度 + 组队探险）============
+  renderNpc() {
+    const p = this.player;
+    if (!p.npcs) p.npcs = {};
+    const met = metNpcs(p);
+    const c = h('div', null);
+    c.append(
+      h('div', { class: 'panel-title' }, '道友'),
+      h('div', { class: 'card' },
+        h('h4', null, '云游寻访'),
+        h('div', { class: 'muted', style: { marginBottom: '0.4rem' } },
+          `结识各路修士，赠礼提升好感。好感达「投缘之交」即可结伴探险，奖励远胜独行。已结识 ${met.length}/${NPC_LIST.length} 位道友。`),
+        h('div', { class: 'stat-grid', style: { marginBottom: '0.4rem' } },
+          kv('道友加成', `修炼 ×${companionCultivateBonus(p).toFixed(2)}`),
+          kv('寻访消耗', `⚡${MEET_VITALITY_COST} 活力`),
+        ),
+        h('button', {
+          class: 'btn-primary big-btn',
+          disabled: !canAffordVitality(p, MEET_VITALITY_COST) || !meetableNpcs(p).length,
+          onClick: () => this.doMeetNpc(),
+        }, meetableNpcs(p).length ? `🍃 寻访道友（活力 ${MEET_VITALITY_COST}）` : '暂无可结识的新道友（提升境界后或有奇遇）'),
+      ),
+    );
+
+    if (!met.length) {
+      c.append(h('div', { class: 'card muted' }, '尚未结识任何道友。寻访一番，结交同道中人吧。'));
+      this.content.appendChild(c);
+      return;
+    }
+
+    for (const npc of met) {
+      const prog = affinityProgress(p, npc.id);
+      const aff = prog.aff;
+      const teamed = teamedToday(p, npc.id);
+      const canTeam = canTeamUp(p, npc.id);
+      const teamOk = canTeam && !teamed && p.mp >= EXPLORE_MP_COST && p.hp > EXPLORE_HP_COST && canAffordVitality(p, TEAM_VITALITY_COST);
+      // 好感进度条：未到顶时按「当前阶→下一阶」区间绘制
+      const segLo = prog.cur.min;
+      const segHi = prog.next ? prog.next.min : prog.cur.min;
+      const segPct = segHi > segLo ? Math.max(0, Math.min(100, ((aff - segLo) / (segHi - segLo)) * 100)) : 100;
+      c.append(h('div', { class: 'card npc-card' },
+        h('div', { class: 'row' },
+          h('div', { class: 'emo sect-emo' }, npc.emoji),
+          h('div', { class: 'grow' },
+            h('div', { class: 'nm' }, `${npc.name}`),
+            h('div', { class: 'muted', style: { marginTop: '0.1rem' } }, `${npc.title} · ${npc.desc}`),
+          ),
+          h('div', { class: 'muted', style: { textAlign: 'right', whiteSpace: 'nowrap' } }, `${prog.cur.emoji} ${prog.cur.name}`),
+        ),
+        h('div', { class: 'npc-aff' },
+          bar(segPct, 100, { class: 'xp', label: prog.next ? `好感 ${Math.floor(aff)} / ${segHi}（下一阶：${prog.next.name}）` : `好感 ${Math.floor(aff)} · 已至最高` }),
+        ),
+        h('div', { class: 'muted', style: { margin: '0.25rem 0' } }, `喜好：${ITEMS[npc.liked] ? ITEMS[npc.liked].name : '??'} · 组队奖励 ×${npc.teamMult.toFixed(1)}`),
+        h('div', { class: 'row', style: { marginTop: '0.3rem' } },
+          h('button', { class: 'btn-ghost', style: { flex: 1 }, onClick: () => this.showGiftPicker(npc.id) }, '🎁 赠礼'),
+          canTeam
+            ? h('button', { class: 'btn-jade', style: { flex: 1 }, disabled: !teamOk, onClick: () => this.doTeamExplore(npc.id) },
+                teamed ? '今日已同游' : `🤝 结伴探险（活力 ${TEAM_VITALITY_COST}）`)
+            : h('div', { class: 'muted', style: { flex: 1, textAlign: 'center', alignSelf: 'center' } }, `好感达「${affinityLevel(TEAM_AFFINITY_THRESHOLD).name}」可结伴`),
+        ),
+      ));
+    }
+    this.content.appendChild(c);
+  }
+
+  doMeetNpc() {
+    const res = meetNpc(this.player, Math.random);
+    if (!res.ok) { this.toast(res.reason, 'bad'); playSfx('error'); this.afterAction(); return; }
+    for (const l of res.logs) this.pushLog(l.text, l.type);
+    this.float(`结识 ${res.npc.name}`, 'epic');
+    playSfx('meet');
+    this.afterAction();
+  }
+
+  showGiftPicker(npcId) {
+    const p = this.player;
+    const npc = npcDef(npcId);
+    const giftable = distinctItems(p).filter((id) => {
+      const d = ITEMS[id];
+      return d && (d.type === 'material' || d.type === 'pill' || d.type === 'misc' || d.type === 'treasure');
+    });
+    const body = [];
+    body.push(h('div', { class: 'muted', style: { marginBottom: '0.4rem' } },
+      `选择一件赠予${npc.emoji} ${npc.name}。喜好之物（${ITEMS[npc.liked] ? ITEMS[npc.liked].name : '??'}）好感增益更高。`));
+    if (!giftable.length) body.push(h('div', { class: 'muted' }, '背包中没有可赠送之物。'));
+    const grid = h('div', { class: 'item-grid' });
+    for (const id of giftable) {
+      const d = ITEMS[id];
+      const liked = id === npc.liked;
+      grid.appendChild(h('button', { class: `item gift-item ${liked ? 'liked' : ''}`, onClick: () => { this.closeModal(); this.doGiftNpc(npcId, id); } },
+        h('div', { class: 'emo' }, d.emoji),
+        h('div', { class: 'nm' }, d.name),
+        h('div', { class: 'qty' }, `×${countItem(p, id)}`),
+        liked ? h('div', { class: 'tag' }, '喜') : null,
+      ));
+    }
+    body.push(grid);
+    this.showSheet({ title: `赠礼 · ${npc.name}`, body, foot: [h('button', { class: 'btn-ghost', onClick: () => this.closeModal() }, '关闭')] });
+  }
+
+  doGiftNpc(npcId, itemId) {
+    const res = giftNpc(this.player, npcId, itemId, Math.random);
+    if (!res.ok) { this.toast(res.reason, 'bad'); return; }
+    for (const l of res.logs) this.pushLog(l.text, l.type);
+    this.float(`好感 +${res.affGain}`, res.liked ? 'epic' : 'good');
+    playSfx('gift');
+    this.afterAction();
+  }
+
+  doTeamExplore(npcId) {
+    const p = this.player;
+    const npc = npcDef(npcId);
+    const res = teamExplore(p, npcId, Math.random);
+    if (res.error) { this.toast(res.error, 'bad'); playSfx('error'); this.rerender(); return; }
+    this.pushLog(`你与${npc.name}结伴前往${res.sceneName}……`, 'epic');
+    playSfx('explore');
+    this.encounter = res.encounter;
+    this.sceneName = res.sceneName;
+    this.openEncounter();
+    this.refreshStatus();
   }
 
   // ============ 人物档案 ============

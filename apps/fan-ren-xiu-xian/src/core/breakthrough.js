@@ -4,7 +4,7 @@
 import { REALMS, ASCEND_INDEX, breakthroughChance, clamp } from '../config.js';
 import {
   recompute, fullHeal, isXpFull, addXp, xpOverflow, removeItem, hasItem, addStones,
-  grantTitle, grantAchievement,
+  grantTitle, grantAchievement, hasAnyEquipped,
 } from './player.js';
 import { chance } from './rng.js';
 import { recordSectActivity } from './sect.js';
@@ -135,11 +135,11 @@ export function trialRespond(trial, player, action, rng) {
   let dmg = baseDmg * (0.85 + (rng ? rng() : Math.random()) * 0.3);
   let instantFail = trial.kind === 'ascend' ? 0.06 : 0.02 + trial.tier * 0.004;
   if (trial.hadReq) instantFail -= 0.06;
-  if (player.equipment) instantFail -= 0.03;
+  if (hasAnyEquipped(player)) instantFail -= 0.03;
   instantFail = Math.max(0, instantFail);
 
   if (action.type === 'treasure') {
-    if (player.equipment) { dmg *= 0.35; logs.push('你祭出法宝硬抗天劫，劫力被卸去大半！'); }
+    if (hasAnyEquipped(player)) { dmg *= 0.35; logs.push('你祭出法宝硬抗天劫，劫力被卸去大半！'); }
     else { dmg *= 0.9; logs.push('你徒手抗劫，所受不轻。'); }
   } else if (action.type === 'pill') {
     if (hasItem(player, 'pill_huitian') || hasItem(player, 'pill_huitian2')) {

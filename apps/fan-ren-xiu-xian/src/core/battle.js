@@ -42,7 +42,14 @@ export function battleStep(battle, player, action, rng) {
       break;
     }
     case 'skill': {
-      const eq = player.equipment ? ITEMS[player.equipment] : null;
+      // 多槽装备：取第一件附带技能的已装备法宝催动其绝技
+      let eq = null;
+      if (player.equipment && typeof player.equipment === 'object') {
+        for (const k of ['weapon', 'armor']) {
+          const id = player.equipment[k];
+          if (id && ITEMS[id] && ITEMS[id].stats && ITEMS[id].stats.skill) { eq = ITEMS[id]; break; }
+        }
+      }
       const skillId = eq && eq.stats && eq.stats.skill;
       const skill = skillId ? TREASURE_SKILLS[skillId] : null;
       if (!skill) {

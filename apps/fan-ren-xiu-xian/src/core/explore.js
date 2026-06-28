@@ -14,6 +14,7 @@ import {
 } from './player.js';
 import { recordSectActivity } from './sect.js';
 import { ITEMS } from '../data/items.js';
+import { RECIPE_BY_ID } from '../data/recipes.js';
 
 // 执行一次探索：返回 { encounter, scene } 或 { error }
 export function rollExplore(player, rng) {
@@ -82,7 +83,10 @@ export function applyReward(player, reward, rng) {
   }
   if (reward.recipe) {
     const learned = learnRecipe(player, reward.recipe);
-    push(learned ? `获得配方【${reward.recipe}】` : `已有该配方，折为灵石`, learned ? 'good' : 'normal');
+    // 配方名映射：奖励里给的是配方 id（rcp_xxx / bp_xxx），需查表转中文名，
+    // 否则日志会冒出未映射的英文 id（组队探险奖励的常见症状）。
+    const rname = (RECIPE_BY_ID[reward.recipe] && RECIPE_BY_ID[reward.recipe].name) || reward.recipe;
+    push(learned ? `获得配方【${rname}】` : `已有配方【${rname}】，折为灵石`, learned ? 'good' : 'normal');
     if (!learned) addStones(player, 40);
   }
   if (reward.title) { grantTitle(player, reward.title); push(`获得称号`, 'epic'); }

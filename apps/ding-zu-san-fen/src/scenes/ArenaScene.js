@@ -24,16 +24,24 @@ function dayKey() {
 }
 function arenaKey() { return `${ARENA_PREFIX}${getActiveSlot()}`; }
 function loadArena() {
+  const today = dayKey();
+  let p = null;
   try {
     if (typeof localStorage !== 'undefined') {
       const raw = localStorage.getItem(arenaKey());
-      if (raw) {
-        const p = JSON.parse(raw);
-        if (p && p.date === dayKey()) return p;
-      }
+      if (raw) p = JSON.parse(raw);
     }
   } catch { /* noop */ }
-  return { date: dayKey(), drills: 0, bestRound: 0 };
+  if (p && typeof p === 'object') {
+    // bestRound 为"今日最佳"（随每日次数一起重置）；bestEver 为"历史最佳"，跨日保留。
+    // 跨日读取时次数/今日最佳清零，但历史最佳取已存值与（旧档无 bestEver 字段时）今日最佳的最大值，避免老数据迁移丢值。
+    const bestEver = Math.max(0, p.bestEver | 0, p.date === today ? (p.bestRound | 0) : 0);
+    if (p.date === today) {
+      return { date: today, drills: p.drills | 0, bestRound: p.bestRound | 0, bestEver };
+    }
+    return { date: today, drills: 0, bestRound: 0, bestEver };
+  }
+  return { date: today, drills: 0, bestRound: 0, bestEver: 0 };
 }
 function saveArena(a) {
   try {
@@ -116,7 +124,9 @@ export default class ArenaScene extends Phaser.Scene {
   }
 
   // 动作按钮：绝对坐标命中区（深度 6，与其它场景一致的稳健写法）
-  _action(cx, cy, w, h, label, color, onClick) {
+  // disabled=true 时禁用命中、不显示手型光标并整体降透明度，呈现为真正的"不可用"按钮，
+  // 而非外观灰却仍可点击发声的"坏按钮"。
+  _action(cx, cy, w, h, label, color, onClick, disabled = false) {
     const cont = this.add.container(cx, cy).setDepth(6);
     this._body.add(cont);
     const g = this.add.graphics();
@@ -131,13 +141,18 @@ export default class ArenaScene extends Phaser.Scene {
       fontFamily: '"PingFang SC",sans-serif', fontSize: '22px', color: '#fff', fontStyle: 'bold',
     }).setOrigin(0.5);
     cont.add(txt);
-    const zone = this.add.zone(cx, cy, w, h).setInteractive({ useHandCursor: true }).setDepth(7);
-    zone.on('pointerover', () => cont.setScale(1.04));
-    zone.on('pointerout', () => cont.setScale(1));
-    zone.on('pointerdown', () => {
-      this.tweens.add({ targets: cont, scale: 0.95, duration: 70, yoyo: true });
-      this.time.delayedCall(80, onClick);
-    });
+    const zone = this.add.zone(cx, cy, w, h).setInteractive({ useHandCursor: !disabled }).setDepth(7);
+    if (disabled) {
+      zone.input.enabled = false;
+      cont.setAlpha(0.7);
+    } else {
+      zone.on('pointerover', () => cont.setScale(1.04));
+      zone.on('pointerout', () => cont.setScale(1));
+      zone.on('pointerdown', () => {
+        this.tweens.add({ targets: cont, scale: 0.95, duration: 70, yoyo: true });
+        this.time.delayedCall(80, onClick);
+      });
+    }
     this._actionZones = this._actionZones || [];
     this._actionZones.push(zone);
     cont._txt = txt;
@@ -198,7 +213,7 @@ export default class ArenaScene extends Phaser.Scene {
     body.add(this.add.text(width / 2, py - 18, String(power), {
       fontFamily: 'serif', fontSize: '54px', color: '#ffe08a', fontStyle: 'bold',
     }).setOrigin(0.5));
-    body.add(this.add.text(width / 2, py + 30, `今日剩余演练 ${left}/${DAILY_DRILLS}　·　历史最佳第 ${arena.bestRound} 轮`, {
+    body.add(this.add.text(width / 2, py + 30, `今日剩余演练 ${left}/${DAILY_DRILLS}　·　历史最佳第 ${arena.bestEver} 轮`, {
       fontFamily: '"PingFang SC",sans-serif', fontSize: '15px', color: '#e6d4ac',
     }).setOrigin(0.5));
     body.add(this.add.text(width / 2, py + 62, `收录武将 ${unlockedGenerals().length} 位`, {
@@ -216,10 +231,8 @@ export default class ArenaScene extends Phaser.Scene {
     });
 
     // 开始演练
-    this._action(width / 2, 760, 320, 78, left > 0 ? '⚔ 开始演练' : '今日演练已用尽', left > 0 ? 0x2f7d4a : 0x4a3f30, () => {
-      if (left <= 0) { audio.play('error'); return; }
-      this._startDrill();
-    });
+    const exhausted = left <= 0;
+    this._action(width / 2, 760, 320, 78, exhausted ? '今日演练已用尽' : '⚔ 开始演练', exhausted ? 0x4a3f30 : 0x2f7d4a, () => this._startDrill(), exhausted);
 
     body.add(this.add.text(width / 2, 840, `每轮敌军战力递增；战力高于敌军即胜并获得金币，直至落败或满 ${MAX_ROUNDS} 回合。`, {
       fontFamily: '"PingFang SC",sans-serif', fontSize: '13px', color: '#9a8a5a',
@@ -345,6 +358,7 @@ export default class ArenaScene extends Phaser.Scene {
     const reached = defeated ? this._round - 1 : this._round; // 落败时本轮不计为通过
     const passed = Math.max(0, reached);
     if (passed > arena.bestRound) arena.bestRound = passed;
+    if (passed > arena.bestEver) arena.bestEver = passed;
     saveArena(arena);
 
     const body = this._newBody();
@@ -370,10 +384,8 @@ export default class ArenaScene extends Phaser.Scene {
     }
     this._goldText.setText(`金 ${getMeta().gold}`);
     const left = Math.max(0, DAILY_DRILLS - arena.drills);
-    this._action(width / 2, 700, 320, 72, left > 0 ? '⚔ 再演练一次' : '今日演练已用尽', left > 0 ? 0x2f7d4a : 0x4a3f30, () => {
-      if (left <= 0) { audio.play('error'); return; }
-      this._startDrill();
-    });
+    const exhausted = left <= 0;
+    this._action(width / 2, 700, 320, 72, exhausted ? '今日演练已用尽' : '⚔ 再演练一次', exhausted ? 0x4a3f30 : 0x2f7d4a, () => this._startDrill(), exhausted);
     this._action(width / 2, 790, 320, 60, '返回演武场', 0x6b5a40, () => this._renderReady());
   }
 }

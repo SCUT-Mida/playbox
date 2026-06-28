@@ -71,6 +71,7 @@ export default class MenuScene extends Phaser.Scene {
       if (!this._levels) return;
       this._levels.scrollY = this._clamp(this._levels.scrollY + dy, 0, this._levels.maxScroll);
       this._levels.cont.y = -this._levels.scrollY;
+      this._updateCardInput();
     });
   }
 
@@ -113,7 +114,9 @@ export default class MenuScene extends Phaser.Scene {
       fontFamily: '"PingFang SC",sans-serif', fontSize: '16px', color: '#ffe08a', fontStyle: 'bold',
     }).setOrigin(0.5);
     this._slotCont.add(this._slotText);
-    const slotZone = this.add.zone(width - 270, 48, 92, 44).setInteractive({ useHandCursor: true });
+    // 深度 10：确保这些覆盖层命中区永远排在可滚动关卡列表（容器 depth 5）之上，
+    // 不被滚出可视带、却被 mask 裁剪掉的"幽灵"卡片命中区遮挡（兜底，主修复见 _updateCardInput）。
+    const slotZone = this.add.zone(width - 270, 48, 92, 44).setInteractive({ useHandCursor: true }).setDepth(10);
     slotZone.on('pointerdown', () => {
       audio.play('click');
       this.tweens.add({ targets: this._slotCont, scale: 0.94, duration: 70, yoyo: true });
@@ -132,7 +135,7 @@ export default class MenuScene extends Phaser.Scene {
       fontSize: '22px',
     }).setOrigin(0.5);
     this._muteCont.add(this._muteIcon);
-    const muteZone = this.add.zone(44, 48, 48, 48).setInteractive({ useHandCursor: true });
+    const muteZone = this.add.zone(44, 48, 48, 48).setInteractive({ useHandCursor: true }).setDepth(10);
     muteZone.on('pointerover', () => this._muteCont.setScale(1.06));
     muteZone.on('pointerout', () => this._muteCont.setScale(1));
     muteZone.on('pointerdown', () => {
@@ -179,7 +182,7 @@ export default class MenuScene extends Phaser.Scene {
     cont.add(this.add.text(0, 16, sub, {
       fontFamily: '"PingFang SC",sans-serif', fontSize: '12px', color: '#e6d4ac',
     }).setOrigin(0.5));
-    const zone = this.add.zone(cx, cy, w, h).setInteractive({ useHandCursor: true });
+    const zone = this.add.zone(cx, cy, w, h).setInteractive({ useHandCursor: true }).setDepth(10);
     zone.on('pointerover', () => cont.setAlpha(0.92));
     zone.on('pointerout', () => cont.setAlpha(1));
     zone.on('pointerdown', () => {
@@ -212,7 +215,7 @@ export default class MenuScene extends Phaser.Scene {
     cont.add(this.add.text(w / 2 - 22, 0, '▶ 续战', {
       fontFamily: '"PingFang SC",sans-serif', fontSize: '18px', color: '#9affb8',
     }).setOrigin(1, 0.5));
-    const zone = this.add.zone(cx, cy, w, h).setInteractive({ useHandCursor: true });
+    const zone = this.add.zone(cx, cy, w, h).setInteractive({ useHandCursor: true }).setDepth(10);
     zone.on('pointerover', () => cont.setAlpha(0.92));
     zone.on('pointerout', () => cont.setAlpha(1));
     zone.on('pointerdown', () => {
@@ -249,6 +252,8 @@ export default class MenuScene extends Phaser.Scene {
     const cont = this.add.container(0, 0).setDepth(5);
     cont.setMask(mask);
     this._levels = { cont, listTop, listBottom, listH, maxScroll, scrollY: 0 };
+    // 收集每张关卡卡的命中区 {zone, baseCy}，滚动时按可视带动态启停 input（见 _updateCardInput）
+    this._cardZones = [];
 
     LEVEL_LIST.forEach((key, i) => {
       const lv = LEVELS[key];
@@ -284,6 +289,7 @@ export default class MenuScene extends Phaser.Scene {
           this._dragged = true;
           this._levels.scrollY = this._clamp(this._levels.scrollY - dy, 0, this._levels.maxScroll);
           this._levels.cont.y = -this._levels.scrollY;
+          this._updateCardInput();
         }
       }
       this._lastDragY = p.y;
@@ -293,6 +299,25 @@ export default class MenuScene extends Phaser.Scene {
       this._lastDragY = null;
       // 重置 _dragged 交给下一次 pointerdown；卡片在 pointerup 时自行读取判断
     });
+
+    // 初始即按可视带启停：可视带之下的卡片（被 mask 裁掉）一开始就不接收命中
+    this._updateCardInput();
+  }
+
+  // GeometryMask 只裁剪渲染、不裁剪命中检测：被遮罩裁掉（视觉不可见）的卡片命中区
+  // 仍停留在原世界坐标。向下滚动时这些"幽灵"命中区会叠到导航/续战区（y≈232/312），
+  // 导致导航按钮失灵、或在空白处抬手误入玩家根本看不见的关卡。
+  // 故按卡片中心当前世界 y（= baseCy - scrollY，因 cont.y = -scrollY）是否落在
+  // 可视带 [listTop, listBottom] 内，动态启停其 input —— 这是误触的根因修复。
+  _updateCardInput() {
+    if (!this._cardZones || !this._levels) return;
+    const { listTop, listBottom, scrollY } = this._levels;
+    for (const c of this._cardZones) {
+      if (!c.zone.input) continue;
+      const worldCy = c.baseCy - scrollY;
+      const visible = worldCy >= listTop && worldCy <= listBottom;
+      if (visible !== c.zone.input.enabled) c.zone.input.enabled = visible;
+    }
   }
 
   _levelCard(parent, cx, cy, w, h, lv) {
@@ -343,6 +368,7 @@ export default class MenuScene extends Phaser.Scene {
 
     const zone = this.add.zone(cx, cy, w, h).setInteractive({ useHandCursor: true });
     parent.add(zone);
+    this._cardZones.push({ zone, baseCy: cy });
     zone.on('pointerover', () => cont.setAlpha(0.92));
     zone.on('pointerout', () => cont.setAlpha(1));
     zone.on('pointerdown', () => {

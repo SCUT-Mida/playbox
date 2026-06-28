@@ -9,6 +9,7 @@ import { portraitSVG } from './portrait.js';
 import {
   REALMS, SPIRIT_ROOTS, ACTIVE_CULTIVATE_MP_COST, EXPLORE_MP_COST, EXPLORE_HP_COST,
   VITALITY_COSTS, breakthroughChance, cultivateSpeedMult, passiveXpPerSec, nowSec,
+  baseMaxHp, baseMaxMp, baseAtk, baseDef, baseSpirit,
 } from '../config.js';
 import { ITEMS, TREASURE_SKILLS } from '../data/items.js';
 import { RECIPE_BY_ID, ALCHEMY_RECIPES, FORGE_BLUEPRINTS } from '../data/recipes.js';
@@ -318,11 +319,11 @@ export class GameUI {
     const info = realmInfo(p);
     const pt = portraitDef(p.portraitId);
     this.ui.avatar = h('button', { class: 'avatar-btn', title: '人物档案', html: portraitSVG(pt, 34), onClick: () => this.showCharacter() });
-    // 境界徽章：只呈现大境界，点击展开完整「境界总纲」（可上下滑动，标注当前境界）
+    // 境界徽章：只呈现「图标」（2 字境界简称，如凡人/炼气/筑基），点击展开完整「境界总纲」。
+    // 不再附带境界全名文字——状态栏空间有限，省下的位置让设置按钮始终可见。
     this.ui.realmBadge = h('button', { class: 'realm-badge', title: '查看境界总纲',
       onClick: () => this.showRealmAxis() },
-      h('span', { class: 'seal', style: { background: info.realm.color } }, info.realm.short),
-      h('span', { class: 'realm-name' }, info.majorName),
+      h('span', { class: 'seal', style: { background: info.realm.color } }, realmTag(info.realm)),
     );
     this.ui.stones = h('span', { class: 'stones' }, `💎 ${fmt(p.stones)}`);
     this.ui.vitality = h('span', { class: 'vit-pill', title: '每日活力：消耗型行动力，跨日恢复' }, `⚡${Math.floor(p.vitality)}/${p.maxVitality}`);
@@ -337,12 +338,14 @@ export class GameUI {
       h('div', { class: 'status-row' },
         this.ui.avatar,
         this.ui.realmBadge,
-        h('div', { class: 'spacer' }),
-        this.ui.vitality,
-        this.ui.stones,
-        this.ui.soundBtn,
-        h('button', { class: 'icon-btn', title: '成就与称号', onClick: () => this.showAchievements() }, '🏆'),
-        h('button', { class: 'icon-btn', title: '设置 / 存档', onClick: () => this.showSettings() }, '⚙️'),
+        // 右侧工具收拢成一组：窄屏放不下时整组换行，确保设置按钮永不被挤出可视区
+        h('div', { class: 'status-tools' },
+          this.ui.vitality,
+          this.ui.stones,
+          this.ui.soundBtn,
+          h('button', { class: 'icon-btn', title: '成就与称号', onClick: () => this.showAchievements() }, '🏆'),
+          h('button', { class: 'icon-btn', title: '设置 / 存档', onClick: () => this.showSettings() }, '⚙️'),
+        ),
       ),
       h('div', { class: 'res-bars' }, this.ui.hpBar, this.ui.mpBar),
       h('div', { class: 'xp-wrap' }, this.ui.xpBar),
@@ -359,10 +362,10 @@ export class GameUI {
   refreshStatus() {
     const p = this.player;
     const info = realmInfo(p);
-    // 境界徽章：颜色/文字（只呈现大境界，详情见「境界总纲」）
+    // 境界徽章：印章配色 + 2 字图标简称（无境界全名文字）
     const seal = this.ui.realmBadge.querySelector('.seal');
     seal.style.background = info.realm.color;
-    this.ui.realmBadge.querySelector('.realm-name').textContent = info.majorName;
+    seal.textContent = realmTag(info.realm);
     // 头像：飞升后切换为仙尊形象
     const pt = portraitDef(p.ascended ? 'pt_ascend' : p.portraitId);
     this.ui.avatar.innerHTML = portraitSVG(pt, 34);
@@ -994,7 +997,7 @@ export class GameUI {
       c.append(h('div', { class: 'card' },
         h('h4', null, '装备中'),
         h('div', { class: 'row' },
-          h('div', { class: 'grow' }, `${tr.emoji} ${tr.name}`, h('div', { class: 'muted' }, `${tr.stats.atk ? `攻+${tr.stats.atk} ` : ''}${tr.stats.def ? `防+${tr.stats.def} ` : ''}${elName(tr.stats.el)}${tr.stats.skill ? ` · ${TREASURE_SKILLS[tr.stats.skill].name}` : ''}`)),
+          h('div', { class: 'grow' }, `${tr.emoji} ${tr.name}`, h('div', { class: 'muted' }, treasureStatText(tr))),
           h('button', { class: 'btn-ghost', onClick: () => { if (!unequip(p)) this.toast('储物袋已满，无法卸下装备', 'bad'); this.afterAction(); } }, '卸下'),
         ),
       ));
@@ -1489,24 +1492,51 @@ export class GameUI {
     const talents = (p.talentIds || []).map((id) => TALENTS[id]).filter(Boolean);
     const sect = p.sectId ? sectDef(p.sectId) : null;
     const sectTitle = currentSectTitle(p);
+    const lv = p.lv || 0;
+    // 属性呈现：总数（基础 + 加成汇总），如 攻击 89（69+20）
+    const equipDef = p.equipment ? ITEMS[p.equipment] : null;
 
     const body = [
       h('div', { class: 'char-head' },
         h('div', { class: `portrait-big ${p.gender}`, html: portraitSVG(pt, 72) }),
         h('div', { class: 'char-id' },
           h('div', { class: 'char-name' }, p.name || '无名修士'),
-          h('div', { class: 'muted' }, `${p.gender === 'female' ? '女' : '男'}修 · ${pt.tag}`),
+          // 姓名下方：性别 · 宗门归属（已入宗门显示宗门名，未入显示「散修」）
+          h('div', { class: 'muted' }, `${p.gender === 'female' ? '女' : '男'}修 · ${sect ? sect.name : '散修'}`),
           h('div', { class: 'char-realm', style: { color: info.realm.color } }, `${info.majorName}${info.subName}`),
         ),
       ),
       h('div', { class: 'stat-grid', style: { margin: '0.6rem 0' } },
         kv('灵根', root.name), kv('气运', `${qy} · ${ql.text}`),
-        kv('攻击', p.atk), kv('防御', p.def),
-        kv('神识', p.spirit), kv('气血上限', p.maxHp),
-        kv('灵力上限', p.maxMp), kv('每日活力', `${Math.floor(p.vitality)}/${p.maxVitality}`),
+        kv('攻击', statText(p.atk, baseAtk(lv))), kv('防御', statText(p.def, baseDef(lv))),
+        kv('神识', statText(p.spirit, baseSpirit(lv))), kv('气血上限', statText(p.maxHp, baseMaxHp(lv))),
+        kv('灵力上限', statText(p.maxMp, baseMaxMp(lv))), kv('每日活力', `${Math.floor(p.vitality)}/${p.maxVitality}`),
         kv('修炼/秒', passiveXpPerSec(p.tier, cultivateSpeedMult(p)).toFixed(2)), kv('出身', `${bg.emoji}${bg.name}`),
         kv('宗门', sect ? `${sect.emoji}${sect.name}` : '散修（未入宗门）'),
         kv('宗门称号', sectTitle ? `${sectTitle.emoji} ${sectTitle.name}` : '——'),
+      ),
+      // 装备
+      h('div', { class: 'card', style: { marginBottom: '0.6rem' } },
+        h('h4', null, '装备'),
+        equipDef
+          ? h('div', { class: 'row' },
+              h('div', { class: 'emo', style: { fontSize: '1.5rem', flex: 'none' } }, equipDef.emoji),
+              h('div', { class: 'grow' },
+                h('div', { class: 'nm', style: { fontWeight: 600 } }, equipDef.name),
+                h('div', { class: 'muted', style: { marginTop: '0.1rem' } }, treasureStatText(equipDef)),
+              ),
+            )
+          : h('div', { class: 'muted' }, '尚未装备任何法宝。'),
+      ),
+      // 已习功法
+      h('div', { class: 'card', style: { marginBottom: '0.6rem' } },
+        h('h4', null, '已习功法'),
+        p.techniques && p.techniques.length
+          ? h('div', { class: 'muted' }, p.techniques.map((id) => {
+              const t = ITEMS[id];
+              return t ? `${t.emoji}${t.name}` : id;
+            }).join('、'))
+          : h('div', { class: 'muted' }, '尚未习得任何功法。'),
       ),
     ];
     if (talents.length) {
@@ -1795,6 +1825,20 @@ function kv(k, v) { return [h('div', { class: 'k' }, k), h('div', { class: 'v' }
 function line(text, ok) { return h('div', { class: 'req-line' }, h('span', { class: ok ? 'ok' : 'no' }, `${ok ? '✓' : '○'} ${text}`)); }
 function typeName(t) { return { pill: '丹药', material: '材料', treasure: '法宝', technique: '功法', misc: '杂物', recipe: '配方' }[t] || t; }
 function elName(el) { return ({ metal: '金', wood: '木', water: '水', fire: '火', earth: '土' })[el] ? `${({ metal: '金', wood: '木', water: '水', fire: '火', earth: '土' })[el]}属性` : ''; }
+// 境界 2 字图标简称（凡人/炼气/筑基…）：去掉境界名末尾「期」，凡人/飞升本就是 2 字。
+function realmTag(realm) { return (realm && realm.name || '').replace(/期$/, ''); }
+// 法宝属性摘要（攻防 + 五行 + 技能），背包与人物档案共用，避免两处格式漂移。
+function treasureStatText(tr) {
+  const s = (tr && tr.stats) || {};
+  return `${s.atk ? `攻+${s.atk} ` : ''}${s.def ? `防+${s.def} ` : ''}${elName(s.el)}${s.skill && TREASURE_SKILLS[s.skill] ? ` · ${TREASURE_SKILLS[s.skill].name}` : ''}`.trim();
+}
+// 属性构成：总数 = 基础(随境界) + 加成汇总(天赋/功法/装备)，如 攻击 89（69+20）。加成为 0 时只显示总数。
+function statText(total, base) {
+  const t = Math.round(total);
+  const b = Math.round(base);
+  const bonus = t - b;
+  return bonus > 0 ? `${t}（${b}+${bonus}）` : `${t}`;
+}
 function trialLabel(kind) { return { heart: '渡心魔', trib: '渡天劫', ascend: '飞升天劫' }[kind] || '突破'; }
 function learnRecipeGuard(p, id) { const r = RECIPE_BY_ID[id]; if (r && !p.recipes.includes(id)) p.recipes.push(id); }
 // 大数简写：1.2k / 3.4w

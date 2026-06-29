@@ -33,7 +33,7 @@ import {
 } from '../core/breakthrough.js';
 import { tryAlchemy, tryForge, hasMaterials, successRate } from '../core/alchemy.js';
 import { rollMarket, buyItem, sellItem, sellPrice, itemEffectText } from '../core/market.js';
-import { ACHIEVEMENTS, ACH_CATS, TITLES, checkAchievements } from '../core/achievements.js';
+import { ACHIEVEMENTS, ACH_CATS, TITLES, checkAchievements, achProgress, rewardDesc } from '../core/achievements.js';
 import { SECTS, SECT_LIST, SECT_TITLES, CHALLENGE_TEMPLATES, MAX_ACTIVE_CHALLENGES } from '../data/sect.js';
 import {
   joinSect, sectDef, currentSectTitle, titleProgress,
@@ -1692,6 +1692,7 @@ export class GameUI {
 
   showAchievements() {
     const p = this.player;
+    if (!this.achvCollapsed) this.achvCollapsed = new Set(); // 记住每个分类的折叠态
     const sectTitle = currentSectTitle(p);
     const totalGot = ACHIEVEMENTS.filter((a) => p.achievements.includes(a.id)).length;
     const body = [h('div', { class: 'card' },
@@ -1701,32 +1702,60 @@ export class GameUI {
       // 突破称号：筑基道子 / 结丹仙缘 等（固定，存于 player.titles）
       p.titles.length ? h('div', { class: 'muted' }, p.titles.map((id) => `${TITLES[id] ? TITLES[id].emoji + ' ' + TITLES[id].name + '：' + TITLES[id].desc : id}`).join('　')) : (sectTitle ? null : h('div', { class: 'muted' }, '尚无称号。')),
     )];
-    // 成就总进度
+    // 成就总进度（数字 + 进度条）
     body.push(h('div', { class: 'achv-overview' },
-      h('span', { class: 'k' }, '成就总览'),
-      h('span', { class: 'v' }, `${totalGot}/${ACHIEVEMENTS.length}`),
+      h('div', { class: 'achv-overview__row' },
+        h('span', { class: 'k' }, '成就总览'),
+        h('span', { class: 'v' }, `${totalGot}/${ACHIEVEMENTS.length}`),
+      ),
+      bar(totalGot, ACHIEVEMENTS.length, { class: 'xp', label: `已达成 ${Math.round((totalGot / ACHIEVEMENTS.length) * 100)}%` }),
     ));
-    // 按类型分门别类、目录式呈现
+    body.push(h('div', { class: 'muted', style: { fontSize: '0.72rem', margin: '0.2rem 0 0.5rem' } }, '点击分类标题可伸缩折叠。每项标注达成条件、当前进度与奖励。'));
+    // 按类型分门别类、目录式（可伸缩）呈现
     for (const cat of ACH_CATS) {
       const list = ACHIEVEMENTS.filter((a) => a.cat === cat.id);
       if (!list.length) continue;
       const got = list.filter((a) => p.achievements.includes(a.id)).length;
-      body.push(h('div', { class: 'achv-cat' },
-        h('div', { class: 'achv-cat__head' },
+      const collapsed = this.achvCollapsed.has(cat.id);
+      body.push(h('div', { class: `achv-cat${collapsed ? ' collapsed' : ''}`, dataset: { cat: cat.id } },
+        h('button', { type: 'button', class: 'achv-cat__head', onClick: (ev) => this.toggleAchvCat(cat.id, ev.currentTarget) },
+          h('span', { class: 'achv-cat__caret' }, collapsed ? '▶' : '▼'),
           h('span', { class: 'achv-cat__name' }, `${cat.emoji} ${cat.name}`),
           h('span', { class: 'achv-cat__count' }, `${got}/${list.length}`),
         ),
-        ...list.map((a) => {
-          const has = p.achievements.includes(a.id);
-          return h('div', { class: `achv ${has ? '' : 'locked'}` },
-            h('div', { class: 'emo' }, a.emoji),
-            h('div', { class: 'grow' }, h('div', null, a.name), h('div', { class: 'muted' }, a.desc)),
-            h('div', { class: 'muted' }, has ? '✓' : '✗'),
-          );
-        }),
+        h('div', { class: 'achv-cat__list' },
+          ...list.map((a) => this.renderAchvRow(a, p)),
+        ),
       ));
     }
     this.showSheet({ title: '成就与称号', body, foot: [h('button', { class: 'btn-ghost', onClick: () => this.closeModal() }, '关闭')] });
+  }
+
+  // 折叠 / 展开某个成就分类：直接切 DOM class + 更新 caret，避免整张表重渲染（保留滚动位置）
+  toggleAchvCat(catId, headBtn) {
+    const set = this.achvCollapsed;
+    if (set.has(catId)) set.delete(catId); else set.add(catId);
+    const catEl = headBtn.parentElement;
+    const collapsed = catEl.classList.toggle('collapsed');
+    const caret = headBtn.querySelector('.achv-cat__caret');
+    if (caret) caret.textContent = collapsed ? '▶' : '▼';
+  }
+
+  // 单条成就：达成条件 + 当前进度 + 奖励说明
+  renderAchvRow(a, p) {
+    const has = p.achievements.includes(a.id);
+    const { cur, target } = achProgress(p, a);
+    return h('div', { class: `achv ${has ? 'done' : 'locked'}` },
+      h('div', { class: 'emo' }, a.emoji),
+      h('div', { class: 'grow' },
+        h('div', { class: 'achv__name' }, has ? `${a.name} ✓` : a.name),
+        h('div', { class: 'muted achv__cond' }, a.desc),
+        h('div', { class: 'achv__reward' }, `🎁 奖励：${rewardDesc(a.reward)}`),
+        has
+          ? h('div', { class: 'achv__done' }, '已达成')
+          : bar(cur, target, { class: 'sm', label: `${cur} / ${target}` }),
+      ),
+    );
   }
 
   showSettings() {
@@ -1852,7 +1881,7 @@ export class GameUI {
   checkAchvAndToast() {
     const granted = checkAchievements(this.player);
     for (const a of granted) {
-      this.pushLog(`🏅 成就达成：${a.name}`, 'epic');
+      this.pushLog(`🏅 成就达成：${a.name}（奖励：${rewardDesc(a.reward)}）`, 'epic');
       this.toast(`成就：${a.name}`, 'epic');
     }
     if (granted.length) recompute(this.player);

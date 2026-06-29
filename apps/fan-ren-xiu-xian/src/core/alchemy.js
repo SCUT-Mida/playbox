@@ -4,7 +4,7 @@
 import { clamp } from '../config.js';
 import { ALCHEMY_RECIPES, FORGE_BLUEPRINTS, RECIPE_BY_ID } from '../data/recipes.js';
 import { ITEMS } from '../data/items.js';
-import { removeItem, hasItem, addItemOrLog, addStones, grantAchievement, countItem, talentAlchemyBonus } from './player.js';
+import { removeItem, hasItem, addItemOrLog, addStones, countItem, talentAlchemyBonus } from './player.js';
 import { recordSectActivity } from './sect.js';
 import { chance } from './rng.js';
 
@@ -35,7 +35,7 @@ export function tryAlchemy(player, recipeId, rng) {
 
   if (!success) {
     player.stats.alchemyFails += 1;
-    grantAchievement(player, 'ach_alchemy_fail'); // 首次炼丹失败
+    // 「万事开头难」成就由 checkAchievements 统一按 alchemyFails 检测授予（UI 各动作后调用）
     logs.push({ text: `炼制【${recipe.name}】失败，丹炉炸裂，材料化为灰烬。`, type: 'bad' });
     return { ok: true, success: false, logs };
   }

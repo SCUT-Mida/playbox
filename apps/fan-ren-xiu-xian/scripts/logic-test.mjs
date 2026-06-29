@@ -1003,7 +1003,7 @@ console.log('— achievements: goal / progress / reward —');
 console.log('— autoplay —');
 // 测试用：构造一份「只启用指定倾向」的完整配置（normalize 会用默认值补齐缺省倾向，
 // 故测试需显式给出全部 0，避免默认倾向混入干扰加权抽取判定）。
-const ZERO_TEND = { cultivate: 0, explore: 0, breakthrough: 0, craft: 0, team: 0, meet: 0 };
+const ZERO_TEND = { cultivate: 0, explore: 0, breakthrough: 0, craft: 0, market: 0, team: 0, meet: 0 };
 const onlyTendency = (over) => normalizeAutoPlay({ enabled: true, tendencies: { ...ZERO_TEND, ...over } });
 
 ok(AUTO_TENDENCIES.length >= 4, `自动挂机倾向 >= 4（实际 ${AUTO_TENDENCIES.length}）`);
@@ -1077,6 +1077,29 @@ ok(AUTO_TENDENCIES.every((d) => d.id && d.label && d.emoji && Number.isFinite(d.
   const before = countItem(q, 'pill_huitian');
   for (let i = 0; i < 80; i++) { autoStep(q, q.autoPlay, makeRng(i)); if (q.vitality < 6) q.vitality = q.maxVitality; }
   ok(countItem(q, 'pill_huitian') > before, '自动炼制倾向能产出丹药');
+}
+// autoStep：坊市倾向刷新货架并采购补给，活力丹入袋 / 缺活力时服用回补，全程不抛错
+{
+  ok(AUTO_TENDENCIES.some((d) => d.id === 'market'), '自动挂机含「坊市」倾向');
+  ok(defaultTendencies().market > 0, '坊市倾向默认权重为正');
+  const q = newPlayer(() => 0);
+  q.autoPlay = onlyTendency({ market: 1 });
+  q.stones = 99999; recompute(q); q.vitality = 0; // 活力见底，便于触发服用
+  let anyOk = false, vitGained = false, stocked = false, crashed = false;
+  try {
+    for (let i = 0; i < 300; i++) {
+      const r = autoStep(q, q.autoPlay, makeRng(i));
+      if (r.ok) anyOk = true;
+      if ((q.vitality || 0) > 0) vitGained = true;
+      // 活力丹 / 突破丹 / 回血丹任一入袋即说明采购成功
+      if (countItem(q, 'pill_peiyuan') || countItem(q, 'pill_lingjiu') || countItem(q, 'pill_xiancha')
+        || countItem(q, 'pill_tupo') || countItem(q, 'pill_huitian')) stocked = true;
+    }
+  } catch (e) { crashed = true; console.error(e); }
+  ok(!crashed, '自动坊市倾向全程不抛异常');
+  ok(anyOk, '自动坊市倾向至少一轮成功采购 / 服用');
+  ok(stocked, '自动坊市倾向会购入活力丹等补给');
+  ok(vitGained, '活力见底时自动服用活力丹回补，支撑挂机持续');
 }
 // autoStep：突破倾向自动渡心魔，可跨越炼气→筑基大境界
 {

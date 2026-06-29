@@ -13,7 +13,7 @@
 import { ACTIVE_CULTIVATE_MP_COST, VITALITY_COSTS } from '../config.js';
 import { weighted } from './rng.js';
 import {
-  recompute, addXp, realmInfo, equippedList, countItem, hasItem,
+  recompute, addXp, realmInfo, equippedList, countItem, hasItem, removeItem,
   canAffordVitality, spendVitality, hasAnyEquipped,
 } from './player.js';
 import { activeCultivate } from './cultivate.js';
@@ -24,10 +24,12 @@ import {
   startMajorTrial, trialRespond, advanceRealm, failMajor,
 } from './breakthrough.js';
 import { tryAlchemy, tryForge, hasMaterials } from './alchemy.js';
+import { rollMarket, buyItem } from './market.js';
 import {
   metNpcs, canTeamUp, teamedToday, teamExplore, teamExploreRemaining,
   meetableNpcs, meetNpc,
 } from './npc.js';
+import { ITEMS } from '../data/items.js';
 import { ALCHEMY_RECIPES, FORGE_BLUEPRINTS } from '../data/recipes.js';
 
 export const DEFAULT_INTERVAL = 4;   // 默认周期节奏（秒/轮）
@@ -42,6 +44,7 @@ export const AUTO_TENDENCIES = [
   { id: 'explore', emoji: '🗺️', label: '探索', defaultWeight: 3, desc: '行走江湖，自动处置遭遇与战斗' },
   { id: 'breakthrough', emoji: '🌀', label: '突破', defaultWeight: 3, desc: '修为圆满即突破，自动应对渡劫' },
   { id: 'craft', emoji: '⚗️', label: '炼制', defaultWeight: 2, desc: '材料齐备时自动炼丹 / 炼器' },
+  { id: 'market', emoji: '🏪', label: '坊市', defaultWeight: 2, desc: '刷新坊市，自动购入活力丹等补给' },
   { id: 'team', emoji: '🤝', label: '结伴', defaultWeight: 1, desc: '与投缘道友结伴探险' },
   { id: 'meet', emoji: '🍃', label: '寻访', defaultWeight: 1, desc: '寻访结识各路修士' },
 ];
@@ -236,6 +239,60 @@ function autoMeet(player, rng) {
   return { ok: true, logs: res.logs || [] };
 }
 
+// —— 倾向：坊市 ——
+// 每次光顾即刷新一次货架（视作「云游坊市，看看今日有何好货」），把有用的补给买入：
+// 活力丹（挂机核心补给）/ 突破丹·清心丹（自动突破·渡心魔备用）/ 回血·补灵丹（自动战斗·渡劫续命）。
+// 材料法宝功法配方及境界专用丹不自动采购（价格高、需按需手动），避免无谓消耗灵石。
+// 买到的活力丹若当下活力有缺口则就地服一颗回补，让挂机得以持续，而非只囤在背包里。
+function autoMarket(player, rng) {
+  const r = rng || Math.random;
+  const logs = [];
+  const market = rollMarket(player, r); // 刷新货架（不收「刷新费」，自然随时光顾）
+  let bought = false;
+  for (const entry of market.entries) {
+    if (entry.stock <= 0) continue;
+    if (!wantBuy(player, entry)) continue;
+    if (player.stones < entry.price) continue;
+    const res = buyItem(player, entry, 1); // 内部校验背包容量 / 灵石并扣费扣库存
+    if (!res.ok) continue;
+    bought = true;
+    logs.push({ text: `🤖🏪 购入${entry.name}（${res.cost} 灵石）`, type: 'good' });
+  }
+  const used = autoUseVitalityPill(player, logs);
+  return { ok: bought || used, logs };
+}
+
+// 是否值得购入：仅补常用补给，并控制每种囤货上限，避免灵石被无意义地花光。
+function wantBuy(player, entry) {
+  const def = ITEMS[entry.id];
+  if (!def) return false;
+  if (def.effect && def.effect.kind === 'restore_vitality') return countItem(player, entry.id) < 3; // 活力丹留 3 颗
+  if (def.role === 'break_boost' || def.role === 'heart_pass') return countItem(player, entry.id) < 3; // 突破 / 清心丹各 3 颗
+  if (def.effect && (def.effect.kind === 'heal_hp' || def.effect.kind === 'heal_mp')) return countItem(player, entry.id) < 5; // 回血 / 补灵丹各 5 颗
+  return false;
+}
+
+// 活力有缺口时服一颗库存活力丹回补，支撑长时间挂机。
+// 选「能一次补满」的最小档（不浪费高阶丹）；都不够则取最高档尽量回血。
+// 缺口 <10 时不服（接近满值不值得磕药），避免频繁消耗。
+function autoUseVitalityPill(player, logs) {
+  const need = (player.maxVitality || 0) - (player.vitality || 0);
+  if (need < 10) return false;
+  const owned = VITALITY_PILLS
+    .filter((id) => countItem(player, id) > 0)
+    .map((id) => ({ id, amt: ITEMS[id].effect.amount }))
+    .sort((a, b) => a.amt - b.amt);
+  if (!owned.length) return false;
+  const pick = owned.find((o) => o.amt >= need) || owned[owned.length - 1];
+  if (!removeItem(player, pick.id, 1)) return false;
+  const before = player.vitality || 0;
+  player.vitality = Math.min(player.maxVitality, before + pick.amt);
+  logs.push({ text: `🤖🟢 服${ITEMS[pick.id].name}，活力 +${Math.round(player.vitality - before)}。`, type: 'good' });
+  return true;
+}
+// 活力恢复类丹药（按回复量升序），供自动坊市购入与服用挑选
+const VITALITY_PILLS = ['pill_peiyuan', 'pill_lingjiu', 'pill_xiancha'];
+
 // —— 倾向：突破（小境界直接掷骰；大境界自动渡劫）——
 function autoBreakthrough(player, rng) {
   const r = rng || Math.random;
@@ -283,6 +340,7 @@ const HANDLERS = {
   explore: autoExplore,
   breakthrough: autoBreakthrough,
   craft: autoCraft,
+  market: autoMarket,
   team: autoTeam,
   meet: autoMeet,
 };

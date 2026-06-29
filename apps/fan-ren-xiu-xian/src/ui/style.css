@@ -67,13 +67,15 @@
   background: linear-gradient(180deg, #1c150d, var(--bg-2));
   border-bottom: 1px solid var(--line);
 }
-/* 顶行：头像 / 境界 / 活力 / 灵石 / 工具按钮一律单行排列，不再换行。
-   落地页关闭按钮(✕)已移入外层顶栏，不再压住游戏右上角，故无需为此预留右侧空间。 */
+/* 顶行：头像 / 境界 收拢于左，右侧工具组靠右。
+   开启自动挂机后多出「🤖自动」徽丸，窄屏一行放不下时整组工具换行到第二行——
+   绝不任由最右侧的设置/成就按钮被挤出可视区（根容器 overflow:hidden 会裁掉溢出部分，
+   导致设置按钮点不到，即「自动挂机占住导航栏、设置按钮按不了」的 bug）。 */
 .frxx .status-row {
-  display: flex; align-items: center; gap: 0.35rem; flex-wrap: nowrap;
+  display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;
   padding-right: env(safe-area-inset-right);
 }
-/* 右侧工具组：与左侧核心信息同处一行，永不换行，确保设置按钮始终可见可达 */
+/* 右侧工具组：作为整体右对齐；窄屏换行时整组落到第二行，设置按钮随之可见可达 */
 .frxx .status-tools {
   display: flex; align-items: center; gap: 0.35rem; flex-wrap: nowrap;
   margin-left: auto; justify-content: flex-end;

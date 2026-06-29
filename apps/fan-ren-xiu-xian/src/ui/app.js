@@ -363,7 +363,7 @@ export class GameUI {
     this.ui.vitality = h('span', { class: 'vit-pill', title: '每月行动力：消耗型行动力，跨月恢复' }, `⚡${Math.floor(p.vitality)}/${p.maxVitality}`);
     this.ui.chaosBanner = h('div', { class: 'chaos-banner', style: { display: 'none' } });
     // 自动挂机指示徽丸：仅在开启时显示，提示玩家「主角正在自动修行」。
-    this.ui.autoBadge = h('span', { class: 'auto-badge', title: '自动挂机进行中（打开任意弹窗时自动暂停）', style: { display: 'none' } }, '🤖自动');
+    this.ui.autoBadge = h('span', { class: 'auto-badge', title: '自动挂机进行中（打开任意弹窗时自动暂停）', style: { display: 'none' } }, '🤖');
 
     this.ui.hpBar = bar(p.hp, p.maxHp, { class: 'hp', label: `气血 ${Math.floor(p.hp)}/${p.maxHp}` });
     this.ui.mpBar = bar(p.mp, p.maxMp, { class: 'mp', label: `灵力 ${Math.floor(p.mp)}/${p.maxMp}` });

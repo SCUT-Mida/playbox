@@ -5,6 +5,7 @@
 // 旧的 frxx_save_v1 单存档会在首启时迁移到槽 1。
 // ============================================================================
 import { recompute } from './player.js';
+import { normalizeAutoPlay } from './autoplay.js';
 import {
   OFFLINE_CAP_HOURS, OFFLINE_EFFICIENCY, passiveXpPerSec, cultivateSpeedMult, nowSec,
   vitalityMax, cycleKey, rootFromLegacy, START_AGE_MIN, ageMonthFromKey,
@@ -230,6 +231,8 @@ function migrate(player) {
   // v7：道友结伴探险每月全局上限计数（teamExploreDate 为月份键，跨月自动归零）
   if (!player.teamExploreDate) player.teamExploreDate = '';
   if (!Number.isFinite(player.teamExploreCount)) player.teamExploreCount = 0;
+  // v7：自动挂机配置（旧档缺失时补默认，且不擅自开启）
+  player.autoPlay = normalizeAutoPlay(player.autoPlay);
   if (player.slot == null) player.slot = 1;
   return player;
 }

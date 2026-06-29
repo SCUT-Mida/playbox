@@ -128,6 +128,10 @@ export function newPlayer(rng, template) {
     sectRewardDate: '',
     challengeTasks: [],     // 悬赏挑战（v4）：自主领取，难度随境界缩放
     npcs: {},               // 道友系统（v4）：npcId → { met, aff, teamedDate }
+    // 自动挂机（v7）：主角按倾向与权重每周期自动修行。默认关闭，配置由「设置」面板维护。
+    // 此处内联一份默认结构（而非 import autoplay），以避免 player↔autoplay 循环依赖；
+    // 读写时统一经 core/autoplay.js 的 normalizeAutoPlay 规范化。
+    autoPlay: { enabled: false, intervalSec: 4, tendencies: { cultivate: 4, explore: 3, breakthrough: 3, craft: 2, team: 1, meet: 1 } },
     stats: { battlesWon: 0, breakthroughs: 0, alchemyFails: 0, alchemyOk: 0, lowHpWins: 0, breakthroughStreak: 0, exploreCount: 0, deaths: 0 },
     createdAt: nowSec(),
     lastSeen: 0,

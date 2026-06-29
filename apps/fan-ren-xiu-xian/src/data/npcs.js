@@ -36,6 +36,8 @@ export const TEAM_AFFINITY_THRESHOLD = 40;
 export const MEET_VITALITY_COST = 6;
 // 组队探险消耗（与普通探索一致，但奖励大幅放大）
 export const TEAM_VITALITY_COST = 10;
+// 每轮（自然月）结伴探险的全局次数上限：一轮最多 10 次（与单道友「每月一次」并存）
+export const TEAM_EXPLORE_MAX_PER_CYCLE = 10;
 
 // 由好感值映射当前等级（已达标中最高的）
 export function affinityLevel(aff) {

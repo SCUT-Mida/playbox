@@ -10,7 +10,7 @@ import {
   REALMS, ACTIVE_CULTIVATE_MP_COST, EXPLORE_MP_COST, EXPLORE_HP_COST,
   VITALITY_COSTS, breakthroughChance, cultivateSpeedMult, passiveXpPerSec, nowSec,
   baseMaxHp, baseMaxMp, baseAtk, baseDef, baseSpirit,
-  rootDescriptor, ageLabel, realmLifespan,
+  rootDescriptor, ageLabel, ageDetailLabel, realmLifespan,
   isDying, canReincarnate, REINCARNATION_CULT_BONUS,
 } from '../config.js';
 import { ITEMS, TREASURE_SKILLS, EQUIP_SLOTS, slotName } from '../data/items.js';
@@ -33,7 +33,7 @@ import {
 } from '../core/breakthrough.js';
 import { tryAlchemy, tryForge, hasMaterials, successRate } from '../core/alchemy.js';
 import { rollMarket, buyItem, sellItem, sellPrice, itemEffectText } from '../core/market.js';
-import { ACHIEVEMENTS, TITLES, checkAchievements } from '../core/achievements.js';
+import { ACHIEVEMENTS, ACH_CATS, TITLES, checkAchievements } from '../core/achievements.js';
 import { SECTS, SECT_LIST, SECT_TITLES, CHALLENGE_TEMPLATES, MAX_ACTIVE_CHALLENGES } from '../data/sect.js';
 import {
   joinSect, sectDef, currentSectTitle, titleProgress,
@@ -46,9 +46,9 @@ import {
   listSlots, loadSlot, saveSlot, deleteSlot, getActiveSlot, setActiveSlot, migrateLegacy,
 } from '../core/save.js';
 import { playSfx, isSfxEnabled, setSfxEnabled } from '../core/sfx.js';
-import { NPC_LIST, npcDef, affinityLevel, AFFINITY_LEVELS, TEAM_AFFINITY_THRESHOLD, MEET_VITALITY_COST, TEAM_VITALITY_COST } from '../data/npcs.js';
+import { NPC_LIST, npcDef, affinityLevel, AFFINITY_LEVELS, TEAM_AFFINITY_THRESHOLD, MEET_VITALITY_COST, TEAM_VITALITY_COST, TEAM_EXPLORE_MAX_PER_CYCLE } from '../data/npcs.js';
 import {
-  meetNpc, giftNpc, canTeamUp, teamedToday, teamExplore,
+  meetNpc, giftNpc, canTeamUp, teamedToday, teamExplore, teamExploreUsed, teamExploreRemaining,
   metNpcs, meetableNpcs, curAffinityLevel, affinityProgress, getAffinity, isMet, companionCultivateBonus,
 } from '../core/npc.js';
 
@@ -186,6 +186,9 @@ export class GameUI {
     const qy = (t.qiyun || 0) + sumTalent(t.talentIds, 'qiyunBonus');
     const ql = qiyunLabel(qy);
     const bg = BACKGROUNDS[t.bgId] || BACKGROUNDS[Object.keys(BACKGROUNDS)[0]];
+    // 由当前模板派生一份完整玩家用于预览衍生属性（攻击/防御/神识/气血/灵力 等），不落盘。
+    const preview = newPlayer(() => 0, t);
+    const plv = preview.lv || 0;
 
     clear(this.stage);
     const wrap = h('div', { class: 'launcher create' });
@@ -208,14 +211,16 @@ export class GameUI {
         h('div', { class: 'card' },
           h('div', { class: 'row' },
             h('div', { class: 'grow' },
-              h('h4', null, `灵根 · ${root.name}`),
-              h('div', { class: 'muted' }, `${root.desc}${root.displayEls ? ` · 属性：${root.displayEls}` : ''}`),
+              h('h4', null, root.name),
+              // 灵根说明与五行属性分两行展示（属性另起一行，便于阅读）
+              h('div', { class: 'muted' }, root.desc),
+              root.displayEls ? h('div', { class: 'muted', style: { marginTop: '0.2rem' } }, `五行属性：${root.displayEls}`) : null,
             ),
             h('div', { class: 'muted', style: { textAlign: 'right' } }, h('div', null, `修炼 ×${root.mult.toFixed(2)}`), h('div', null, `突破 ${(root.breakBonus >= 0 ? '+' : '')}${Math.round(root.breakBonus * 100)}%`)),
           ),
           h('div', { class: 'row', style: { marginTop: '0.4rem', alignItems: 'center' } },
             h('span', { class: 'k' }, '年龄'),
-            h('span', { class: 'muted grow' }, `${t.age}岁 · 岁月随每月周期增长，境界越高寿元越长；大限将至可轮回重修`),
+            h('span', { class: 'muted grow' }, `${ageDetailLabel(preview)} · 岁月随每月周期增长，境界越高寿元越长；大限将至可轮回重修`),
           ),
           h('div', { class: 'row', style: { marginTop: '0.4rem', alignItems: 'center' } },
             h('span', { class: 'k' }, '气运'),
@@ -230,6 +235,19 @@ export class GameUI {
           h('div', { class: 'muted' }, bg.desc),
         ),
         h('button', { class: 'btn-ghost big-btn reroll-btn', onClick: () => this.reroll() }, '🎲 重新随机属性'),
+        // 衍生属性一览：汇总（基础 + 加成），每项独占一行
+        h('div', { class: 'card' },
+          h('h4', null, '属性一览'),
+          h('div', { class: 'muted', style: { marginBottom: '0.4rem' } }, '总数 = 基础（随境界）+ 加成（天赋 / 功法 / 装备）。'),
+          h('div', { class: 'attr-list' },
+            attrRow('攻击', statText(preview.atk, baseAtk(plv))),
+            attrRow('防御', statText(preview.def, baseDef(plv))),
+            attrRow('神识', statText(preview.spirit, baseSpirit(plv))),
+            attrRow('气血上限', statText(preview.maxHp, baseMaxHp(plv))),
+            attrRow('灵力上限', statText(preview.maxMp, baseMaxMp(plv))),
+            attrRow('修炼/秒', passiveXpPerSec(preview.tier, cultivateSpeedMult(preview)).toFixed(2)),
+          ),
+        ),
         // 流程② 后取名：属性随机满意后，再主动点击此处输入道号
         h('div', { class: 'card' },
           h('h4', null, '道号'),
@@ -240,7 +258,7 @@ export class GameUI {
       h('div', { class: 'create__foot' },
         h('button', { class: 'btn-primary big-btn', onClick: () => this.confirmCreate() }, '⚡ 开始修仙'),
       ),
-      h('div', { class: 'muted', style: { textAlign: 'center', padding: '0 1rem 1rem' } }, '灵根（等级·组合·属性）、年龄、天赋、气运、出身皆随机生成；先随机至称心，再取道号入道。'),
+      h('div', { class: 'muted', style: { textAlign: 'center', padding: '0 1rem 1rem' } }, '灵根（组合·等级·属性）、年龄、天赋、气运、出身皆随机生成；先随机至称心，再取道号入道。'),
     );
     this.stage.appendChild(wrap);
     const inp = wrap.querySelector('[data-id="name"]');
@@ -339,7 +357,6 @@ export class GameUI {
     this.ui.age = h('span', { class: 'vit-pill age-pill', title: '年龄：随每月周期增长，境界越高寿元越长；大限将至可轮回重修' }, `🕯️${ageLabel(p)}`);
     this.ui.vitality = h('span', { class: 'vit-pill', title: '每月行动力：消耗型行动力，跨月恢复' }, `⚡${Math.floor(p.vitality)}/${p.maxVitality}`);
     this.ui.chaosBanner = h('div', { class: 'chaos-banner', style: { display: 'none' } });
-    this.ui.soundBtn = h('button', { class: 'icon-btn', title: '音效开关', onClick: () => this.toggleSfx() }, isSfxEnabled() ? '🔊' : '🔇');
 
     this.ui.hpBar = bar(p.hp, p.maxHp, { class: 'hp', label: `气血 ${Math.floor(p.hp)}/${p.maxHp}` });
     this.ui.mpBar = bar(p.mp, p.maxMp, { class: 'mp', label: `灵力 ${Math.floor(p.mp)}/${p.maxMp}` });
@@ -350,11 +367,11 @@ export class GameUI {
         this.ui.avatar,
         this.ui.realmBadge,
         // 右侧工具收拢成一组：窄屏放不下时整组换行，确保设置按钮永不被挤出可视区
+        // 音效开关已移入「设置」弹窗，状态栏不再占用工具位。
         h('div', { class: 'status-tools' },
           this.ui.age,
           this.ui.vitality,
           this.ui.stones,
-          this.ui.soundBtn,
           h('button', { class: 'icon-btn', title: '成就与称号', onClick: () => this.showAchievements() }, '🏆'),
           h('button', { class: 'icon-btn', title: '设置 / 存档', onClick: () => this.showSettings() }, '⚙️'),
         ),
@@ -367,7 +384,11 @@ export class GameUI {
 
   toggleSfx() {
     const on = setSfxEnabled(!isSfxEnabled());
-    if (this.ui.soundBtn) this.ui.soundBtn.textContent = on ? '🔊' : '🔇';
+    // 音效开关位于「设置」弹窗内：就地刷新按钮文案与样式，无需重建整张弹窗。
+    if (this._sfxBtn) {
+      this._sfxBtn.textContent = on ? '🔊 音效：开' : '🔇 音效：关';
+      this._sfxBtn.className = on ? 'btn-primary' : 'btn-ghost';
+    }
     this.toast(on ? '音效已开启' : '音效已关闭', 'normal');
   }
 
@@ -490,7 +511,7 @@ export class GameUI {
       h('div', { class: 'card' },
         h('div', { class: 'row' },
           h('div', { class: 'grow' },
-            h('h4', null, `灵根 · ${root.name}`),
+            h('h4', null, root.name),
             h('div', { class: 'muted' }, `${root.desc}${root.displayEls ? ` · 属性：${root.displayEls}` : ''}`),
           ),
           h('div', { class: 'muted', style: { textAlign: 'right' } },
@@ -501,7 +522,7 @@ export class GameUI {
         h('div', { class: 'stat-grid', style: { marginTop: '0.5rem' } },
           kv('攻击', p.atk), kv('防御', p.def), kv('神识', p.spirit),
           kv('气血上限', p.maxHp), kv('灵力上限', p.maxMp), kv('修炼/秒', speed.toFixed(2)),
-          kv('年龄', ageLabel(p)), kv('寿元', lifespan === Infinity ? '与天同寿' : `${Math.floor(p.age)}/${lifespan}岁`),
+          kv('年龄', ageDetailLabel(p)), kv('寿元', lifespan === Infinity ? '与天同寿' : `${Math.floor(p.age)}/${lifespan}岁`),
         ),
         dying ? h('div', { class: 'req-line', style: { marginTop: '0.5rem' } },
           h('span', { class: 'no' }, `☠ 大限将至：寿元已逾${REALMS[p.tier].name}之限，尽早突破延寿，否则需轮回重修。`)
@@ -1444,6 +1465,8 @@ export class GameUI {
         h('div', { class: 'stat-grid', style: { marginBottom: '0.4rem' } },
           kv('道友加成', `修炼 ×${companionCultivateBonus(p).toFixed(2)}`),
           kv('寻访消耗', `⚡${MEET_VITALITY_COST} 活力`),
+          kv('本月结伴', `${teamExploreUsed(p)}/${TEAM_EXPLORE_MAX_PER_CYCLE}`),
+          kv('结伴消耗', `⚡${TEAM_VITALITY_COST} 活力`),
         ),
         h('button', {
           class: 'btn-primary big-btn',
@@ -1464,7 +1487,8 @@ export class GameUI {
       const aff = prog.aff;
       const teamed = teamedToday(p, npc.id);
       const canTeam = canTeamUp(p, npc.id);
-      const teamOk = canTeam && !teamed && p.mp >= EXPLORE_MP_COST && p.hp > EXPLORE_HP_COST && canAffordVitality(p, TEAM_VITALITY_COST);
+      const teamLeft = teamExploreRemaining(p);
+      const teamOk = canTeam && !teamed && teamLeft > 0 && p.mp >= EXPLORE_MP_COST && p.hp > EXPLORE_HP_COST && canAffordVitality(p, TEAM_VITALITY_COST);
       // 好感进度条：未到顶时按「当前阶→下一阶」区间绘制
       const segLo = prog.cur.min;
       const segHi = prog.next ? prog.next.min : prog.cur.min;
@@ -1486,7 +1510,8 @@ export class GameUI {
           h('button', { class: 'btn-ghost', style: { flex: 1 }, onClick: () => this.showGiftPicker(npc.id) }, '🎁 赠礼'),
           canTeam
             ? h('button', { class: 'btn-jade', style: { flex: 1 }, disabled: !teamOk, onClick: () => this.doTeamExplore(npc.id) },
-                teamed ? '本月已同游' : `🤝 结伴探险（活力 ${TEAM_VITALITY_COST}）`)
+                teamed ? '本月已同游'
+                  : (teamLeft <= 0 ? `本月结伴已满 ${TEAM_EXPLORE_MAX_PER_CYCLE} 次` : `🤝 结伴探险（活力 ${TEAM_VITALITY_COST}）`))
             : h('div', { class: 'muted', style: { flex: 1, textAlign: 'center', alignSelf: 'center' } }, `好感达「${affinityLevel(TEAM_AFFINITY_THRESHOLD).name}」可结伴`),
         ),
       ));
@@ -1579,7 +1604,7 @@ export class GameUI {
       ),
       h('div', { class: 'stat-grid', style: { margin: '0.6rem 0' } },
         kv('灵根', root.name), kv('灵根属性', root.displayEls || '——'),
-        kv('气运', `${qy} · ${ql.text}`), kv('年龄', ageLabel(p)),
+        kv('气运', `${qy} · ${ql.text}`), kv('年龄', ageDetailLabel(p)),
         kv('寿元', realmLifespan(p.tier) === Infinity ? '与天同寿' : `${Math.floor(p.age)}/${realmLifespan(p.tier)}岁`),
         kv('攻击', statText(p.atk, baseAtk(lv))), kv('防御', statText(p.def, baseDef(lv))),
         kv('神识', statText(p.spirit, baseSpirit(lv))), kv('气血上限', statText(p.maxHp, baseMaxHp(lv))),
@@ -1668,6 +1693,7 @@ export class GameUI {
   showAchievements() {
     const p = this.player;
     const sectTitle = currentSectTitle(p);
+    const totalGot = ACHIEVEMENTS.filter((a) => p.achievements.includes(a.id)).length;
     const body = [h('div', { class: 'card' },
       h('h4', null, '称号'),
       // 宗门称号：随境界与声望动态变化的「活称号」
@@ -1675,12 +1701,29 @@ export class GameUI {
       // 突破称号：筑基道子 / 结丹仙缘 等（固定，存于 player.titles）
       p.titles.length ? h('div', { class: 'muted' }, p.titles.map((id) => `${TITLES[id] ? TITLES[id].emoji + ' ' + TITLES[id].name + '：' + TITLES[id].desc : id}`).join('　')) : (sectTitle ? null : h('div', { class: 'muted' }, '尚无称号。')),
     )];
-    for (const a of ACHIEVEMENTS) {
-      const got = p.achievements.includes(a.id);
-      body.push(h('div', { class: `achv ${got ? '' : 'locked'}` },
-        h('div', { class: 'emo' }, a.emoji),
-        h('div', { class: 'grow' }, h('div', null, a.name), h('div', { class: 'muted' }, a.desc)),
-        h('div', { class: 'muted' }, got ? '✓' : '✗'),
+    // 成就总进度
+    body.push(h('div', { class: 'achv-overview' },
+      h('span', { class: 'k' }, '成就总览'),
+      h('span', { class: 'v' }, `${totalGot}/${ACHIEVEMENTS.length}`),
+    ));
+    // 按类型分门别类、目录式呈现
+    for (const cat of ACH_CATS) {
+      const list = ACHIEVEMENTS.filter((a) => a.cat === cat.id);
+      if (!list.length) continue;
+      const got = list.filter((a) => p.achievements.includes(a.id)).length;
+      body.push(h('div', { class: 'achv-cat' },
+        h('div', { class: 'achv-cat__head' },
+          h('span', { class: 'achv-cat__name' }, `${cat.emoji} ${cat.name}`),
+          h('span', { class: 'achv-cat__count' }, `${got}/${list.length}`),
+        ),
+        ...list.map((a) => {
+          const has = p.achievements.includes(a.id);
+          return h('div', { class: `achv ${has ? '' : 'locked'}` },
+            h('div', { class: 'emo' }, a.emoji),
+            h('div', { class: 'grow' }, h('div', null, a.name), h('div', { class: 'muted' }, a.desc)),
+            h('div', { class: 'muted' }, has ? '✓' : '✗'),
+          );
+        }),
       ));
     }
     this.showSheet({ title: '成就与称号', body, foot: [h('button', { class: 'btn-ghost', onClick: () => this.closeModal() }, '关闭')] });
@@ -1689,7 +1732,15 @@ export class GameUI {
   showSettings() {
     const p = this.player;
     const exportStr = exportSave(p);
+    const sfxOn = isSfxEnabled();
+    // 音效开关卡片：按钮文案随开关状态变化，切换时由 toggleSfx 就地刷新。
+    this._sfxBtn = h('button', { class: sfxOn ? 'btn-primary' : 'btn-ghost', style: { flex: 1 }, onClick: () => this.toggleSfx() }, sfxOn ? '🔊 音效：开' : '🔇 音效：关');
     const body = [
+      h('div', { class: 'card' },
+        h('h4', null, '音效'),
+        h('div', { class: 'muted', style: { marginBottom: '0.4rem' } }, '开关游戏音效（修炼 / 战斗 / 突破 / 收获等提示音）。设置会自动保存。'),
+        h('div', { class: 'row' }, this._sfxBtn),
+      ),
       h('div', { class: 'card' },
         h('h4', null, '存档导出'),
         h('div', { class: 'muted', style: { marginBottom: '0.3rem' } }, '复制下方字符串，可在他处导入恢复。'),
@@ -1866,7 +1917,7 @@ export class GameUI {
     return h('div', { class: 'card rest-banner death-banner' },
       h('div', { class: 'row' },
         h('div', { class: 'grow' },
-          h('h4', null, `☠ 大限将至 · ${ageLabel(p)}`),
+          h('h4', null, `☠ 大限将至 · ${ageDetailLabel(p)}`),
           h('div', { class: 'muted', style: { marginTop: '0.2rem' } }, desc),
         ),
         ...actions,
@@ -1920,7 +1971,7 @@ export class GameUI {
       this.toast('新的一月，活力回满', 'good');
     }
     if (aged > 0) {
-      this.pushLog(`⏳ 岁月流转，痴长 ${aged} 岁，今已 ${ageLabel(this.player)}。`, 'normal');
+      this.pushLog(`⏳ 岁月流转，痴长 ${aged} 岁，今已 ${ageDetailLabel(this.player)}。`, 'normal');
       if (isDying(this.player)) this.pushLog('☠ 寿元将尽，大限将至，须尽早突破延寿或轮回重修。', 'bad');
     }
     // 同一轮既回满活力又推进年龄时合并为一次存档（原本 rolled 与 aged 各存一次）。
@@ -2005,6 +2056,10 @@ function statText(total, base) {
   const b = Math.round(base);
   const bonus = t - b;
   return bonus > 0 ? `${t}（${b}+${bonus}）` : `${t}`;
+}
+// 属性单行（创角预览用）：标签左、数值右，一项一行
+function attrRow(label, val) {
+  return h('div', { class: 'attr-row' }, h('span', { class: 'k' }, label), h('span', { class: 'v' }, String(val)));
 }
 function trialLabel(kind) { return { heart: '渡心魔', trib: '渡天劫', ascend: '飞升天劫' }[kind] || '突破'; }
 function learnRecipeGuard(p, id) { const r = RECIPE_BY_ID[id]; if (r && !p.recipes.includes(id)) p.recipes.push(id); }

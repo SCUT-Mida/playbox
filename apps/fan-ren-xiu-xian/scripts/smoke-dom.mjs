@@ -273,14 +273,20 @@ ok(!renderErr, `七大功能页渲染无异常（${renderErr ? renderErr.message
   await sleep(5);
 }
 
-// ---------- 9b1f) 音效开关按钮存在且可切换 ----------
+// ---------- 9b1f) 音效开关位于设置弹窗内且可切换 ----------
 {
-  const soundBtn = document.querySelector('.status-row .icon-btn[title="音效开关"]');
-  ok(!!soundBtn, '状态栏有音效开关按钮');
-  const before = soundBtn.textContent;
-  soundBtn.click();
+  // 状态栏不再有音效按钮（已按要求移入「设置」弹窗）
+  ok(document.querySelector('.status-row .icon-btn[title="音效开关"]') === null, '状态栏不再有音效按钮（已移入设置）');
+  ui.showSettings();
+  await sleep(10);
+  const sfxBtn = [...document.querySelectorAll('.sheet__body button')].find((b) => /音效[:：]/.test(b.textContent));
+  ok(!!sfxBtn, '设置弹窗内有音效开关按钮');
+  const before = sfxBtn.textContent;
+  sfxBtn.click();
   await sleep(5);
-  ok(soundBtn.textContent !== before, '点击音效按钮切换图标（🔊/🔇）');
+  ok(sfxBtn.textContent !== before, '点击音效按钮切换文案（开/关）');
+  ui.closeModal();
+  await sleep(5);
 }
 
 // ---------- 9b2) 损坏境界档不闪退（「点修炼偶发闪退」UI 回归）----------

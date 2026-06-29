@@ -6,8 +6,8 @@ import {
   PITTY_THRESHOLD, PITTY_BOOST, dayKey, cycleKey, monthKey, monthsBetween,
   ROOT_GRADES, ROOT_COUNTS, FIVE_ELEMENTS, MUTANT_ELEMENTS,
   rootDescriptor, rootAffinity, rootGradeDef, rootCountDef, elDef, rootFromLegacy,
-  realmLifespan, isDying, canReincarnate, ageLabel,
-  vitalityMax, MAX_VITALITY,
+  realmLifespan, isDying, canReincarnate, ageLabel, ageDetailLabel, ageMonthFromKey,
+  vitalityMax, MAX_VITALITY, MONTHS_PER_CYCLE,
   START_AGE_MIN, START_AGE_MAX, YEARS_PER_CYCLE, MAX_REINCARNATIONS, REINCARNATION_CULT_BONUS,
   ROOT_AFFINITY_MATCH,
 } from '../src/config.js';
@@ -28,7 +28,7 @@ import {
 } from '../src/core/breakthrough.js';
 import { tryAlchemy, tryForge, hasMaterials, successRate } from '../src/core/alchemy.js';
 import { rollMarket, buyItem, sellItem, sellPrice, shopBlurb, itemEffectText } from '../src/core/market.js';
-import { ACHIEVEMENTS, checkAchievements } from '../src/core/achievements.js';
+import { ACHIEVEMENTS, ACH_CATS, checkAchievements } from '../src/core/achievements.js';
 import { SECTS, SECT_LIST, SECT_TITLES, SECT_TASK_POOL, CHALLENGE_TEMPLATES, MAX_ACTIVE_CHALLENGES } from '../src/data/sect.js';
 import {
   joinSect, sectDef, currentSectTitle, nextSectTitle, titleProgress,
@@ -36,9 +36,9 @@ import {
   claimDailySectReward, sectRewardClaimedToday, sectCultivateBonus, rollDailySectTasks,
   acceptChallenge, claimChallenge, abandonChallenge, activeChallengeCount, scaleChallenge,
 } from '../src/core/sect.js';
-import { NPC_LIST, NPCS, npcDef, affinityLevel, TEAM_AFFINITY_THRESHOLD, MEET_VITALITY_COST, TEAM_VITALITY_COST } from '../src/data/npcs.js';
+import { NPC_LIST, NPCS, npcDef, affinityLevel, TEAM_AFFINITY_THRESHOLD, MEET_VITALITY_COST, TEAM_VITALITY_COST, TEAM_EXPLORE_MAX_PER_CYCLE } from '../src/data/npcs.js';
 import {
-  meetNpc, giftNpc, canTeamUp, teamedToday, teamExplore,
+  meetNpc, giftNpc, canTeamUp, teamedToday, teamExplore, teamExploreUsed, teamExploreRemaining,
   meetableNpcs, metNpcs, getAffinity, isMet, companionCultivateBonus,
 } from '../src/core/npc.js';
 import { playSfx, isSfxEnabled, setSfxEnabled } from '../src/core/sfx.js';
@@ -877,6 +877,76 @@ console.log('— save migration (legacy rootId) —');
   ok(Number.isFinite(loaded.age), '迁移补齐年龄');
   ok(loaded.reincarnations === 0 && loaded.reincarnationBonus === 1, '迁移补齐 reincarnations/bonus');
   ok(loaded.rootMult > 0, '迁移后 rootMult 有效');
+}
+
+// ---------- 灵根显示格式：组合·等级·属性（n灵根·灵根等级·五行属性）----------
+console.log('— root display format —');
+{
+  const d = rootDescriptor({ grade: 'tian', count: 'single', els: ['metal'] });
+  ok(d.name === '单灵根·天灵根·金', `单系天灵根显示为「组合·等级·属性」(${d.name})`);
+  const d2 = rootDescriptor({ grade: 'di', count: 'dual', els: ['wood', 'fire'] });
+  ok(/^双灵根·地灵根·木火$/.test(d2.name), `双系地灵根顺序为 组合·等级·属性 (${d2.name})`);
+  const d3 = rootDescriptor({ grade: 'yi', count: 'single', els: ['thunder'] });
+  ok(d3.name === '单灵根·异灵根·雷', `异灵根顺序正确 (${d3.name})`);
+}
+
+// ---------- 年龄详细展示（X岁X月）+ 按修仙月进位 ----------
+console.log('— age detail (years + months) —');
+ok(MONTHS_PER_CYCLE === 25, '每周期推进 25 修仙月（≈2 岁 + 1 月）');
+{
+  const q = newPlayer(() => 0);
+  ok(/^\d+岁\d{1,2}月$/.test(ageDetailLabel(q)), `详细年龄格式 X岁X月 (${ageDetailLabel(q)})`);
+  ok(/岁$/.test(ageLabel(q)) && !/月/.test(ageLabel(q)), '简化年龄只显示岁（不含月）');
+  ok(q.ageMonth >= 0 && q.ageMonth < 12, `初始年龄·月在 0~11 (${q.ageMonth})`);
+  // 跨月推进：年龄增长；月份按 MONTHS_PER_CYCLE 进位（25 月 = 2 岁 + 1 月）
+  const age0 = q.age;
+  q.lastVitalityDate = '1970-01'; q.lastAgeMonth = '1970-01';
+  rolloverVitality(q);
+  ok(q.age > age0, '跨月后年龄增长');
+  ok(Number.isFinite(q.ageMonth) && q.ageMonth >= 0 && q.ageMonth < 12, `进位后年龄·月仍在 0~11 (${q.ageMonth})`);
+  // 月份键 → 0~11 月序
+  ok(ageMonthFromKey('2024-01') === 0 && ageMonthFromKey('2024-12') === 11, 'ageMonthFromKey 1 月→0、12 月→11');
+  // 轮回标注
+  q.reincarnations = 1;
+  ok(/（轮回）/.test(ageDetailLabel(q)), '详细年龄含「（轮回）」标注');
+  // 存档迁移补齐 ageMonth
+  const old = newPlayer(() => 0); delete old.ageMonth;
+  const mig = importSave(exportSave(old));
+  ok(Number.isFinite(mig.ageMonth) && mig.ageMonth >= 0 && mig.ageMonth < 12, '迁移补齐 ageMonth（0~11）');
+}
+
+// ---------- 结伴探险每月全局上限（一轮最多 10 次）----------
+console.log('— team explore monthly cap (10/cycle) —');
+ok(TEAM_EXPLORE_MAX_PER_CYCLE === 10, '结伴探险每月上限为 10 次');
+{
+  const q = newPlayer(() => 0); q.tier = 2; recompute(q);
+  q.hp = q.maxHp; q.mp = q.maxMp; q.vitality = q.maxVitality;
+  ok(teamExploreUsed(q) === 0 && teamExploreRemaining(q) === 10, '初始本月结伴 0/10');
+  const m = meetNpc(q, makeRng(5));
+  q.npcs[m.npc.id].aff = TEAM_AFFINITY_THRESHOLD;
+  const r1 = teamExplore(q, m.npc.id, makeRng(1));
+  ok(!r1.error && r1.encounter, '首次结伴探险成功');
+  ok(teamExploreUsed(q) === 1 && teamExploreRemaining(q) === 9, '本月结伴计数 +1（1/10）');
+  // 同一道友本月只能一次
+  ok(teamExplore(q, m.npc.id, makeRng(2)).error, '同一道友本月二次被拒');
+  // 跨月归零
+  q.teamExploreDate = '1970-01';
+  ok(teamExploreUsed(q) === 0 && teamExploreRemaining(q) === 10, '跨月结伴计数归零');
+}
+
+// ---------- 成就按类型分类汇总 ----------
+console.log('— achievements by category —');
+ok(Array.isArray(ACH_CATS) && ACH_CATS.length >= 5, '成就分类 >= 5 类');
+ok(ACHIEVEMENTS.every((a) => ACH_CATS.some((c) => c.id === a.cat)), '每个成就都归属某个分类');
+{
+  ok(ACHIEVEMENTS.some((a) => a.cat === 'friend'), '存在「道友好友类」成就');
+  const q = newPlayer(() => 0);
+  q.npcs = { a: { met: true }, b: { met: true }, c: { met: true } };
+  const g = checkAchievements(q);
+  ok(g.some((a) => a.id === 'ach_friends3'), '结识 3 位道友触发「广结善缘」');
+  // 分类计数：统计每个分类下成就数，且各类之和 = 总数
+  const byCat = ACH_CATS.map((c) => ACHIEVEMENTS.filter((a) => a.cat === c.id).length).reduce((s, n) => s + n, 0);
+  ok(byCat === ACHIEVEMENTS.length, '各分类成就数之和 = 总数（无遗漏/重复归类）');
 }
 
 console.log(`\n结果: ${pass} 通过, ${fail} 失败`);

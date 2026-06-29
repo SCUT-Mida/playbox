@@ -8,7 +8,7 @@ import {
 } from '../config.js';
 import {
   NPCS, NPC_LIST, npcDef, AFFINITY_LEVELS, affinityLevel, nextAffinityLevel,
-  TEAM_AFFINITY_THRESHOLD, MEET_VITALITY_COST, TEAM_VITALITY_COST,
+  TEAM_AFFINITY_THRESHOLD, MEET_VITALITY_COST, TEAM_VITALITY_COST, TEAM_EXPLORE_MAX_PER_CYCLE,
 } from '../data/npcs.js';
 import {
   addXp, removeItem, hasItem, countItem, canAffordVitality, spendVitality,
@@ -120,6 +120,16 @@ export function teamedToday(player, npcId) {
   return !!(st && st.teamedDate === cycleKey());
 }
 
+// 本轮（自然月）已结伴探险的次数（跨月自动归零；teamExploreDate 为月份键）
+export function teamExploreUsed(player) {
+  if (!player || player.teamExploreDate !== cycleKey()) return 0;
+  return player.teamExploreCount || 0;
+}
+// 本轮剩余可结伴次数
+export function teamExploreRemaining(player) {
+  return Math.max(0, TEAM_EXPLORE_MAX_PER_CYCLE - teamExploreUsed(player));
+}
+
 // 结伴探险：消耗灵力/气血/活力，奖励随境界与道友 teamMult 大幅放大。
 // 返回 { encounter, sceneName }（encounter 为 instant，交由 UI 的 applyReward 结算）或 { error }。
 export function teamExplore(player, npcId, rng) {
@@ -128,7 +138,10 @@ export function teamExplore(player, npcId, rng) {
   if (!npc) return { error: '无此道友' };
   if (!isMet(player, npcId)) return { error: '尚未结识此人' };
   if (!canTeamUp(player, npcId)) return { error: `需「${affinityLevel(TEAM_AFFINITY_THRESHOLD).name}」方可结伴` };
-  if (teamedToday(player, npcId)) return { error: `${npc.name}今日已与你同游，明日再约` };
+  if (teamedToday(player, npcId)) return { error: `${npc.name}本月已与你同游，下月再约` };
+  if (teamExploreUsed(player) >= TEAM_EXPLORE_MAX_PER_CYCLE) {
+    return { error: `本月结伴探险已达上限（${TEAM_EXPLORE_MAX_PER_CYCLE} 次/月），下月再约` };
+  }
   if (player.mp < EXPLORE_MP_COST) return { error: '灵力不足，无法探险' };
   if (player.hp <= EXPLORE_HP_COST) return { error: '气血过低，不宜探险' };
   if (!canAffordVitality(player, TEAM_VITALITY_COST)) return { error: '活力不足，明日恢复' };
@@ -176,6 +189,10 @@ export function teamExplore(player, npcId, rng) {
   const affGain = 2 + Math.floor(r() * 2);
   st.aff = (st.aff || 0) + affGain;
   st.teamedDate = cycleKey();
+
+  // 全局「每月结伴上限」计数（与单道友「每月一次」并存）：跨月自动归零
+  if (player.teamExploreDate !== cycleKey()) { player.teamExploreDate = cycleKey(); player.teamExploreCount = 0; }
+  player.teamExploreCount = (player.teamExploreCount || 0) + 1;
 
   // 上报宗门「外出探索」任务
   recordSectActivity(player, 'explore');

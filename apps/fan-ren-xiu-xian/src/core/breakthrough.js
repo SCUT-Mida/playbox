@@ -4,7 +4,7 @@
 import { REALMS, ASCEND_INDEX, breakthroughChance, clamp } from '../config.js';
 import {
   recompute, fullHeal, isXpFull, addXp, xpOverflow, removeItem, hasItem, addStones,
-  grantTitle, grantAchievement, hasAnyEquipped,
+  grantTitle, hasAnyEquipped,
 } from './player.js';
 import { chance } from './rng.js';
 import { recordSectActivity } from './sect.js';
@@ -197,14 +197,11 @@ export function advanceRealm(player, target) {
   // 奖励：灵石 + 偶得配方/称号
   const reward = Math.round(30 * (player.tier + 1) * (1 + player.sub * 0.3));
   addStones(player, reward);
-  // 称号：首次到筑基/结丹/飞升
+  // 称号：首次到筑基/结丹
   if (player.tier === 2 && !player.titles.includes('title_qidao')) grantTitle(player, 'title_qidao');
   if (player.tier === 3 && !player.titles.includes('title_xianyuan')) grantTitle(player, 'title_xianyuan');
-  if (player.stats.breakthroughStreak >= 10) grantAchievement(player, 'ach_streak10');
-  if (player.tier >= ASCEND_INDEX) {
-    player.ascended = true;
-    grantAchievement(player, 'ach_ascend');
-  }
+  // 「势如破竹」「白日飞升」等成就由 checkAchievements 统一检测授予（UI 各动作后调用）
+  if (player.tier >= ASCEND_INDEX) player.ascended = true;
   return { stones: reward };
 }
 

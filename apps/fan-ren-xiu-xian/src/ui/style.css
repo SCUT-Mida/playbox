@@ -281,25 +281,48 @@
 .frxx .toast.bad { border-color: var(--bad); color: var(--bad); }
 .frxx .toast.epic { border-color: var(--epic); color: var(--epic); font-weight: 600; }
 
+/* 成就条目：图标 + 名称 + 达成条件 + 奖励 + 进度条 */
 .frxx .achv { display: flex; gap: 0.5rem; padding: 0.5rem; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 0.4rem; background: var(--card-2); }
-.frxx .achv.locked { opacity: 0.4; }
-.frxx .achv .emo { font-size: 1.4rem; }
+.frxx .achv.locked { opacity: 0.62; }
+.frxx .achv.done { border-color: rgba(212,168,75,0.55); background: linear-gradient(180deg, rgba(212,168,75,0.10), var(--card-2)); }
+.frxx .achv .emo { font-size: 1.4rem; line-height: 1.2; }
+.frxx .achv .grow { min-width: 0; flex: 1; }
+.frxx .achv__name { font-weight: 600; font-size: 0.86rem; color: var(--gold); }
+.frxx .achv__cond { font-size: 0.74rem; margin-top: 0.1rem; }
+.frxx .achv__reward { font-size: 0.72rem; color: var(--jade); margin-top: 0.15rem; }
+.frxx .achv__done { font-size: 0.72rem; color: var(--gold); font-weight: 600; margin-top: 0.25rem; }
+.frxx .achv .bar { margin-top: 0.3rem; height: 11px; }
+.frxx .achv .bar .bar__fill { background: linear-gradient(90deg, var(--gold-dim), var(--gold)); }
+.frxx .achv .bar .bar__label { font-size: 9px; }
 
-/* 成就分类（目录式）：总览 + 各类目分组 */
+/* 成就分类（目录式、可伸缩折叠）：总览 + 各类目分组 */
 .frxx .achv-overview {
-  display: flex; align-items: baseline; justify-content: space-between;
+  display: flex; flex-direction: column; gap: 0.3rem;
   margin: 0.2rem 0 0.6rem; padding: 0.4rem 0.6rem; border-radius: 8px;
   background: rgba(212,168,75,0.10); border: 1px solid rgba(212,168,75,0.28);
 }
+.frxx .achv-overview__row { display: flex; align-items: baseline; justify-content: space-between; }
 .frxx .achv-overview .k { font-size: 0.8rem; color: var(--muted); }
 .frxx .achv-overview .v { font-size: 0.9rem; color: var(--gold); font-weight: 600; font-variant-numeric: tabular-nums; }
+.frxx .achv-overview .bar { height: 10px; }
+.frxx .achv-overview .bar .bar__label { font-size: 9px; }
+
 .frxx .achv-cat { margin-bottom: 0.7rem; }
+/* 头部做成可点击按钮：点按伸缩折叠该分类 */
 .frxx .achv-cat__head {
-  display: flex; align-items: baseline; justify-content: space-between;
-  margin: 0.1rem 0 0.4rem; padding-bottom: 0.25rem; border-bottom: 1px dashed var(--line);
+  display: flex; align-items: center; gap: 0.35rem; width: 100%;
+  margin: 0.1rem 0 0.4rem; padding: 0.15rem 0; padding-bottom: 0.25rem;
+  border: none; border-bottom: 1px dashed var(--line);
+  background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
 }
-.frxx .achv-cat__name { font-size: 0.88rem; font-weight: 600; color: var(--gold); }
+.frxx .achv-cat__head:hover { color: var(--gold); }
+.frxx .achv-cat__caret { font-size: 0.7rem; color: var(--muted); width: 0.8rem; flex: none; }
+.frxx .achv-cat__name { font-size: 0.88rem; font-weight: 600; color: var(--gold); flex: 1; }
 .frxx .achv-cat__count { font-size: 0.74rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* 折叠态：隐藏列表 */
+.frxx .achv-cat.collapsed .achv-cat__list { display: none; }
+.frxx .achv-cat.collapsed .achv-cat__head { margin-bottom: 0; border-bottom-color: transparent; }
+.frxx .achv-cat__list { display: flex; flex-direction: column; gap: 0.1rem; }
 
 /* 创角属性一览：每项独占一行（标签左、数值右） */
 .frxx .attr-list { display: flex; flex-direction: column; gap: 0.22rem; font-size: 0.84rem; }

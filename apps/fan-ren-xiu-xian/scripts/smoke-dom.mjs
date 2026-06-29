@@ -289,6 +289,44 @@ ok(!renderErr, `七大功能页渲染无异常（${renderErr ? renderErr.message
   await sleep(5);
 }
 
+// ---------- 9b1g) 成就面板：进度条 + 奖励 + 可伸缩分类 ----------
+{
+  ui.showAchievements();
+  await sleep(10);
+  ok(/成就与称号/.test(document.querySelector('.sheet__head .t')?.textContent || ''), '打开成就与称号面板');
+  const txt = document.querySelector('.sheet__body')?.textContent || '';
+  ok(/奖励：/.test(txt), '成就条目展示奖励说明');
+  // 未达成项渲染「当前进度 / 目标」进度条
+  ok(document.querySelectorAll('.achv .bar').length > 0, '未达成成就渲染当前进度条');
+  // 分类头部为可点击按钮（伸缩入口），且带伸缩指示符
+  const heads = document.querySelectorAll('.achv-cat__head');
+  ok(heads.length >= 5 && [...heads].every((b) => b.tagName === 'BUTTON'), '各分类头部为可点击按钮');
+  ok(document.querySelectorAll('.achv-cat__caret').length === heads.length, '每个分类头部有伸缩指示符');
+  // 默认全展开
+  ok(document.querySelectorAll('.achv-cat:not(.collapsed)').length === heads.length, '默认所有分类展开');
+  // 点击首个分类头部 → 折叠（collapsed 类 + caret 变 ▶）
+  const firstHead = heads[0];
+  firstHead.click();
+  await sleep(5);
+  const firstCat = firstHead.parentElement;
+  ok(firstCat.classList.contains('collapsed'), '点击分类头部后该分类折叠');
+  ok(firstCat.querySelector('.achv-cat__caret').textContent === '▶', '折叠后 caret 显示 ▶');
+  // 再次点击 → 重新展开
+  firstHead.click();
+  await sleep(5);
+  ok(!firstCat.classList.contains('collapsed'), '再次点击分类头部后重新展开');
+  // 让一项成就达成后重开面板：应显示「已达成」且不再渲染该条进度条
+  ui.player.stats.battlesWon = 1;
+  ui.checkAchvAndToast();
+  ui.showAchievements();
+  await sleep(10);
+  const doneRow = [...document.querySelectorAll('.achv.done')].find((r) => /初露锋芒/.test(r.textContent));
+  ok(!!doneRow && /已达成/.test(doneRow.textContent), '达成后的成就标注「已达成」');
+  ok(!doneRow.querySelector('.bar'), '已达成成就不再渲染进度条');
+  ui.closeModal();
+  await sleep(5);
+}
+
 // ---------- 9b2) 损坏境界档不闪退（「点修炼偶发闪退」UI 回归）----------
 // 模拟 tier/sub 非法（损坏档/导入串/旧版缺字段）：点修炼 + 刷新状态栏 + 渲染修炼页
 // 这条热路径必须全程不抛错，否则整页白屏即「闪退」。

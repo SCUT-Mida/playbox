@@ -8,7 +8,7 @@ import {
   sanitizeRealm,
   ROOT_GRADES, ROOT_COUNTS, FIVE_ELEMENTS, MUTANT_ELEMENTS,
   rootGradeDef, rootCountDef, rootDescriptor, rootAffinity, rootFromLegacy,
-  START_AGE_MIN, START_AGE_MAX, YEARS_PER_CYCLE, MAX_REINCARNATIONS, REINCARNATION_CULT_BONUS,
+  START_AGE_MIN, START_AGE_MAX, MONTHS_PER_CYCLE, ageMonthFromKey, MAX_REINCARNATIONS, REINCARNATION_CULT_BONUS,
   isDying, canReincarnate,
 } from '../config.js';
 import { ITEMS } from '../data/items.js';
@@ -94,6 +94,7 @@ export function newPlayer(rng, template) {
     root: { grade: root.grade, count: root.count, els: (root.els || []).slice() },
     rootId: root.grade,      // 兼容旧引用（= 等级档次 id）
     age,                     // 年龄（岁）：随周期（自然月）增长
+    ageMonth: ageMonthFromKey(cycleKey()), // 年龄·月（0~11）：详细展示「X岁X月」用
     bornKey: cycleKey(),     // 降生周期键
     lastAgeMonth: cycleKey(),// 上次结算年龄增长的周期键
     reincarnations: 0,       // 已轮回次数（最多 1）
@@ -261,6 +262,7 @@ export function reincarnate(player, rng) {
   player.sub = 0;
   player.xp = 0;
   player.age = START_AGE_MIN + Math.floor(r() * (START_AGE_MAX - START_AGE_MIN + 1));
+  player.ageMonth = ageMonthFromKey(cycleKey());
   player.bornKey = cycleKey();
   player.lastAgeMonth = cycleKey();
   // 前世记忆修炼加成
@@ -468,7 +470,7 @@ export function realmInfo(player) {
 }
 
 // —— 周期刷新（自然月）：回满活力 + 推进年龄 ——
-// 跨越自然月时 vitality 回满；同时按跨越的自然月数推进年龄（YEARS_PER_CYCLE 岁/月）。
+// 跨越自然月时 vitality 回满；同时按跨越的自然月数推进年龄（MONTHS_PER_CYCLE 修仙月/月，12 月 = 1 岁）。
 // 返回是否发生「新周期」刷新（供 UI 弹提示）。_cycleAgedYears 为本次增长的岁数（非持久态）。
 export function rolloverVitality(player) {
   const cur = cycleKey();
@@ -479,14 +481,18 @@ export function rolloverVitality(player) {
     player.vitality = player.maxVitality;
     rolled = true;
   }
-  // 年龄推进：按自上次记月以来的自然月数增长
+  // 年龄推进：按自上次记月以来的自然月数，以「修仙月」精度推进（12 月 = 1 岁，含进位）。
   let aged = 0;
   const from = player.lastAgeMonth || player.bornKey || cur;
   if (from !== cur) {
     const months = monthsBetween(from, cur);
     if (months > 0) {
-      aged = months * YEARS_PER_CYCLE;
-      player.age = (player.age || 0) + aged;
+      const total = months * MONTHS_PER_CYCLE;     // 本次跨越的修仙月数
+      const addYears = Math.floor(total / 12);      // 整岁部分
+      const carry = Math.floor(((player.ageMonth || 0) + (total % 12)) / 12); // 月份溢出进位
+      player.age = (player.age || 0) + addYears + carry;
+      player.ageMonth = ((player.ageMonth || 0) + total) % 12;
+      aged = addYears + carry; // 本次增长的整「岁」数（供 UI 日志展示）
       // 仅在前拨（months > 0）时推进记月点；时钟回拨时保持原值，
       // 否则回拨后再前拨会以更早的月份为基准，造成年龄「超算」。
       player.lastAgeMonth = cur;

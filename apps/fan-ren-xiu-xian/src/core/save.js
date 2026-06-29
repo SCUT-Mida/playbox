@@ -7,7 +7,7 @@
 import { recompute } from './player.js';
 import {
   OFFLINE_CAP_HOURS, OFFLINE_EFFICIENCY, passiveXpPerSec, cultivateSpeedMult, nowSec,
-  vitalityMax, cycleKey, rootFromLegacy, START_AGE_MIN,
+  vitalityMax, cycleKey, rootFromLegacy, START_AGE_MIN, ageMonthFromKey,
 } from '../config.js';
 
 const NUM_SLOTS = 5;
@@ -213,6 +213,7 @@ function migrate(player) {
   if (!Array.isArray(player.root.els)) player.root.els = [];
   if (player.rootId == null) player.rootId = player.root.grade;
   if (!Number.isFinite(player.age)) player.age = START_AGE_MIN;
+  if (!Number.isFinite(player.ageMonth)) player.ageMonth = ageMonthFromKey(player.bornKey || cycleKey());
   if (!player.bornKey) player.bornKey = cycleKey();
   if (!player.lastAgeMonth) player.lastAgeMonth = cycleKey();
   if (!Number.isFinite(player.reincarnations)) player.reincarnations = 0;
@@ -226,6 +227,9 @@ function migrate(player) {
   // v4：悬赏挑战 + 道友（NPC）系统
   if (!Array.isArray(player.challengeTasks)) player.challengeTasks = [];
   if (!player.npcs || typeof player.npcs !== 'object') player.npcs = {};
+  // v7：道友结伴探险每月全局上限计数（teamExploreDate 为月份键，跨月自动归零）
+  if (!player.teamExploreDate) player.teamExploreDate = '';
+  if (!Number.isFinite(player.teamExploreCount)) player.teamExploreCount = 0;
   if (player.slot == null) player.slot = 1;
   return player;
 }

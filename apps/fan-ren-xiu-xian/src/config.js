@@ -95,9 +95,9 @@ export function rootDescriptor(root) {
   const breakBonus = grade.breakBonus;
   const elNames = els.map((e) => e.name).join('');
   const displayEls = els.map((e) => `${e.emoji}${e.name}`).join(' ');
-  // 显示名：等级 + 组合简称 + 属性，如「天灵根·单·金」「异灵根·单·雷」「地灵根·双·木火」
-  const countTag = count.name.replace('灵根', '');
-  const name = elNames ? `${grade.name}·${countTag}·${elNames}` : `${grade.name}·${countTag}`;
+  // 显示名：组合(n灵根) · 等级(灵根等级) · 属性(五行属性)，
+  // 如「单灵根·天灵根·金」「单灵根·异灵根·雷」「双灵根·地灵根·木火」
+  const name = elNames ? `${count.name}·${grade.name}·${elNames}` : `${count.name}·${grade.name}`;
   return { grade, count, els, mult, breakBonus, elNames, displayEls, name, desc: grade.desc };
 }
 
@@ -304,7 +304,11 @@ export function monthsBetween(a, b) {
 // 创角起始年龄（岁）：凡人修仙多自幼年起，随机 8~16 岁。
 export const START_AGE_MIN = 8;
 export const START_AGE_MAX = 16;
-// 每个自然月周期推进的年龄（岁）。修仙岁月漫长，以月为刻度推进较合理。
+// 每个自然月周期推进的「修仙月」数。取 25（≈ 2 岁 + 1 月/月）：
+// 12 个月进位 1 岁，使「X岁X月」展示里的月份会逐月变化（而非永远卡在同一月），
+// 整体寿元节奏与原先（2 岁/月）几乎一致。
+export const MONTHS_PER_CYCLE = 25;
+// 历史导出：每周期推进的「岁」数（≈ MONTHS_PER_CYCLE / 12），仅供旧引用 / 单测沿用。
 export const YEARS_PER_CYCLE = 2;
 // 轮回重修最多一次（大限将至时可携部分资质重来）。
 export const MAX_REINCARNATIONS = 1;
@@ -325,10 +329,23 @@ export function isDying(player) {
 export function canReincarnate(player) {
   return !!(player && isDying(player) && (player.reincarnations || 0) < MAX_REINCARNATIONS);
 }
-// 年龄展示：轮回过的修士年龄前标注「（轮回）」。
+// 年龄展示（简化）：只显示岁。轮回过的修士年龄前标注「（轮回）」。
 export function ageLabel(player) {
   const prefix = player && player.reincarnations ? '（轮回）' : '';
   return `${prefix}${Math.floor((player && player.age) || 0)}岁`;
+}
+// 年龄展示（详细）：xx岁xx月。月份取自 player.ageMonth（0~11，随周期推进）。
+export function ageDetailLabel(player) {
+  const prefix = player && player.reincarnations ? '（轮回）' : '';
+  const years = Math.floor((player && player.age) || 0);
+  const raw = (player && player.ageMonth) || 0;
+  const month = clamp(((raw % 12) + 12) % 12, 0, 11) + 1;
+  return `${prefix}${years}岁${month}月`;
+}
+// 由月份键（YYYY-MM）取 0~11 的月序，用于初始化「年龄·月」
+export function ageMonthFromKey(key) {
+  const m = parseInt(String(key || '').slice(5, 7), 10);
+  return Number.isFinite(m) ? clamp(m - 1, 0, 11) : 0;
 }
 
 // ============================================================================

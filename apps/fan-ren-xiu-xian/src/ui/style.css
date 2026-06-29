@@ -285,6 +285,28 @@
 .frxx .achv.locked { opacity: 0.4; }
 .frxx .achv .emo { font-size: 1.4rem; }
 
+/* 成就分类（目录式）：总览 + 各类目分组 */
+.frxx .achv-overview {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin: 0.2rem 0 0.6rem; padding: 0.4rem 0.6rem; border-radius: 8px;
+  background: rgba(212,168,75,0.10); border: 1px solid rgba(212,168,75,0.28);
+}
+.frxx .achv-overview .k { font-size: 0.8rem; color: var(--muted); }
+.frxx .achv-overview .v { font-size: 0.9rem; color: var(--gold); font-weight: 600; font-variant-numeric: tabular-nums; }
+.frxx .achv-cat { margin-bottom: 0.7rem; }
+.frxx .achv-cat__head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin: 0.1rem 0 0.4rem; padding-bottom: 0.25rem; border-bottom: 1px dashed var(--line);
+}
+.frxx .achv-cat__name { font-size: 0.88rem; font-weight: 600; color: var(--gold); }
+.frxx .achv-cat__count { font-size: 0.74rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* 创角属性一览：每项独占一行（标签左、数值右） */
+.frxx .attr-list { display: flex; flex-direction: column; gap: 0.22rem; font-size: 0.84rem; }
+.frxx .attr-list .attr-row { display: flex; justify-content: space-between; gap: 0.5rem; }
+.frxx .attr-list .attr-row .k { color: var(--muted); }
+.frxx .attr-list .attr-row .v { color: var(--text); font-variant-numeric: tabular-nums; }
+
 /* 浮动数字（突破/暴击反馈） */
 .frxx .float-num {
   position: absolute; left: 50%; top: 40%; transform: translateX(-50%);

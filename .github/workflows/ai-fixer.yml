@@ -1,4 +1,6 @@
-name: 🛠️ AI Code Fixer
+# ⚠️ 此工作流现在仅用于手动触发（人工在 PR 评论 /claude-fix）。
+# 自动化的审查-修复循环已内联到 ai-reviewer.yml 中（避免 issue_comment 触发需要人工审批）。
+name: 🛠️ AI Code Fixer (Manual Fallback)
 
 on:
   issue_comment:

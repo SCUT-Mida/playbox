@@ -8,15 +8,26 @@ jobs:
   review:
     if: startsWith(github.head_ref, 'ai-fix/issue-')
     runs-on: ubuntu-latest
+    # Claude 配置提升到 job 级别，review 和 fix 步骤共享
+    env:
+      "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic"
+      "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-4.7"
+      "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5.2[1m]"
+      "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5.2[1m]"
+      "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1000000"
+      "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": 1
+      "API_TIMEOUT_MS": "3000000"
+      ANTHROPIC_AUTH_TOKEN: ${{ secrets.GLM_API_KEY }}
     permissions:
       pull-requests: write
       contents: write
       issues: write
 
     steps:
-      - name: 📥 Checkout code
+      - name: 📥 Checkout PR Branch
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.head_ref }}
           fetch-depth: 0
 
       - name: 🟢 Setup Node.js
@@ -24,38 +35,54 @@ jobs:
         with:
           node-version: '24'
 
-      - name: 📝 Generate Reviewer Prompt (inline, 不依赖 PR 分支脚本)
+      - name: 📝 Generate Reviewer Prompt (inline)
         env:
           HEAD_REF: ${{ github.head_ref }}
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           ISSUE_NUMBER=$(echo "$HEAD_REF" | grep -oiE 'issue-[0-9]+' | grep -oiE '[0-9]+' | head -n 1)
-          if [ -z "$ISSUE_NUMBER" ]; then ISSUE_NUMBER=${{ github.event.pull_request.number }}; fi
+          if [ -z "$ISSUE_NUMBER" ]; then ISSUE_NUMBER="${{ github.event.pull_request.number }}"; fi
           ISSUE_NUMBER="${ISSUE_NUMBER%$'\r'}"
 
           TASK_DIR=".ai-tasks/issue-${ISSUE_NUMBER}"
           mkdir -p "$TASK_DIR"
           echo "TASK_DIR=$TASK_DIR" >> $GITHUB_ENV
 
-          # 通过 PR 上 /claude-fix 评论数推算审查轮次（reviewer 不提交文件，find 计数永远是 0）
-          CLAUDE_FIX_COUNT=$(gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json comments --jq '[.comments[] | select(.body | contains("/claude-fix"))] | length' 2>/dev/null || echo "0")
-          CURRENT_ROUND=$((CLAUDE_FIX_COUNT + 1))
+          # 轮次推算：通过已提交的 fixer-feedback 文件数（每轮修复会提交一个，不再依赖 /claude-fix 评论计数）
+          EXISTING_FIXES=$(find "$TASK_DIR" -maxdepth 1 -name 'fixer-feedback_r*.md' 2>/dev/null | wc -l)
+          CURRENT_ROUND=$((EXISTING_FIXES + 1))
           echo "CURRENT_ROUND=$CURRENT_ROUND" >> $GITHUB_ENV
+          echo "📁 当前审查轮次: $CURRENT_ROUND (已有 $EXISTING_FIXES 个 fixer-feedback 文件)"
+
+          # 最大轮次保护：防止审查-修复无限循环
+          MAX_ROUNDS=8
+          if [ "$CURRENT_ROUND" -gt "$MAX_ROUNDS" ]; then
+            echo "⚠️ 已达到最大审查轮次 ($MAX_ROUNDS)，需要人工介入。"
+            gh pr comment "$PR_NUMBER" --body "⚠️ 自动化审查-修复循环已达到 ${MAX_ROUNDS} 轮上限，请人工检查并决定是否合并。"
+            exit 1
+          fi
 
           # 生成 diff 文件
           git fetch origin main
           git diff origin/main...HEAD > "$TASK_DIR/pr_diff_r${CURRENT_ROUND}.md"
 
-          # 内联生成提示词（不再调用 PR 分支上的脚本）
+          # 内联生成提示词
           {
             echo "你是一个极其严格、甚至有些刁钻的资深代码审查员。"
             echo "这是代码提交后的【第 ${CURRENT_ROUND} 轮】审查。"
             echo "请阅读当前目录下的 ${TASK_DIR}/pr_diff_r${CURRENT_ROUND}.md 文件，这是本次 PR 的代码变更。"
             echo ""
             echo "请检查是否有 Bug、逻辑错误、安全问题或性能瓶颈。"
-            echo "请严格按照以下纯文本格式输出你的审查结果，不要输出其他任何内容："
-            echo "DECISION: APPROVE 或 REQUEST_CHANGES"
+            echo ""
+            echo "【⚠️ 重要输出格式要求】："
+            echo "请严格按照以下纯文本格式输出，每项各占一行，不要使用 Markdown 代码块包裹，不要输出其他任何内容："
+            echo "DECISION: APPROVE"
+            echo "或"
+            echo "DECISION: REQUEST_CHANGES"
             echo "COMMENT: 你的详细审查意见 (如果你的意见中涉及需要修改 CI/CD 或 workflows，请告知人类手动处理)"
+            echo ""
+            echo "注意：DECISION 和 COMMENT 必须各占一行，以 DECISION: 和 COMMENT: 开头。COMMENT 的内容可以跨多行。"
           } > "$TASK_DIR/ai-reviewer-prompt_r${CURRENT_ROUND}.md"
 
           echo "📁 提示词已生成，文件大小：$(wc -c < "$TASK_DIR/ai-reviewer-prompt_r${CURRENT_ROUND}.md") bytes"
@@ -63,14 +90,6 @@ jobs:
 
       - name: 🤖 Execute Claude Code Agent (Reviewer)
         env:
-          "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic"
-          "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-4.7"
-          "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5.2[1m]"
-          "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5.2[1m]"
-          "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1000000"
-          "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": 1
-          "API_TIMEOUT_MS": "3000000"
-          ANTHROPIC_AUTH_TOKEN: ${{ secrets.GLM_API_KEY }}
           TASK_DIR: ${{ env.TASK_DIR }}
           ROUND: ${{ env.CURRENT_ROUND }}
         run: |
@@ -78,6 +97,7 @@ jobs:
 
           PROMPT_FILE="$TASK_DIR/ai-reviewer-prompt_r${ROUND}.md"
           OUTPUT_FILE="$TASK_DIR/review_result_r${ROUND}.md"
+          ERROR_FILE="$TASK_DIR/review_error_r${ROUND}.log"
 
           echo "正在读取 $PROMPT_FILE 并执行审查..."
           if [ ! -f "$PROMPT_FILE" ]; then
@@ -95,7 +115,8 @@ jobs:
             for ATTEMPT in 1 2; do
               echo "🔄 第 $ATTEMPT/2 次尝试..."
               set +e
-              claude -p "$(cat "$PROMPT_FILE")" --dangerously-skip-permissions > "$OUTPUT_FILE" 2>&1
+              # stdout → 审查结果；stderr → 错误日志（分离，避免 stderr 噪声污染解析）
+              claude -p "$(cat "$PROMPT_FILE")" --dangerously-skip-permissions > "$OUTPUT_FILE" 2> "$ERROR_FILE"
               CLAUDE_EXIT=$?
               set -e
 
@@ -105,7 +126,7 @@ jobs:
               fi
 
               echo "⚠️ 第 $ATTEMPT 次失败 (exit $CLAUDE_EXIT)，错误："
-              cat "$OUTPUT_FILE"
+              cat "$ERROR_FILE"
               echo "⏳ 等待 120 秒..."
               sleep 120
             done
@@ -119,7 +140,7 @@ jobs:
             exit 1
           fi
 
-      - name: ⚙️ Parse Review & Action (approve→merge→close→deploy 一体)
+      - name: ⚙️ Parse Review & Route (approve→merge 或 生成修复提示词)
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
           BOT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -129,28 +150,173 @@ jobs:
           ROUND: ${{ env.CURRENT_ROUND }}
         run: |
           RESULT_FILE="$TASK_DIR/review_result_r${ROUND}.md"
+          ERROR_FILE="$TASK_DIR/review_error_r${ROUND}.log"
 
-          DECISION=$(grep "^DECISION:" "$RESULT_FILE" | awk '{print $2}')
-          COMMENT=$(sed -n '/^COMMENT:/,$p' "$RESULT_FILE" | sed 's/^COMMENT://' | tr -d '\r')
+          echo "=== 审查结果原文 ==="
+          cat "$RESULT_FILE"
+          echo "=== END ==="
+
+          # 1. 去除 Markdown 代码围栏（```text / ``` 等空行）
+          CLEANED=$(sed 's/^```[a-zA-Z]*$//' "$RESULT_FILE")
+
+          # 2. 提取 DECISION（优先从 "DECISION:" 前缀行提取，避免 COMMENT 中的 APPROVE 等词干扰）
+          DECISION=$(echo "$CLEANED" | grep -oiE '^DECISION:[[:space:]]*(APPROVE|REQUEST_CHANGES)' | head -1 | grep -oiE 'APPROVE|REQUEST_CHANGES' | tr '[:lower:]' '[:upper:]')
+          # Fallback：如果没有 DECISION: 前缀行，尝试独占一行的 APPROVE/REQUEST_CHANGES
+          if [ -z "$DECISION" ]; then
+            DECISION=$(echo "$CLEANED" | grep -oiE '^[[:space:]]*(APPROVE|REQUEST_CHANGES)[[:space:]]*$' | head -1 | grep -oiE 'APPROVE|REQUEST_CHANGES' | tr '[:lower:]' '[:upper:]')
+          fi
+
+          # 3. 提取 COMMENT（从 COMMENT: 标记到文件末尾，大小写不敏感）
+          COMMENT=$(echo "$CLEANED" | sed -n '/^[[:space:]]*[Cc][Oo][Mm][Mm][Ee][Nn][Tt]:/,$p' | sed 's/^[[:space:]]*[Cc][Oo][Mm][Mm][Ee][Nn][Tt]://; 1s/^[[:space:]]*//' | tr -d '\r')
+
+          # 4. Fallback：如果 COMMENT 为空，尝试提取 DECISION 行之后的所有非空内容（排除 DECISION/COMMENT 标记行本身）
+          if [ -z "$(echo "$COMMENT" | tr -d '[:space:]')" ]; then
+            COMMENT=$(echo "$CLEANED" | sed -n '/APPROVE\|REQUEST_CHANGES/,$p' | tail -n +2 | grep -v '^[[:space:]]*$' | grep -viE '^(DECISION|COMMENT):')
+          fi
+
+          # 5. 验证：DECISION 必须存在且合法
+          if [ -z "$DECISION" ]; then
+            echo "❌ 无法从 Claude 输出中提取审查决策 (DECISION)！"
+            echo "--- stderr 日志 ---"
+            cat "$ERROR_FILE" 2>/dev/null || echo "(无 stderr)"
+            exit 1
+          fi
+
+          if [ "$DECISION" != "APPROVE" ] && [ "$DECISION" != "REQUEST_CHANGES" ]; then
+            echo "❌ 无效的审查决策: $DECISION"
+            exit 1
+          fi
+
+          # 6. 验证：REQUEST_CHANGES 时 COMMENT 不能为空（否则修复无方向）
+          if [ "$DECISION" = "REQUEST_CHANGES" ] && [ -z "$(echo "$COMMENT" | tr -d '[:space:]')" ]; then
+            echo "❌ REQUEST_CHANGES 但审查意见 (COMMENT) 为空！无法指导修复。"
+            echo "--- 审查结果原文 ---"
+            cat "$RESULT_FILE"
+            echo "--- stderr 日志 ---"
+            cat "$ERROR_FILE" 2>/dev/null || echo "(无 stderr)"
+            exit 1
+          fi
+
+          echo "✅ 解析成功: DECISION=$DECISION"
+          echo "DECISION=$DECISION" >> $GITHUB_ENV
 
           if [ "$DECISION" = "APPROVE" ]; then
             echo "✅ 代码审查通过！"
-            # 1. bot 批准（避免 PAT 用户 approve 自己的 PR）
-            GH_TOKEN="$BOT_TOKEN" gh pr review $PR_NUMBER --approve --body "🕵️ AI 审查通过！代码质量优秀。\n\n$COMMENT"
+            # bot 批准（GITHUB_TOKEN，避免 PAT 用户 approve 自己的 PR）
+            GH_TOKEN="$BOT_TOKEN" gh pr review "$PR_NUMBER" --approve --body "🕵️ AI 审查通过！代码质量优秀。"
 
-            # 2. 立即合并（用 PAT_TOKEN，GITHUB_TOKEN 合并不触发 deploy）
+            # 立即合并（PAT_TOKEN，GITHUB_TOKEN 合并不触发 deploy）
             echo "🔄 合并 PR..."
-            gh pr merge $PR_NUMBER --squash --delete-branch
+            gh pr merge "$PR_NUMBER" --squash --delete-branch
 
-            # 3. 关闭关联 Issue
+            # 关闭关联 Issue
             ISSUE_NUMBER=$(echo "$HEAD_REF" | grep -oiE 'issue-[0-9]+' | grep -oiE '[0-9]+' | head -n 1)
             if [ -n "$ISSUE_NUMBER" ]; then
               echo "🏁 关闭 Issue #$ISSUE_NUMBER..."
-              gh issue close $ISSUE_NUMBER --comment "🤖 本问题已通过自动化流水线解决并合并。"
+              gh issue close "$ISSUE_NUMBER" --comment "🤖 本问题已通过自动化流水线解决并合并。"
             fi
             echo "✅ 全流程完成：审查通过 → 已合并 → Issue 已关闭 → deploy 已触发"
           else
-            echo "❌ 代码审查不通过，触发 AI-Fixer..."
-            # 用 PAT_TOKEN 评论（GITHUB_TOKEN 评论不触发 issue_comment 事件）
-            gh pr comment $PR_NUMBER --body "/claude-fix 🛠️ **请立即根据以下审查意见修改代码：** \n\n> 以下是第 $ROUND 轮审查未通过的意见：\n\n$COMMENT"
+            echo "❌ 代码审查不通过，准备内联修复（不再通过 /claude-fix 评论中转）..."
+
+            # 写入 fixer-feedback（COMMENT 内容直接写入文件，无需 PR 评论传递）
+            printf '%s\n' "$COMMENT" > "$TASK_DIR/fixer-feedback_r${ROUND}.md"
+
+            # 生成 fixer 提示词（与原 ai-fixer.yml 格式一致）
+            {
+              echo "你是一个资深开发工程师。这是针对上一轮代码的【第 ${ROUND} 轮】修复任务。"
+              echo "以下是代码审查员给你的修改建议，请阅读当前目录下的 ${TASK_DIR}/fixer-feedback_r${ROUND}.md 文件获取详细内容。"
+              echo ""
+              echo "【⚠️ 严格红线规则】："
+              echo "请绝对不要修改、重命名或生成 .github/ 目录下的任何文件（特别是 workflows 等 CI/CD 配置），这会破坏项目的自动化流程！如果审查员要求你修改这些文件，请在回复中说明无法自动修改，需要人类介入。"
+              echo ""
+              echo "请直接分析并修改当前项目中的代码文件来满足审查员的要求，不要做过多的文字解释。"
+            } > "$TASK_DIR/fixer-prompt_r${ROUND}.md"
+
+            echo "📁 修复提示词已生成，大小：$(wc -c < "$TASK_DIR/fixer-prompt_r${ROUND}.md") bytes"
+          fi
+
+      - name: 🤖 Execute Claude Code Agent (Fixer)
+        if: env.DECISION == 'REQUEST_CHANGES'
+        env:
+          TASK_DIR: ${{ env.TASK_DIR }}
+          ROUND: ${{ env.CURRENT_ROUND }}
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # 确保 claude-code 已安装（review 步骤已装，防御性检查）
+          which claude || npm install -g @anthropic-ai/claude-code
+
+          PROMPT_FILE="$TASK_DIR/fixer-prompt_r${ROUND}.md"
+
+          echo "正在读取 $PROMPT_FILE 并执行代码修复..."
+          if [ ! -f "$PROMPT_FILE" ]; then
+            echo "❌ 致命错误：提示词文件 $PROMPT_FILE 不存在，生成步骤可能失败，无法继续。"
+            exit 1
+          fi
+
+          # 带模型 fallback 的重试：先 GLM-5.2，529 过载时降级 GLM-5-Turbo
+          CLAUDE_EXIT=1
+          for MODEL in "glm-5.2[1m]" "glm-5-turbo"; do
+            export ANTHROPIC_DEFAULT_SONNET_MODEL="$MODEL"
+            export ANTHROPIC_DEFAULT_OPUS_MODEL="$MODEL"
+            echo "📌 使用模型: $MODEL"
+
+            for ATTEMPT in 1 2; do
+              echo "🔄 第 $ATTEMPT/2 次尝试..."
+              set +e
+              claude -p "$(cat "$PROMPT_FILE")" --dangerously-skip-permissions
+              CLAUDE_EXIT=$?
+              set -e
+
+              if [ $CLAUDE_EXIT -eq 0 ]; then
+                echo "✅ Claude 修复完成 (model: $MODEL)"
+                break 2
+              fi
+
+              echo "⚠️ 第 $ATTEMPT 次失败 (exit $CLAUDE_EXIT)"
+              echo "⏳ 等待 120 秒..."
+              sleep 120
+            done
+
+            [ $CLAUDE_EXIT -eq 0 ] && break
+            echo "🔄 $MODEL 不可用，切换下一个模型..."
+          done
+
+          if [ $CLAUDE_EXIT -ne 0 ]; then
+            echo "❌ 所有模型和重试均失败，放弃。"
+            exit 1
+          fi
+
+      - name: 🚀 Push Fix Code & Archive Doc
+        if: env.DECISION == 'REQUEST_CHANGES'
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          ROUND: ${{ env.CURRENT_ROUND }}
+          HEAD_REF: ${{ github.head_ref }}
+          TASK_DIR: ${{ env.TASK_DIR }}
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add .
+
+          # 红线检查：如果 Claude 修改了 .github/ 下的文件，回滚这些改动
+          if git diff --cached --name-only | grep -q '^\.github/'; then
+            echo "❌ 红线违规：Claude 修改了 .github/ 目录下的文件！回滚这些改动..."
+            git diff --cached --name-only | grep '^\.github/'
+            git reset HEAD -- .github/
+            git checkout -- .github/ 2>/dev/null || true
+          fi
+
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "⚠️ 警告: AI 没有修改任何代码文件！"
+          else
+            echo "✅ 发现代码修改，准备提交第 ${ROUND} 轮修复"
+            git commit -m "🛠️ fix: 根据审查员意见完成第 ${ROUND} 轮代码重构 (归档交互文档)"
+            # 先拉远端最新再推（处理并发推送冲突，如 main 合入导致远端更新）
+            git pull --rebase origin "$HEAD_REF" || { echo "❌ Rebase 冲突，需人工介入"; git rebase --abort 2>/dev/null; exit 1; }
+            git push origin "$HEAD_REF" || { echo "❌ Push 失败"; exit 1; }
+            echo "✅ 第 ${ROUND} 轮修复已推送，synchronize 事件将自动触发新一轮审查"
           fi

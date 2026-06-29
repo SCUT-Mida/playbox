@@ -43,6 +43,9 @@ import {
 } from '../src/core/npc.js';
 import { playSfx, isSfxEnabled, setSfxEnabled } from '../src/core/sfx.js';
 import {
+  AUTO_TENDENCIES, defaultTendencies, defaultAutoPlay, normalizeAutoPlay, pickTendency, autoStep,
+} from '../src/core/autoplay.js';
+import {
   hasSave, loadGame, saveGame, clearSave, exportSave, importSave, computeOffline, _setStorage,
 } from '../src/core/save.js';
 import { makeRng, weighted, rangeInt, pick } from '../src/core/rng.js';
@@ -996,8 +999,124 @@ console.log('— achievements: goal / progress / reward —');
   ok(/×1/.test(rewardDesc({ items: [['pill_huitian', 1]] })), 'rewardDesc 含物品数量');
 }
 
+// ---------- 自动挂机（autoplay）----------
+console.log('— autoplay —');
+// 测试用：构造一份「只启用指定倾向」的完整配置（normalize 会用默认值补齐缺省倾向，
+// 故测试需显式给出全部 0，避免默认倾向混入干扰加权抽取判定）。
+const ZERO_TEND = { cultivate: 0, explore: 0, breakthrough: 0, craft: 0, team: 0, meet: 0 };
+const onlyTendency = (over) => normalizeAutoPlay({ enabled: true, tendencies: { ...ZERO_TEND, ...over } });
+
+ok(AUTO_TENDENCIES.length >= 4, `自动挂机倾向 >= 4（实际 ${AUTO_TENDENCIES.length}）`);
+ok(AUTO_TENDENCIES.every((d) => d.id && d.label && d.emoji && Number.isFinite(d.defaultWeight)), '每个倾向字段完整');
+// 默认配置：关闭 + 合法节奏 + 全倾向正权重
+{
+  const ap = defaultAutoPlay();
+  ok(ap.enabled === false, '默认自动挂机关闭（不擅自开启）');
+  ok(Number.isFinite(ap.intervalSec) && ap.intervalSec >= 1, '默认周期节奏合法');
+  const t = defaultTendencies();
+  ok(AUTO_TENDENCIES.every((d) => Number.isFinite(t[d.id]) && t[d.id] > 0), '默认倾向权重均为正');
+}
+// normalizeAutoPlay 兜底 / 钳制
+{
+  const ap = normalizeAutoPlay(null);
+  ok(ap.enabled === false && ap.intervalSec >= 1, 'normalizeAutoPlay(null) 给出合法默认（且关闭）');
+  ok(AUTO_TENDENCIES.every((d) => Number.isFinite(ap.tendencies[d.id])), 'normalize 补齐所有倾向权重');
+  const clamped = normalizeAutoPlay({ intervalSec: 999, tendencies: { cultivate: -3, explore: 99 } });
+  ok(clamped.intervalSec <= 30, 'normalize 钳制越界周期节奏');
+  ok(clamped.tendencies.cultivate === 0 && clamped.tendencies.explore === 9, 'normalize 钳制权重到 0~9');
+  ok(normalizeAutoPlay({ enabled: true }).enabled === true, 'normalize 保留 enabled=true');
+}
+// pickTendency：仅在权重>0 的倾向中抽取；权重比例近似
+{
+  const cfg = onlyTendency({ cultivate: 1 });
+  let allCult = true;
+  for (let i = 0; i < 50; i++) { if (pickTendency(cfg, makeRng(i)) !== 'cultivate') allCult = false; }
+  ok(allCult, 'pickTendency 仅在权重>0 的倾向中抽取');
+  ok(pickTendency(onlyTendency({}), makeRng(0)) === null, '全部权重为 0 时返回 null');
+  // 权重比 ≈ cultivate:explore = 4:1（容差放宽，仅验证大致倾向）
+  const cfg2 = onlyTendency({ cultivate: 4, explore: 1 });
+  let c = 0; const N = 3000;
+  for (let i = 0; i < N; i++) if (pickTendency(cfg2, makeRng(i)) === 'cultivate') c++;
+  const ratio = c / N;
+  ok(ratio > 0.72 && ratio < 0.85, `权重比例近似 4:1（cultivate 占比 ${(ratio * 100).toFixed(0)}%）`);
+}
+// autoStep：修炼倾向能积累修为
+{
+  const q = newPlayer(() => 0);
+  q.autoPlay = onlyTendency({ cultivate: 1 });
+  q.tier = 1; q.sub = 0; recompute(q); q.mp = q.maxMp; q.hp = q.maxHp; q.vitality = q.maxVitality;
+  const xp0 = q.xp;
+  let progressed = false;
+  for (let i = 0; i < 20; i++) {
+    const r = autoStep(q, q.autoPlay, makeRng(i));
+    ok(Array.isArray(r.logs), 'autoStep 返回 logs 数组');
+    if (q.xp > xp0) { progressed = true; break; }
+  }
+  ok(progressed, '自动修炼倾向能积累修为');
+}
+// autoStep：探索倾向自动处置 battle/choice/instant 全程不抛错（大量随机覆盖）
+{
+  let crashed = false;
+  try {
+    for (let i = 0; i < 150; i++) {
+      const q = newPlayer(() => 0);
+      q.autoPlay = onlyTendency({ explore: 1 });
+      q.tier = 3; q.sub = 0; recompute(q); q.hp = q.maxHp; q.mp = q.maxMp; q.vitality = q.maxVitality;
+      for (let j = 0; j < 20; j++) autoStep(q, q.autoPlay, makeRng(i * 131 + j));
+    }
+  } catch (e) { crashed = true; console.error(e); }
+  ok(!crashed, '自动探索（含战斗/抉择自动处置）全程不抛异常');
+}
+// autoStep：炼制倾向材料齐备时产出丹药
+{
+  const q = newPlayer(() => 0);
+  q.autoPlay = onlyTendency({ craft: 1 });
+  q.tier = 1; recompute(q); q.mp = q.maxMp; q.hp = q.maxHp; q.vitality = q.maxVitality;
+  q.recipes = ['rcp_huitian'];
+  addItem(q, 'herb_qingmu', 300);
+  const before = countItem(q, 'pill_huitian');
+  for (let i = 0; i < 80; i++) { autoStep(q, q.autoPlay, makeRng(i)); if (q.vitality < 6) q.vitality = q.maxVitality; }
+  ok(countItem(q, 'pill_huitian') > before, '自动炼制倾向能产出丹药');
+}
+// autoStep：突破倾向自动渡心魔，可跨越炼气→筑基大境界
+{
+  let reached = false; let crashed = false;
+  try {
+    const q = newPlayer(() => 0);
+    q.autoPlay = onlyTendency({ cultivate: 2, breakthrough: 1 });
+    q.tier = 1; q.sub = 0; recompute(q); q.hp = q.maxHp; q.mp = q.maxMp; q.vitality = q.maxVitality;
+    addItem(q, 'fabao_huoyun', 1); equip(q, 'fabao_huoyun');
+    // 用一条共享 rng 流（连续抽取分布良好）；按 i 重播种会让 LCG 首抽取高度相关，
+    // 致加权选择系统性偏向首项，与真实游戏（Math.random）不符。
+    const rng = makeRng(42);
+    for (let i = 0; i < 20000 && q.tier < 2; i++) {
+      autoStep(q, q.autoPlay, rng);
+      if (q.hp <= 1) q.hp = q.maxHp;        // 战斗/渡劫掉血后补给，避免卡死
+      if (q.mp < 20) q.mp = q.maxMp;
+      if (q.vitality < 6) q.vitality = q.maxVitality; // 模拟跨月活力回满
+    }
+    reached = q.tier >= 2;
+  } catch (e) { crashed = true; console.error(e); }
+  ok(!crashed, '自动突破（含渡心魔）全程不抛异常');
+  ok(reached, '自动挂机能跨越心魔大境界进入筑基');
+}
+// autoStep：全部权重为 0 时 ok=false，不抛错
+{
+  const q = newPlayer(() => 0);
+  q.autoPlay = onlyTendency({});
+  const r = autoStep(q, q.autoPlay, makeRng(0));
+  ok(r.ok === false && r.tendency === null, '无启用倾向时 autoStep 返回 ok=false');
+}
+// 自动挂机配置随存档持久化（migrate 补齐）
+{
+  const q = newPlayer(() => 0);
+  delete q.autoPlay;
+  const mig = importSave(exportSave(q));
+  ok(mig.autoPlay && typeof mig.autoPlay === 'object' && mig.autoPlay.enabled === false, '存档迁移补齐 autoPlay 配置（且不开启）');
+  ok(AUTO_TENDENCIES.every((d) => Number.isFinite(mig.autoPlay.tendencies[d.id])), '迁移后所有倾向权重齐备');
+}
+
 console.log(`\n结果: ${pass} 通过, ${fail} 失败`);
 process.exit(fail ? 1 : 0);
-
 // —— 辅助 ——
 function SCENE_VALID(s) { return ['mountain', 'cave', 'ruin', 'wild'].includes(s); }

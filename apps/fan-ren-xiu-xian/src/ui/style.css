@@ -155,6 +155,36 @@
 .frxx .chaos-banner.lingchao { background: rgba(95,208,160,0.16); color: var(--jade); border: 1px solid rgba(95,208,160,0.4); }
 .frxx .chaos-banner.mojie { background: rgba(224,107,107,0.16); color: var(--bad); border: 1px solid rgba(224,107,107,0.4); }
 
+/* —— 自动挂机 —— */
+/* 状态栏指示徽丸：开启时金色脉动，提示主角正在自动修行 */
+.frxx .auto-badge {
+  flex: none; font-size: 0.66rem; font-weight: 700; color: var(--gold);
+  background: rgba(212,168,75,0.16); border: 1px solid rgba(212,168,75,0.45);
+  border-radius: 999px; padding: 0.12rem 0.36rem; white-space: nowrap;
+  animation: frxx-pulse 1.6s ease-in-out infinite;
+}
+/* 设置面板内的倾向配置行 */
+.frxx .auto-cfg-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0; }
+.frxx .auto-cfg-row + .auto-cfg-row { border-top: 1px dashed var(--line); }
+.frxx .auto-cfg-row .k { color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
+.frxx .auto-cfg-row .emo { font-size: 1.15rem; flex: none; }
+.frxx .auto-cfg-row .nm { font-size: 0.84rem; color: var(--text); }
+.frxx .auto-cfg-row.tendency.off .nm,
+.frxx .auto-cfg-row.tendency.off .muted { opacity: 0.5; }
+/* 数值步进器（周期节奏 / 倾向权重） */
+.frxx .stepper { display: flex; align-items: center; gap: 0.35rem; flex: none; }
+.frxx .stepper__val { min-width: 3.4rem; text-align: center; font-size: 0.8rem; font-variant-numeric: tabular-nums; color: var(--text); }
+/* 倾向启用开关 */
+.frxx .auto-toggle {
+  flex: none; width: 30px; height: 30px; border-radius: 50%; font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--card); border: 1px solid var(--line); color: var(--muted);
+}
+.frxx .auto-toggle.on {
+  background: rgba(95,208,160,0.18); border-color: rgba(95,208,160,0.5);
+  color: var(--jade); font-weight: 700;
+}
+
 /* —— 日志条 —— */
 .frxx .log-strip {
   flex: none; max-height: 76px; overflow-y: auto;

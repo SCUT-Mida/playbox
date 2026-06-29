@@ -289,6 +289,58 @@ ok(!renderErr, `七大功能页渲染无异常（${renderErr ? renderErr.message
   await sleep(5);
 }
 
+// ---------- 9b1f2) 自动挂机：设置入口 / 倾向权重 / 立即一轮 / 状态栏徽丸 ----------
+{
+  // 默认关闭：状态栏无自动挂机徽丸
+  ok(document.querySelector('.auto-badge')?.style.display === 'none', '默认关闭时状态栏不显示自动挂机徽丸');
+  ui.showSettings();
+  await sleep(10);
+  const bodyTxt = () => document.querySelector('.sheet__body')?.textContent || '';
+  ok(/自动挂机/.test(bodyTxt()), '设置弹窗含「自动挂机」入口卡片');
+  ok(/周期节奏/.test(bodyTxt()), '自动挂机卡片含周期节奏设置');
+  // 每个倾向都渲染为一行配置
+  ok(document.querySelectorAll('.auto-cfg-row.tendency').length >= 4, '自动挂机列出多个可配置倾向');
+  // 开启总开关
+  const toggleBtn = [...document.querySelectorAll('.sheet__body button')].find((b) => /自动挂机[:：]/.test(b.textContent));
+  ok(!!toggleBtn, '有自动挂机总开关按钮');
+  toggleBtn.click();
+  await sleep(5);
+  ok(ui.player.autoPlay.enabled === true, '点击总开关后 autoPlay.enabled = true');
+  // 权重步进器：找到首个启用倾向的「+」按钮，权重 +1 后回填
+  const plusBtns = [...document.querySelectorAll('.auto-cfg-row.tendency .stepper button')];
+  ok(plusBtns.length > 0, '启用倾向展示权重步进器');
+  const beforeW = Object.values(ui.player.autoPlay.tendencies).reduce((s, w) => s + w, 0);
+  plusBtns[plusBtns.length - 1].click(); // 末项「+」
+  await sleep(5);
+  const afterW = Object.values(ui.player.autoPlay.tendencies).reduce((s, w) => s + w, 0);
+  ok(afterW === beforeW + 1, `权重步进器 +1 生效（${beforeW} → ${afterW}）`);
+  // 关闭某倾向：点击其启用开关圆钮 → 该行变为 off 且无步进器
+  const onToggle = document.querySelector('.auto-toggle.on');
+  ok(!!onToggle, '启用倾向有开关圆钮');
+  onToggle.click();
+  await sleep(5);
+  ok(document.querySelectorAll('.auto-cfg-row.tendency.off').length >= 1, '点击开关后该倾向变为已停用');
+  // 重新全部启用，便于后续「立即一轮」有倾向可执行
+  ui.player.autoPlay = { enabled: true, intervalSec: 2, tendencies: { cultivate: 4, explore: 3, breakthrough: 3, craft: 2, team: 1, meet: 1 } };
+  ui._saveAuto(); ui._fillAutoCard();
+  await sleep(5);
+  // 「立即挂机一轮」预览按钮：执行一次（凡人会修炼/探索，不抛错）
+  const onceBtn = [...document.querySelectorAll('.sheet__body button')].find((b) => /立即挂机一轮/.test(b.textContent));
+  ok(!!onceBtn, '自动挂机卡片含「立即挂机一轮」按钮');
+  let onceErr = null;
+  try { onceBtn.click(); } catch (e) { onceErr = e; }
+  await sleep(5);
+  ok(!onceErr, `立即挂机一轮不抛异常（${onceErr ? onceErr.message : 'ok'}）`);
+  ui.closeModal();
+  await sleep(5);
+  // 开启后状态栏出现脉动的自动挂机徽丸
+  ok(document.querySelector('.auto-badge')?.style.display !== 'none', '开启后状态栏显示自动挂机徽丸');
+  // 关闭后徽丸消失
+  ui.player.autoPlay.enabled = false; ui._saveAuto(); ui.refreshStatus();
+  await sleep(5);
+  ok(document.querySelector('.auto-badge')?.style.display === 'none', '关闭后状态栏徽丸消失');
+}
+
 // ---------- 9b1g) 成就面板：进度条 + 奖励 + 可伸缩分类 ----------
 {
   ui.showAchievements();

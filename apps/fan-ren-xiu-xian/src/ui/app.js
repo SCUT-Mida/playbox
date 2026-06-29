@@ -46,6 +46,7 @@ import {
   listSlots, loadSlot, saveSlot, deleteSlot, getActiveSlot, setActiveSlot, migrateLegacy,
 } from '../core/save.js';
 import { playSfx, isSfxEnabled, setSfxEnabled } from '../core/sfx.js';
+import { AUTO_TENDENCIES, normalizeAutoPlay, autoStep } from '../core/autoplay.js';
 import { NPC_LIST, npcDef, affinityLevel, AFFINITY_LEVELS, TEAM_AFFINITY_THRESHOLD, MEET_VITALITY_COST, TEAM_VITALITY_COST, TEAM_EXPLORE_MAX_PER_CYCLE } from '../data/npcs.js';
 import {
   meetNpc, giftNpc, canTeamUp, teamedToday, teamExplore, teamExploreUsed, teamExploreRemaining,
@@ -81,6 +82,7 @@ export class GameUI {
     this.activeSlot = 1;
     this.charTemplate = null;  // 创角预览模板
     this.pendingOffline = null;
+    this.autoAccum = 0;        // 自动挂机周期累计（秒），达 intervalSec 触发一轮
     // 绑定 visibilitychange 回调：addEventListener 注册的普通函数 this 为事件目标(document)，
     // 不绑定则 this.player 为 undefined，切后台存档会抛错被静默吞掉。绑定后 add/remove 用同一引用。
     this._onVis = this._onVis.bind(this);
@@ -309,6 +311,9 @@ export class GameUI {
     // 立即落盘刷新 lastSeen：否则 lastSeen 要等到 10 秒定时器 / 首次 afterAction 才更新，
     // 若玩家开档后 10 秒内、未做任何操作即关闭页面，下次开档会按旧 lastSeen 再次发放同一时段收益。
     recompute(player);
+    // 自动挂机配置兜底（旧档 / 损坏档缺失字段时补默认，绝不擅自开启）
+    player.autoPlay = normalizeAutoPlay(player.autoPlay);
+    this.autoAccum = 0;
     this.pendingOffline = offline;
     saveGame(player);
 
@@ -357,6 +362,8 @@ export class GameUI {
     this.ui.age = h('span', { class: 'vit-pill age-pill', title: '年龄：随每月周期增长，境界越高寿元越长；大限将至可轮回重修' }, `🕯️${ageLabel(p)}`);
     this.ui.vitality = h('span', { class: 'vit-pill', title: '每月行动力：消耗型行动力，跨月恢复' }, `⚡${Math.floor(p.vitality)}/${p.maxVitality}`);
     this.ui.chaosBanner = h('div', { class: 'chaos-banner', style: { display: 'none' } });
+    // 自动挂机指示徽丸：仅在开启时显示，提示玩家「主角正在自动修行」。
+    this.ui.autoBadge = h('span', { class: 'auto-badge', title: '自动挂机进行中（打开任意弹窗时自动暂停）', style: { display: 'none' } }, '🤖自动');
 
     this.ui.hpBar = bar(p.hp, p.maxHp, { class: 'hp', label: `气血 ${Math.floor(p.hp)}/${p.maxHp}` });
     this.ui.mpBar = bar(p.mp, p.maxMp, { class: 'mp', label: `灵力 ${Math.floor(p.mp)}/${p.maxMp}` });
@@ -369,6 +376,7 @@ export class GameUI {
         // 右侧工具收拢成一组：窄屏放不下时整组换行，确保设置按钮永不被挤出可视区
         // 音效开关已移入「设置」弹窗，状态栏不再占用工具位。
         h('div', { class: 'status-tools' },
+          this.ui.autoBadge,
           this.ui.age,
           this.ui.vitality,
           this.ui.stones,
@@ -392,9 +400,108 @@ export class GameUI {
     this.toast(on ? '音效已开启' : '音效已关闭', 'normal');
   }
 
+  // ============ 自动挂机设置 ============
+  // 渲染一张可独立重建的「自动挂机」卡片：修改任一配置只刷新本卡内容，不波及其余设置项。
+  _renderAutoPlayCard() {
+    this.player.autoPlay = normalizeAutoPlay(this.player.autoPlay);
+    const card = h('div', { class: 'card' });
+    this._autoCardEl = card;
+    this._fillAutoCard();
+    return card;
+  }
+
+  _fillAutoCard() {
+    const card = this._autoCardEl;
+    if (!card) return;
+    clear(card);
+    const p = this.player;
+    const ap = p.autoPlay;
+    card.append(
+      h('h4', null, '🤖 自动挂机'),
+      h('div', { class: 'muted', style: { marginBottom: '0.5rem' } },
+        '开启后，主角将按下方倾向与权重，每「周期」自动修炼、探索、炼制、突破、结伴、寻访——真正挂机修仙。打开任何弹窗（设置 / 战斗 / 渡劫等）时会自动暂停，不与你的操作冲突。被动修炼始终在累积。'),
+      h('div', { class: 'row' },
+        h('button', {
+          class: ap.enabled ? 'btn-jade' : 'btn-ghost', style: { flex: 1 },
+          onClick: () => this._toggleAuto(),
+        }, ap.enabled ? '✅ 自动挂机：已开启' : '💤 自动挂机：已关闭'),
+      ),
+      h('div', { class: 'auto-cfg-row', style: { marginTop: '0.5rem' } },
+        h('span', { class: 'k' }, '周期节奏'),
+        h('div', { class: 'spacer' }),
+        this._stepper(ap.intervalSec, 1, 30, (v) => this._setAutoInterval(v), '秒/轮'),
+      ),
+      h('div', { class: 'muted', style: { margin: '0.5rem 0 0.2rem' } }, '勾选要自动进行的修行，并用权重调节出现频率（可多选）：'),
+      ...AUTO_TENDENCIES.map((d) => this._tendencyRow(d, ap)),
+      h('button', { class: 'btn-ghost', style: { width: '100%', marginTop: '0.5rem' }, onClick: () => this.runAutoOnce() }, '▶ 立即挂机一轮（预览）'),
+    );
+  }
+
+  // 单个倾向行：图标 / 名称说明 / 启用开关 / 权重步进器
+  _tendencyRow(d, ap) {
+    const w = ap.tendencies[d.id] || 0;
+    const enabled = w > 0;
+    return h('div', { class: `auto-cfg-row tendency ${enabled ? '' : 'off'}` },
+      h('span', { class: 'emo' }, d.emoji),
+      h('div', { class: 'grow' },
+        h('div', { class: 'nm' }, d.label),
+        h('div', { class: 'muted' }, d.desc),
+      ),
+      h('button', {
+        class: `auto-toggle ${enabled ? 'on' : ''}`,
+        title: enabled ? '已启用' : '已停用',
+        onClick: () => this._toggleTendency(d.id),
+      }, enabled ? '✓' : '○'),
+      enabled ? this._stepper(w, 1, 9, (v) => this._setTendency(d.id, v), '') : null,
+    );
+  }
+
+  // 通用数值步进器（− / 值 / +），供周期节奏与倾向权重共用
+  _stepper(value, min, max, onChange, suffix) {
+    return h('div', { class: 'stepper' },
+      h('button', { class: 'icon-btn', disabled: value <= min, onClick: () => onChange(Math.max(min, value - 1)) }, '−'),
+      h('span', { class: 'stepper__val' }, `${value}${suffix ? ' ' + suffix : ''}`),
+      h('button', { class: 'icon-btn', disabled: value >= max, onClick: () => onChange(Math.min(max, value + 1)) }, '+'),
+    );
+  }
+
+  _toggleAuto() {
+    this.player.autoPlay.enabled = !this.player.autoPlay.enabled;
+    this._saveAuto();
+    this._fillAutoCard();
+    this.refreshStatus();
+    this.autoAccum = 0;
+    this.toast(this.player.autoPlay.enabled ? '自动挂机已开启' : '自动挂机已关闭', 'normal');
+  }
+  _setAutoInterval(v) {
+    this.player.autoPlay.intervalSec = v;
+    this._saveAuto();
+    this._fillAutoCard();
+  }
+  _toggleTendency(id) {
+    const ap = this.player.autoPlay;
+    ap.tendencies[id] = (ap.tendencies[id] || 0) > 0 ? 0 : 3; // 关闭 / 以默认权重 3 启用
+    this._saveAuto();
+    this._fillAutoCard();
+  }
+  _setTendency(id, v) {
+    this.player.autoPlay.tendencies[id] = v;
+    this._saveAuto();
+    this._fillAutoCard();
+  }
+  // 规范化并落盘自动挂机配置（设置改动即时持久化，避免刷新丢失）
+  _saveAuto() {
+    this.player.autoPlay = normalizeAutoPlay(this.player.autoPlay);
+    saveGame(this.player);
+  }
+
   refreshStatus() {
     const p = this.player;
     const info = realmInfo(p);
+    // 自动挂机徽丸：仅在开启且处于游戏中时显示
+    if (this.ui.autoBadge) {
+      this.ui.autoBadge.style.display = (p.autoPlay && p.autoPlay.enabled && this.screen === 'game') ? '' : 'none';
+    }
     // 境界徽章：印章配色 + 2 字图标简称（无境界全名文字）
     const seal = this.ui.realmBadge.querySelector('.seal');
     seal.style.background = info.realm.color;
@@ -1770,6 +1877,7 @@ export class GameUI {
         h('div', { class: 'muted', style: { marginBottom: '0.4rem' } }, '开关游戏音效（修炼 / 战斗 / 突破 / 收获等提示音）。设置会自动保存。'),
         h('div', { class: 'row' }, this._sfxBtn),
       ),
+      this._renderAutoPlayCard(),
       h('div', { class: 'card' },
         h('h4', null, '存档导出'),
         h('div', { class: 'muted', style: { marginBottom: '0.3rem' } }, '复制下方字符串，可在他处导入恢复。'),
@@ -2036,6 +2144,50 @@ export class GameUI {
     this.refreshStatus();
     // 修为圆满→突破按钮可用：实时重建修炼面板，免得玩家还要切页再回来才点得动
     if (watching && !couldBreak && canBreakthrough(this.player)) this.renderPanel();
+    // 自动挂机：按设定周期执行一轮（弹窗 / 战斗 / 渡劫期间暂停，不与手动操作冲突）
+    this._autoAccumulate();
+  }
+
+  // —— 自动挂机驱动 ——
+  _autoAccumulate() {
+    const ap = this.player && this.player.autoPlay;
+    if (!ap || !ap.enabled) { this.autoAccum = 0; return; }
+    // 任何弹窗（设置 / 档案 / 战斗 / 渡劫 / 收获…）打开时暂停，避免与玩家操作冲突
+    if (this.battle || this.trial || this.screen !== 'game') return;
+    if (this.modalRoot.children.length) return;
+    this.autoAccum += 1;
+    const interval = Math.max(1, ap.intervalSec || 4);
+    if (this.autoAccum >= interval) {
+      this.autoAccum = 0;
+      this.runAutoStep();
+    }
+  }
+
+  // 执行一轮自动挂机（由周期定时器或「立即挂机一轮」按钮触发）。
+  // 全程不开弹窗：遭遇 / 战斗 / 渡劫均由 autoStep 自动处置；异常被吞，绝不中断主循环。
+  runAutoStep() {
+    const p = this.player;
+    if (!p || p.ascended) return;
+    p.autoPlay = normalizeAutoPlay(p.autoPlay);
+    let res;
+    try {
+      res = autoStep(p, p.autoPlay, Math.random);
+    } catch (_) {
+      return;
+    }
+    if (!res.ok) return; // 本轮无可执行行动：静默跳过（被动修炼照常累积）
+    for (const l of (res.logs || [])) this.pushLog(l.text, l.type || 'normal');
+    recompute(p);
+    this.checkAchvAndToast();
+    this.refreshStatus();
+    if (this.tab === 'cultivate') this.renderPanel(); // 突破/修炼后按钮态可能变化
+    saveGame(p);
+  }
+
+  // 「立即挂机一轮」预览按钮：无视开关执行一次，便于玩家直观感受自动挂机效果
+  runAutoOnce() {
+    this.runAutoStep();
+    this.toast('已执行一轮自动挂机', 'normal');
   }
 
   destroy() {

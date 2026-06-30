@@ -48,13 +48,49 @@ export const EVENTS = [
       { label: '抓起拨浪鼓', emoji: '🪈', apply: () => ({ outcome: '你咯咯笑着挥舞，逗得满堂喝彩。', changes: { mood: 8, social: 4 } }) },
     ],
   },
+  {
+    id: 'vaccine', emoji: '💉', stage: ['infant'], weight: 4,
+    title: '预防接种', text: '到了打疫苗的日子，社区医院里一片此起彼伏的哭声。',
+    options: [
+      { label: '按时接种', emoji: '✅', apply: (p, r) => {
+        if (r() < 0.85) return { outcome: '哭了一阵便好了，换来了结实的免疫力。', changes: { health: 5, mood: -2 } };
+        return { outcome: '接种后低烧了一两天，所幸无碍。', changes: { health: 2, mood: -4 } };
+      } },
+      { label: '心疼孩子先缓缓', emoji: '😣', apply: () => ({ outcome: '一拖再拖，抵抗力反倒没跟上。', changes: { health: -3 } }) },
+    ],
+  },
+  {
+    id: 'daycare', emoji: '🧸', stage: ['infant'], weight: 4,
+    title: '送托儿所', text: '父母都要上班，商量着要不要把你送去托儿所。',
+    options: [
+      { label: '早送早适应', emoji: '🏫', apply: (p, r) => {
+        if (r() < 0.6) return { outcome: '虽然开头哭闹，但很快交到了小伙伴，社交开窍。', changes: { social: 7, mood: 3, health: -1 } };
+        return { outcome: '分离焦虑严重，闹了好一阵子才适应。', changes: { social: 3, mood: -4 } };
+      } },
+      { label: '留在长辈身边', emoji: '👵', apply: () => ({ outcome: '被宠着长大，安全感满满，却少了些玩伴。', changes: { mood: 5, social: -2 } }) },
+    ],
+  },
+  {
+    id: 'night_cry', emoji: '🌙', stage: ['infant'], weight: 3,
+    title: '夜啼闹觉', text: '一连几晚你都在半夜哭醒，全家人都被熬成了熊猫眼。',
+    options: [
+      { label: '耐心哄睡、调整作息', emoji: '🍼', apply: () => ({ outcome: '慢慢养成了好作息，大人也松了口气。', changes: { health: 3, mood: 3 } }) },
+      { label: '随哭随喂图省事', emoji: '😴', apply: () => ({ outcome: '暂时止住了哭，却养成了奶睡的坏习惯。', changes: { mood: 2, health: -2 } }) },
+    ],
+  },
 
   // ===================== 学龄期 =====================
   {
     id: 'exam', emoji: '📝', stage: ['child'], weight: 7,
     title: '期中考试', text: '一场重要的考试近在眼前，同学都在临时抱佛脚。',
     options: [
-      { label: '挑灯夜战冲刺', emoji: '🕯️', apply: () => ({ outcome: '成绩出来名列前茅，只是熬出了黑眼圈。', changes: { intelligence: 8, health: -4, mood: 2 } }) },
+      { label: '挑灯夜战冲刺', emoji: '🕯️', apply: (p) => {
+        // 底子好的冲刺如虎添翼，底子差的多半事倍功半。
+        const smart = p.attrs.intelligence;
+        if (smart >= 70) return { outcome: '厚积薄发，成绩一鸣惊人，被老师当众表扬。', changes: { intelligence: 8, mood: 5, social: 3, health: -3 } };
+        if (smart >= 45) return { outcome: '成绩出来名列前茅，只是熬出了黑眼圈。', changes: { intelligence: 6, health: -4, mood: 2 } };
+        return { outcome: '临时抱佛脚收效甚微，成绩平平，还累得够呛。', changes: { intelligence: 2, health: -5, mood: -2 } };
+      } },
       { label: '保持节奏正常发挥', emoji: '😌', apply: () => ({ outcome: '不温不火，成绩中等偏上。', changes: { intelligence: 3, mood: 2 } }) },
       { label: '破罐破摔交白卷', emoji: '🫠', apply: () => ({ outcome: '被请了家长，心里很不是滋味。', changes: { intelligence: -2, mood: -5, social: -2 } }) },
     ],
@@ -96,6 +132,37 @@ export const EVENTS = [
       { label: '默默想念旧友', emoji: '🥺', apply: () => ({ outcome: '一时难以适应，成绩和心情都受影响。', changes: { mood: -4, social: -3, intelligence: -2 } }) },
     ],
   },
+  {
+    id: 'first_crush', emoji: '💘', stage: ['child'], weight: 4,
+    title: '青涩心事', text: '你对班里一个同学生出朦胧的好感，心里小鹿乱撞。',
+    options: [
+      { label: '递张小纸条表白', emoji: '📝', apply: (p, r) => {
+        if (r() < 0.45) return { outcome: '对方竟也红着脸回了信，少年心事甜得发慌。', changes: { mood: 9, social: 5 } };
+        return { outcome: '被婉拒了，窘得几天抬不起头。', changes: { mood: -5, social: 2, intelligence: 1 } };
+      } },
+      { label: '默默喜欢就好', emoji: '🤫', apply: () => ({ outcome: '把心事藏在日记里，化作学习的动力。', changes: { intelligence: 4, mood: 1 } }) },
+    ],
+  },
+  {
+    id: 'contest', emoji: '🏆', stage: ['child'], weight: 4,
+    title: '学科竞赛', text: '老师推荐你代表班级参加市里的学科竞赛。',
+    options: [
+      { label: '闭关特训冲刺奖牌', emoji: '🥇', apply: (p, r) => {
+        const win = r() < (p.attrs.intelligence >= 65 ? 0.8 : 0.4);
+        if (win) return { outcome: '一鸣惊人拿了奖，成了学校的小名人！', changes: { intelligence: 8, social: 6, mood: 7, health: -3 } };
+        return { outcome: '高强度备战却铩羽而归，累得脱了层皮。', changes: { intelligence: 3, health: -5, mood: -3 } };
+      } },
+      { label: '量力而行重在参与', emoji: '😌', apply: () => ({ outcome: '开阔了眼界，名次不重要，收获不少。', changes: { intelligence: 3, mood: 2, social: 2 } }) },
+    ],
+  },
+  {
+    id: 'puberty', emoji: '🔀', stage: ['child'], weight: 3,
+    title: '青春叛逆', text: '进入青春期，你开始嫌父母唠叨，动不动就顶嘴。',
+    options: [
+      { label: '和父母好好沟通', emoji: '🤝', apply: () => ({ outcome: '一番长谈后互相理解，家里恢复了笑声。', changes: { mood: 5, social: 4 } }) },
+      { label: '关门把自己关起来', emoji: '🚪', apply: () => ({ outcome: '谁也不理，沉浸在自己的小世界里。', changes: { mood: -3, social: -3, intelligence: 2 } }) },
+    ],
+  },
 
   // ===================== 成年期 =====================
   {
@@ -104,14 +171,17 @@ export const EVENTS = [
     title: '求职面试', text: '毕业在即，你坐在一间公司的面试室外，攥紧了简历。',
     options: [
       { label: '应聘大厂卷起来', emoji: '🏢', apply: (p, r) => {
-        if (r() < 0.55) return { outcome: '过五关斩六将，拿到大厂 offer，从此走上快车道。', changes: { wealth: 14, intelligence: 4, health: -4, mood: 5 }, career: '大厂白领' };
+        // 学历（智力）越高，越容易卷进大厂。
+        const win = r() < (p.attrs.intelligence >= 70 ? 0.78 : p.attrs.intelligence >= 45 ? 0.55 : 0.32);
+        if (win) return { outcome: '过五关斩六将，拿到大厂 offer，从此走上快车道。', changes: { wealth: 14, intelligence: 4, health: -4, mood: 5 }, career: '大厂白领', careerLevel: 2 };
         return { outcome: '竞争太激烈遗憾落选，只能再找机会。', changes: { mood: -6, intelligence: 2 } };
       } },
       { label: '考个稳定的编制', emoji: '🏛️', apply: (p, r) => {
-        if (r() < 0.65) return { outcome: '上岸成功，端起了铁饭碗，安稳度日。', changes: { wealth: 8, mood: 6, social: 4 }, career: '公职人员' };
+        const win = r() < (p.attrs.intelligence >= 60 ? 0.78 : 0.6);
+        if (win) return { outcome: '上岸成功，端起了铁饭碗，安稳度日。', changes: { wealth: 8, mood: 6, social: 4 }, career: '公职人员', careerLevel: 1 };
         return { outcome: '差一点点惜败，但复习的功底没白费。', changes: { intelligence: 4, mood: -3 } };
       } },
-      { label: '先去小店打工糊口', emoji: '🛠️', apply: () => ({ outcome: '先谋生再谋发展，靠双手吃饭不丢人。', changes: { wealth: 5, health: -3 }, career: '打工人' }) },
+      { label: '先去小店打工糊口', emoji: '🛠️', apply: () => ({ outcome: '先谋生再谋发展，靠双手吃饭不丢人。', changes: { wealth: 5, health: -3 }, career: '打工人', careerLevel: 1 }) },
     ],
   },
   {
@@ -119,7 +189,12 @@ export const EVENTS = [
     cond: (p) => !!p.career,
     title: '升职机会', text: '领导暗示有个升职名额，只是要承担更多责任与加班。',
     options: [
-      { label: '主动争取、加班加点', emoji: '🌙', apply: () => ({ outcome: '升职加薪到手，可健康和心情都亮了红灯。', changes: { wealth: 12, health: -6, mood: -4, social: -2 } }) },
+      { label: '主动争取、加班加点', emoji: '🌙', apply: (p, r) => {
+        // 能力（智力）过硬更可能拿下名额；拿到则职级 +1，后续被动收入随之水涨船高。
+        const win = r() < (p.attrs.intelligence >= 65 ? 0.85 : 0.55);
+        if (win) return { outcome: '升职加薪到手，职级更上一层，可健康和心情都亮了红灯。', changes: { wealth: 12, health: -6, mood: -4, social: -2 }, careerLevel: (p.careerLevel || 1) + 1 };
+        return { outcome: '拼尽全力却惜败，竹篮打水一场空，身心俱疲。', changes: { health: -5, mood: -5 } };
+      } },
       { label: '佛系应对、按时下班', emoji: '🧘', apply: () => ({ outcome: '升职轮不到你，但身心舒泰，家人欣慰。', changes: { mood: 5, health: 3, social: 3 } }) },
     ],
   },
@@ -185,6 +260,62 @@ export const EVENTS = [
       { label: '该吃吃该喝喝', emoji: '🍖', apply: () => ({ outcome: '一时痛快，隐患却埋下了。', changes: { mood: 3, health: -6 } }) },
     ],
   },
+  {
+    id: 'buy_home', emoji: '🏠', stage: ['adult'], weight: 5,
+    cond: (p) => !p.flags?.homeowner,
+    title: '安家置业', text: '看了半年的房，中介催你赶紧下手，可首付不是小数目。',
+    options: [
+      { label: '咬牙贷款买下来', emoji: '🔑', apply: (p, r) => {
+        if (p.attrs.wealth < 30) return { outcome: '首付东拼西凑仍不够，白忙一场。', changes: { mood: -5, wealth: -4 } };
+        if (r() < 0.7) return { outcome: '终于有了自己的小窝，累并快乐着。', changes: { mood: 12, social: 4, wealth: -20 }, flags: { homeowner: true } };
+        return { outcome: '房价阴跌，账面浮亏，但好歹安了家。', changes: { mood: 3, wealth: -22 }, flags: { homeowner: true } };
+      } },
+      { label: '继续观望租房', emoji: '🧾', apply: () => ({ outcome: '把钱留在手里更灵活，心里却也少份踏实。', changes: { wealth: 3, mood: -1 } }) },
+    ],
+  },
+  {
+    id: 'have_baby', emoji: '👶', stage: ['adult'], weight: 5,
+    cond: (p) => !!p.flags?.married && (p.flags?.children || 0) < 2,
+    title: '添丁之喜', text: '伴侣和你商量，是不是该迎接一个小生命了。',
+    options: [
+      { label: '满心欢喜迎接新生命', emoji: '🍼', apply: (p) => ({ outcome: '孩子的啼哭让这个家热闹又幸福，开销也大增。', changes: { mood: 12, social: 6, wealth: -10, health: -3 }, flags: { children: (p.flags?.children || 0) + 1 } }) },
+      { label: '再享受几年二人世界', emoji: '👫', apply: () => ({ outcome: '决定先把日子过好，孩子的事往后放放。', changes: { mood: 3, wealth: 2 } }) },
+    ],
+  },
+  {
+    id: 'layoff', emoji: '📉', stage: ['adult'], weight: 4,
+    cond: (p) => !!p.career,
+    title: '裁员风暴', text: '行业寒冬，公司传出了裁员的消息，人人自危。',
+    options: [
+      { label: '主动争取留下来的机会', emoji: '🛡️', apply: (p, r) => {
+        const keep = r() < (p.attrs.intelligence >= 60 ? 0.7 : 0.4);
+        if (keep) return { outcome: '凭实力留了下来，还接手了更多业务。', changes: { wealth: 4, intelligence: 3, health: -3 } };
+        return { outcome: '还是没躲过裁员，拿着赔偿金开始找下家。', changes: { wealth: -8, mood: -8, social: -2 }, careerLevel: Math.max(1, (p.careerLevel || 1) - 1) };
+      } },
+      { label: '趁机拿赔偿歇一阵', emoji: '🎒', apply: () => ({ outcome: '给自己放了个长假，调整状态再出发。', changes: { mood: 4, health: 4, wealth: -6 } }) },
+    ],
+  },
+  {
+    id: 'further_study', emoji: '🎓', stage: ['adult'], weight: 4,
+    cond: (p) => !!p.career,
+    title: '在职深造', text: '单位有在职读研 / 考证的名额，要占用不少业余时间。',
+    options: [
+      { label: '咬牙坚持拿下学位', emoji: '📚', apply: (p, r) => {
+        if (r() < (p.attrs.intelligence >= 55 ? 0.8 : 0.5)) return { outcome: '顺利毕业，专业能力大涨，职级也跟着上调。', changes: { intelligence: 10, wealth: -6, mood: 4, health: -3 }, careerLevel: (p.careerLevel || 1) + 1 };
+        return { outcome: '工学矛盾太突出，没能坚持下来。', changes: { intelligence: 3, mood: -4, wealth: -4 } };
+      } },
+      { label: '安于现状不折腾', emoji: '☕', apply: () => ({ outcome: '把业余时间留给家人和自己，岁月静好。', changes: { mood: 3, social: 2 } }) },
+    ],
+  },
+  {
+    id: 'midlife', emoji: '🧭', stage: ['adult'], weight: 3,
+    title: '中年危机', text: '人到中年，你望着天花板出神：这一切究竟是不是自己想要的生活？',
+    options: [
+      { label: '重拾年轻时的爱好', emoji: '🎸', apply: () => ({ outcome: '久违的热情被点燃，仿佛又活过来了。', changes: { mood: 9, health: 2, intelligence: 2 } }) },
+      { label: '和爱人朋友倾诉', emoji: '🗨️', apply: () => ({ outcome: '把心里话说出来，卸下了大半包袱。', changes: { mood: 6, social: 6 } }) },
+      { label: '一个人硬扛', emoji: '🥃', apply: () => ({ outcome: '借酒消愁愁更愁，身体也跟着垮了。', changes: { mood: -6, health: -4, wealth: -3 } }) },
+    ],
+  },
 
   // ===================== 老年期 =====================
   {
@@ -234,6 +365,39 @@ export const EVENTS = [
       { label: '静养听天由命', emoji: '🛏️', apply: () => ({ outcome: '卧床休养，身体一天不如一天。', changes: { health: -8, mood: -5, social: -3 } }) },
     ],
   },
+  {
+    id: 'elder_college', emoji: '🎓', stage: ['elder'], weight: 4,
+    title: '老年大学', text: '社区开了老年大学，书法、摄影、合唱班应有尽有。',
+    options: [
+      { label: '报名学点新东西', emoji: '🖌️', apply: () => ({ outcome: '结识了一帮老同学，每天都过得很充实。', changes: { intelligence: 5, social: 7, mood: 6 } }) },
+      { label: '觉得自己学不动了', emoji: '🪑', apply: () => ({ outcome: '错失了热闹，日子更添几分寂寥。', changes: { mood: -3, social: -2 } }) },
+    ],
+  },
+  {
+    id: 'pet', emoji: '🐕', stage: ['elder'], weight: 4,
+    cond: (p) => !p.flags?.pet,
+    title: '毛茸茸的陪伴', text: '孩子不在身边，你考虑养只宠物解解闷。',
+    options: [
+      { label: '领养一只猫狗', emoji: '🐾', apply: () => ({ outcome: '小家伙蹭着你撒娇，屋子重新热闹起来。', changes: { mood: 10, social: 4, health: 2 }, flags: { pet: true } }) },
+      { label: '怕照顾不来算了', emoji: '🚶', apply: () => ({ outcome: '继续一个人发呆，偶尔觉得空落落的。', changes: { mood: -2 } }) },
+    ],
+  },
+  {
+    id: 'chronic', emoji: '💊', stage: ['elder'], weight: 4,
+    title: '慢性病找上门', text: '体检确诊了高血压、糖尿病之类的慢性病，需要长期控制。',
+    options: [
+      { label: '严格遵医嘱管理', emoji: '🥗', apply: () => ({ outcome: '指标控制得不错，带病也能颐养天年。', changes: { health: 4, wealth: -4, mood: 2 } }) },
+      { label: '想起来才吃点药', emoji: '🍪', apply: () => ({ outcome: '管不住嘴也迈不开腿，病情慢慢加重。', changes: { health: -8, mood: -2 } }) },
+    ],
+  },
+  {
+    id: 'mentor', emoji: '🧑‍🏫', stage: ['elder'], weight: 3,
+    title: '发挥余热', text: '社区请你给年轻人讲讲自己这一行的经验。',
+    options: [
+      { label: '欣然受邀、倾囊相授', emoji: '🎙️', apply: () => ({ outcome: '看到后辈成长，成就感满满，人也精神了。', changes: { social: 8, mood: 7, intelligence: 2 } }) },
+      { label: '婉拒、清闲度日', emoji: '🍵', apply: () => ({ outcome: '落得清闲，只是少了几分被需要的踏实。', changes: { mood: 1, health: 1 } }) },
+    ],
+  },
 ];
 
 // 事件挂载索引：stage -> [event]，供抽取时快速过滤。
@@ -256,12 +420,13 @@ export function rollEvent(p, rng) {
   return pool.find((ev) => ev.id === id) || pool[0];
 }
 
-// 结算一个选项：应用属性变化、设置职业/标志，返回带 outcome 文本的完整结果。
+// 结算一个选项：应用属性变化、设置职业/职级/标志，返回带 outcome 文本的完整结果。
 // 注意：option.apply 只返回 changes，真正的属性写入集中在此（applyChanges 已钳制）。
 export function applyOption(p, option, rng) {
   const r = rng || Math.random;
   const res = option.apply(p, r) || {};
-  if (res.career) p.career = res.career;
+  if (res.career) { p.career = res.career; if (!p.careerLevel) p.careerLevel = 1; }
+  if (Number.isFinite(res.careerLevel)) p.careerLevel = Math.max(1, Math.round(res.careerLevel));
   if (res.flags) p.flags = { ...(p.flags || {}), ...res.flags };
   const applied = res.changes ? applyChanges(p, res.changes) : {};
   return { ...res, applied };
@@ -269,10 +434,10 @@ export function applyOption(p, option, rng) {
 
 // 生成一条不带抉择的「日常旁白」，用于没有触发事件的回合，增加沉浸感。
 const AMBIENT = {
-  infant: ['你咿呀学语，又学会了几个新词。', '你在摇篮里甜甜地睡了一觉。', '你被抱到户外晒太阳，好奇地四处张望。'],
-  child: ['平凡的一天，照常上学、放学。', '课间和同学在操场上疯跑了一阵。', '今天的作业有点多，你咬牙写完了。'],
-  adult: ['按部就班的一天，忙忙碌碌。', '通勤路上你看着窗外的车水马龙出神。', '今天的工作平淡无奇地结束了。'],
-  elder: ['晨起在公园里打了一套太极。', '午后阳光正好，你在摇椅上打了个盹。', '翻看旧相册，往事历历在目。'],
+  infant: ['你咿呀学语，又学会了几个新词。', '你在摇篮里甜甜地睡了一觉。', '你被抱到户外晒太阳，好奇地四处张望。', '你抓着大人的手指咯咯直笑，又长大了一点点。', '辅食的滋味让你皱起了小脸。'],
+  child: ['平凡的一天，照常上学、放学。', '课间和同学在操场上疯跑了一阵。', '今天的作业有点多，你咬牙写完了。', '放学路上你蹲在路边看蚂蚁搬家。', '你在日记本里写下了今天的小确幸。'],
+  adult: ['按部就班的一天，忙忙碌碌。', '通勤路上你看着窗外的车水马龙出神。', '今天的工作平淡无奇地结束了。', '深夜加班完，你望着写字楼的灯火发愣。', '周末大扫除，把屋子收拾得井井有条。'],
+  elder: ['晨起在公园里打了一套太极。', '午后阳光正好，你在摇椅上打了个盹。', '翻看旧相册，往事历历在目。', '你去早市挑了把新鲜的青菜，和小贩讨价还价。', '收音机里咿咿呀呀唱着老戏，你跟着哼了两句。'],
 };
 export function ambientLine(p, rng) {
   const r = rng || Math.random;

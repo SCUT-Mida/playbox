@@ -6,10 +6,10 @@
 import '../ui/style.css';
 import { h, clear, bar } from './dom.js';
 import {
-  ATTRS, ATTR_META, ageLabel, ageYearsFromWeeks, stageForAge, EVENT_CHANCE,
+  ATTRS, ATTR_META, ageLabel, ageYearsFromWeeks, stageForAge, EVENT_CHANCE, stepLabel,
 } from '../config.js';
 import {
-  newPlayer, stageOf, applyChanges, stepTime, isDead, evaluateLife,
+  newPlayer, stageOf, applyChanges, stepTime, isDead, evaluateLife, careerLabel,
 } from '../core/player.js';
 import { rollEvent, applyOption, ambientLine } from '../core/events.js';
 import {
@@ -67,7 +67,7 @@ export class GameUI {
       h('div', { class: 'launcher__brand' },
         h('div', { class: 'emblem' }, '生'),
         h('h1', null, '模拟人生'),
-        h('p', { class: 'sub' }, '一周一周，过完这一生 · 文字版人生模拟'),
+        h('p', { class: 'sub' }, '月复一月，年复一年，过完这一生 · 文字版人生模拟'),
       ),
       h('div', { class: 'launcher__actions' },
         saved
@@ -237,7 +237,9 @@ export class GameUI {
     if (this.turnBtn) {
       this.turnBtn.disabled = !on;
       this.turnBtn.classList.toggle('busy', !on);
-      this.turnBtn.textContent = on ? '⏭️ 下一回合' : '…';
+      // 按钮透明展示「这一步会推进多少时间」，呼应整除历法（4 周 = 1 个月）。
+      const step = this.player ? stepLabel(stageOf(this.player).weeksPerTurn) : '';
+      this.turnBtn.textContent = on ? `⏭️ 下一回合 · ${step}` : '…';
     }
   }
 
@@ -430,8 +432,10 @@ export class GameUI {
         )),
       ),
       h('div', { class: 'profile-meta' },
-        metaRow('职业', p.career || '尚无'),
+        metaRow('职业', careerLabel(p)),
         metaRow('婚姻', p.flags?.married ? '已成家' : '未婚'),
+        metaRow('子女', famRow(p)),
+        metaRow('房产', p.flags?.homeowner ? '有房' : '无'),
         metaRow('回合数', String(p.turn)),
         metaRow('生命阶段', stageEmoji(p) + ' ' + stageOf(p).name),
       ),
@@ -583,4 +587,14 @@ function attrPreview(key, val, adj) {
 }
 function metaRow(k, v) {
   return h('div', { class: 'meta-row' }, h('span', { class: 'muted' }, k), h('span', null, v));
+}
+// 家庭概况：子女数 + 是否养宠，无则「尚无」。
+function famRow(p) {
+  const kids = p.flags?.children || 0;
+  const pet = p.flags?.pet;
+  if (!kids && !pet) return '尚无';
+  const parts = [];
+  if (kids) parts.push(`${kids} 个孩子`);
+  if (pet) parts.push('🐾 有宠');
+  return parts.join(' · ');
 }

@@ -34,8 +34,9 @@ export function newPlayer(rng, opts = {}) {
     maxAge,
     attrs: normalizeAttrs(attrs),
     career: null,        // 成年后的职业，影响事件
+    careerLevel: 0,      // 职级（1 起），影响被动收入与升职事件
     log: [],             // 人生大事记（精简，仅里程碑 / 结算）
-    flags: {},           // 杂项标志位（如是否成家）
+    flags: {},           // 杂项标志位（如是否成家 / 育儿 / 购房）
     born: 0,             // 创建时间戳（存档展示用）
     lastSeen: 0,
   };
@@ -101,42 +102,50 @@ export function stepTime(p, rng) {
   };
 }
 
-// 被动漂移：各属性随时间自然变化，彼此联动（例：心情过低拖累健康；老年健康下滑）。
-// 返回实际发生的变化（已钳制），供 UI 闪烁。
+// 被动漂移：各属性随时间自然变化，彼此联动（例：心情过低拖累健康；老年健康下滑；
+// 成年有职级 / 智力挂钩的被动收入）。返回实际发生的变化（已钳制），供 UI 闪烁。
 function passiveDrift(p, r, fromStage, toStage) {
   const changes = {};
   const a = p.attrs;
   const stage = toStage.key;
   const age = ageYears(p);
 
-  // 心情向中性基线缓慢回归（喜怒哀乐终归平淡）。
-  const moodBase = 55;
-  if (a.mood !== moodBase) changes.mood = Math.sign(moodBase - a.mood) * Math.min(3, Math.abs(moodBase - a.mood));
-
-  // 社交向中性基线缓慢回归。
-  const socialBase = 50;
-  if (a.social !== socialBase) changes.social = Math.sign(socialBase - a.social) * Math.min(2, Math.abs(socialBase - a.social));
+  // 向基线缓慢回归：心情→55，社交→50（喜怒哀乐终归平淡，人际有聚有散）。
+  regress(changes, 'mood', a.mood, 55, 3);
+  regress(changes, 'social', a.social, 50, 2);
 
   if (stage === 'infant') {
-    // 婴幼儿健康成长、心情上扬。
-    changes.health = 1;
+    // 婴幼儿健康成长、心情上扬；在关护中心情越好发育越快。
+    changes.health = 1 + (a.mood >= 65 ? 1 : 0);
     changes.mood = (changes.mood || 0) + 1;
   } else if (stage === 'child') {
-    // 求学阶段智力稳步提升。
-    changes.intelligence = 1;
+    // 求学阶段智力稳步提升；心情好的孩子学得更勤。
+    changes.intelligence = 1 + (a.mood >= 65 ? 1 : 0);
   } else if (stage === 'adult') {
-    // 成年：少量被动收入；心情或健康过低会反噬（过度劳累的隐喻）。
-    changes.wealth = 1;
-    if (a.mood < 25) changes.health = -1;   // 郁郁寡欢伤身
+    // 成年被动收入：基础 + 职级分红 + 高智力变现，体现「打工人→高管→专家」的成长曲线。
+    const lvl = p.careerLevel || 0;
+    let inc = 1 + Math.floor(lvl / 2);
+    if (a.intelligence >= 70) inc += 1;
+    changes.wealth = inc;
+    // 身心相互牵扯：郁郁寡欢伤身、积劳成疾伤神、孤僻寡欢坏心情。
+    if (a.mood < 25) changes.health = -1;
     if (a.health < 25) changes.mood = (changes.mood || 0) - 1;
+    if (a.social < 20) changes.mood = (changes.mood || 0) - 1;
   } else if (stage === 'elder') {
-    // 老年：健康不可逆地缓慢衰退，财富缓慢消耗。
+    // 老年：健康不可逆地加速衰退（80 岁后更甚），财富缓慢消耗，老友渐少。
     const frail = age > 80 ? 2 : 1;
     changes.health = -frail;
     changes.wealth = -1;
+    changes.social = (changes.social || 0) - 1;
   }
 
   return applyChanges(p, changes);
+}
+
+// 把某属性向 base 平滑回归至多 max 个点，写进 changes（叠加到已有值上）。
+function regress(changes, key, cur, base, max) {
+  if (cur === base) return;
+  changes[key] = (changes[key] || 0) + Math.sign(base - cur) * Math.min(max, Math.abs(base - cur));
 }
 
 // —— 结局评价：据最终属性与里程碑生成评价标签与人生总结 ——
@@ -229,6 +238,13 @@ function dedupe(arr) {
 export function attrLine(p, key) {
   const meta = ATTR_META[key];
   return `${meta.emoji} ${meta.name} ${p.attrs[key]}`;
+}
+
+// 职业可读文本：有职业则带职级（Lv），无则显示「尚无」。
+export function careerLabel(p) {
+  if (!p.career) return '尚无';
+  const lvl = p.careerLevel || 1;
+  return `${p.career} · Lv${lvl}`;
 }
 
 export { ATTRS, ATTR_META, STAGES, WEEKS_PER_YEAR, ATTR_MIN, ATTR_MAX };

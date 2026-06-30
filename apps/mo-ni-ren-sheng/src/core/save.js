@@ -78,7 +78,15 @@ function migrate(player) {
   // 保证五大属性齐全
   for (const k of ATTRS) if (!Number.isFinite(player.attrs[k])) player.attrs[k] = 50;
   if (typeof player.career !== 'string' && player.career != null) player.career = null;
+  // 职级：有职业时至少为 1，无职业时归零；非法值兜底。
+  if (player.career) {
+    if (!Number.isFinite(player.careerLevel) || player.careerLevel < 1) player.careerLevel = 1;
+  } else {
+    player.careerLevel = 0;
+  }
   if (!player.flags || typeof player.flags !== 'object') player.flags = {};
+  // 子女数（如有）规范化为非负整数。
+  if (Number.isFinite(player.flags.children) && player.flags.children < 0) player.flags.children = 0;
   if (!Array.isArray(player.log)) player.log = [];
   if (!Number.isFinite(player.born)) player.born = 0;
   if (!Number.isFinite(player.lastSeen)) player.lastSeen = 0;

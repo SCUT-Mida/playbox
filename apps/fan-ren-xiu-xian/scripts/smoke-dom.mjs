@@ -432,8 +432,9 @@ ui.charName = '轮回人';
 document.querySelector('[data-id="name"]')?.dispatchEvent(new window.Event('input'));
 ui.confirmCreate();
 await sleep(10);
-// 状态栏含年龄徽丸，且创角档案/修炼页含灵根属性与年龄
-ok(/🕯️/.test(document.querySelector('.age-pill')?.textContent || ''), `状态栏渲染年龄徽丸（${document.querySelector('.age-pill')?.textContent}）`);
+// 状态栏不再单列年龄徽丸，改由头像「寿元环」按年龄占比呈现：环上 --age-pct 已写入、title 含年龄与寿元
+const _avatarBtn = document.querySelector('.avatar-btn');
+ok(_avatarBtn?.style.getPropertyValue('--age-pct') !== '' && /岁/.test(_avatarBtn?.title || ''), `头像寿元环按年龄占比渲染（title=${_avatarBtn?.title}）`);
 ui.tab = 'cultivate'; ui.renderPanel();
 ok(/年龄/.test(document.querySelector('.content')?.textContent || ''), '修炼页展示年龄');
 ok(/灵根属性|属性：/.test(document.querySelector('.content')?.textContent || '') || /灵根 · /.test(document.querySelector('.content')?.textContent || ''), '修炼页展示灵根（含属性）');
@@ -451,7 +452,7 @@ ok(!!confirmBtn, '弹出轮回确认弹窗');
 confirmBtn.click();
 await sleep(10);
 ok(ui.player.tier === 0 && ui.player.reincarnations === 1, `轮回后境界归零、轮回次数=1（tier=${ui.player.tier}）`);
-ok(/（轮回）/.test(document.querySelector('.age-pill')?.textContent || ''), `年龄徽丸标注（轮回）（${document.querySelector('.age-pill')?.textContent}）`);
+ok(/（轮回）/.test(document.querySelector('.avatar-btn')?.title || ''), `头像寿元环标注（轮回）（${document.querySelector('.avatar-btn')?.title}）`);
 ok(document.querySelector('.death-banner') === null, '轮回后大限横幅消失（已重置年龄）');
 
 ui.destroy();

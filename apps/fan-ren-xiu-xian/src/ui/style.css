@@ -67,27 +67,40 @@
   background: linear-gradient(180deg, #1c150d, var(--bg-2));
   border-bottom: 1px solid var(--line);
 }
-/* 顶行：头像 / 境界 / 资源徽丸（自动挂机·年龄·活力·灵石）作为独立 flex 项顺势排开，
-   仅操作按钮（成就 / 设置）收拢成右侧一组。
-   窄屏一行放不下时，只让操作按钮组换行到第二行——资源徽丸仍与头像境界同处首行，
-   形成均衡的两行布局，而非旧版「境界后即断行、首行只剩头像+境界」。
-   同时操作按钮组保持 nowrap，绝不任由最右侧的设置/成就按钮被挤出可视区
-   （根容器 overflow:hidden 会裁掉溢出部分，导致设置按钮点不到）。 */
+/* 顶行：头像 / 境界 / 资源徽丸（自动挂机·活力·灵石）作为独立 flex 项顺势排开，
+   操作按钮（成就 / 设置）收拢成右侧一组。
+   一律单行排布、不再换行：旧版换行反复出现「境界后断行、首行稀疏、设置按钮被挤出可视区」
+   等问题，索性取消换行；窄屏放不下时整行横向滚动（滚动条隐藏，根容器 overflow:hidden 也不会裁掉按钮）。 */
 .frxx .status-row {
-  display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 0.35rem; flex-wrap: nowrap;
+  overflow-x: auto; scrollbar-width: none;
   padding-right: env(safe-area-inset-right);
 }
-/* 操作按钮组：作为整体右对齐；窄屏放不下时整组落到第二行右端，设置按钮随之可见可达 */
+.frxx .status-row::-webkit-scrollbar { display: none; }
+/* 操作按钮组：作为整体右对齐（margin-left:auto 把成就/设置推到行尾）；
+   整行不再换行，富余空间时贴右，溢出时随行滚动，设置按钮始终可达 */
 .frxx .status-tools {
   display: flex; align-items: center; gap: 0.35rem; flex-wrap: nowrap;
   margin-left: auto; justify-content: flex-end;
 }
+/* 头像按钮：外层圆形用 conic-gradient 作「寿元环」——
+   --age-pct 之前的弧段填 --age-ring（赤色，随年龄占比增长），余下为空心轨道（即寿元上限）。
+   中心的 __face 是内切小圆（人物形象），与外圆之间留出一圈环宽，故呈「空心大圆 + 占比填充」之态。
+   --age-pct / --age-ring 由 refreshStatus → _setAgeRing 实时写入。 */
 .frxx .avatar-btn {
-  flex: none; width: 32px; height: 32px; padding: 0; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center; font-size: 18px; line-height: 1;
-  background: var(--card-2); border: 1px solid var(--gold-dim); overflow: hidden;
+  flex: none; width: 34px; height: 34px; padding: 0; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; position: relative;
+  background: conic-gradient(var(--age-ring, var(--bad)) var(--age-pct, 0%), rgba(255,255,255,0.07) 0);
+  border: none;
 }
-.frxx .avatar-btn svg { width: 100%; height: 100%; display: block; }
+.frxx .avatar-btn__face {
+  position: absolute; inset: 3px; border-radius: 50%; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--card-2); border: 1px solid var(--gold-dim);
+}
+.frxx .avatar-btn__face svg { width: 100%; height: 100%; display: block; }
+/* 大限将至：整环已满，脉动赤红警示 */
+.frxx .avatar-btn.dying { animation: frxx-pulse 1.4s ease-in-out infinite; }
 .frxx .realm-badge {
   display: flex; align-items: center;
   flex: none;
@@ -108,9 +121,6 @@
   border-radius: 999px; padding: 0.12rem 0.34rem; font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .frxx .vit-pill.low { color: var(--bad); background: rgba(224,107,107,0.12); border-color: rgba(224,107,107,0.3); }
-/* 年龄徽丸：默认暖灰；大限将至时转赤色警示 */
-.frxx .age-pill { color: #c9a86a; background: rgba(201,168,106,0.12); border-color: rgba(201,168,106,0.3); }
-.frxx .age-pill.dying { color: var(--bad); background: rgba(224,107,107,0.16); border-color: rgba(224,107,107,0.45); animation: frxx-pulse 1.6s ease-in-out infinite; }
 @keyframes frxx-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
 /* 活力不足时的「闭关静修」醒目横幅 */
 .frxx .rest-banner {

@@ -10,7 +10,7 @@ import {
   REALMS, ACTIVE_CULTIVATE_MP_COST, EXPLORE_MP_COST, EXPLORE_HP_COST,
   VITALITY_COSTS, breakthroughChance, cultivateSpeedMult, passiveXpPerSec, nowSec,
   baseMaxHp, baseMaxMp, baseAtk, baseDef, baseSpirit,
-  rootDescriptor, ageLabel, ageDetailLabel, realmLifespan,
+  rootDescriptor, ageDetailLabel, realmLifespan,
   isDying, canReincarnate, REINCARNATION_CULT_BONUS,
 } from '../config.js';
 import { ITEMS, TREASURE_SKILLS, EQUIP_SLOTS, slotName } from '../data/items.js';
@@ -358,7 +358,11 @@ export class GameUI {
     const p = this.player;
     const info = realmInfo(p);
     const pt = portraitDef(p.portraitId);
-    this.ui.avatar = h('button', { class: 'avatar-btn', title: '人物档案', html: portraitSVG(pt, 34), onClick: () => this.showCharacter() });
+    // 头像按钮：外圈「寿元环」按 当前年龄/本境界寿元 占比填充赤色（空心环代表寿元上限）。
+    // 中心为人物形象，点击展开人物档案。境界提升后寿元上限增大，占比自动回落——
+    // 此即「突破延寿」的视觉联动。详细年龄仍在人物档案 / 修炼页中查看，状态栏不再单列年龄徽丸。
+    this.ui.avatarFace = h('span', { class: 'avatar-btn__face', html: portraitSVG(pt, 34) });
+    this.ui.avatar = h('button', { class: 'avatar-btn', title: '人物档案', onClick: () => this.showCharacter() }, this.ui.avatarFace);
     // 境界徽章：只呈现「图标」（2 字境界简称，如凡人/炼气/筑基），点击展开完整「境界总纲」。
     // 不再附带境界全名文字——状态栏空间有限，省下的位置让设置按钮始终可见。
     this.ui.realmBadge = h('button', { class: 'realm-badge', title: '查看境界总纲',
@@ -366,7 +370,6 @@ export class GameUI {
       h('span', { class: 'seal', style: { background: info.realm.color } }, realmTag(info.realm)),
     );
     this.ui.stones = h('span', { class: 'stones' }, `💎 ${fmt(p.stones)}`);
-    this.ui.age = h('span', { class: 'vit-pill age-pill', title: '年龄：随每月周期增长，境界越高寿元越长；大限将至可轮回重修' }, `🕯️${ageLabel(p)}`);
     this.ui.vitality = h('span', { class: 'vit-pill', title: '每月行动力：消耗型行动力，跨月恢复' }, `⚡${Math.floor(p.vitality)}/${p.maxVitality}`);
     this.ui.chaosBanner = h('div', { class: 'chaos-banner', style: { display: 'none' } });
     // 自动挂机指示徽丸：仅在开启时显示，提示玩家「主角正在自动修行」。
@@ -377,16 +380,13 @@ export class GameUI {
     this.ui.xpBar = bar(p.xp, p.xpMax, { class: 'xp', label: `修为 ${Math.floor(p.xp)}/${p.xpMax}` });
 
     this.statusEl.append(
-      // 顶行：头像 / 境界 / 资源徽丸（自动挂机·年龄·活力·灵石）顺势排开，
-      // 仅把「操作按钮（成就 / 设置）」收拢成右侧一组。
-      // 窄屏一行放不下时，仅这组操作按钮整体换到第二行——头像境界与各资源徽丸仍同处首行，
-      // 避免旧版「境界后即断行、首行只剩头像+境界」的稀疏观感（即「在境界后换行」的问题）。
-      // 操作按钮组保持 nowrap + 右对齐，确保设置按钮永不被挤出可视区（根容器 overflow:hidden 会裁掉溢出）。
+      // 顶行：头像 / 境界 / 资源徽丸（自动挂机·活力·灵石）顺势排开，操作按钮（成就 / 设置）收拢成右侧一组。
+      // 状态栏一律单行排布、不再换行（旧版「换行后排版稀疏 / 设置按钮被挤」反复折腾，索性取消换行）：
+      // 窄屏放不下时整行横向滚动，绝不裁剪，确保设置按钮永不可达性问题。
       h('div', { class: 'status-row' },
         this.ui.avatar,
         this.ui.realmBadge,
         this.ui.autoBadge,
-        this.ui.age,
         this.ui.vitality,
         this.ui.stones,
         // 音效开关已移入「设置」弹窗，状态栏不再占用工具位。
@@ -519,12 +519,10 @@ export class GameUI {
     seal.textContent = realmTag(info.realm);
     // 头像：飞升后切换为仙尊形象
     const pt = portraitDef(p.ascended ? 'pt_ascend' : p.portraitId);
-    this.ui.avatar.innerHTML = portraitSVG(pt, 34);
+    if (this.ui.avatarFace) this.ui.avatarFace.innerHTML = portraitSVG(pt, 34);
+    // 头像寿元环：随当前年龄 / 境界寿元 占比刷新（境界提升寿元增加 → 占比自动回落，即延寿联动）
+    this._setAgeRing(p);
     this.ui.stones.textContent = `💎 ${fmt(p.stones)}`;
-    if (this.ui.age) {
-      this.ui.age.textContent = `🕯️${ageLabel(p)}`;
-      this.ui.age.classList.toggle('dying', isDying(p));
-    }
     this._setVitality(p);
     this._setBar(this.ui.hpBar, p.hp, p.maxHp, `气血 ${Math.floor(p.hp)}/${p.maxHp}`);
     this._setBar(this.ui.mpBar, p.mp, p.maxMp, `灵力 ${Math.floor(p.mp)}/${p.maxMp}`);
@@ -540,6 +538,29 @@ export class GameUI {
     if (c === 'lingchao') this._setChaos('🌊 灵潮爆发中，修炼速度翻倍！', 'lingchao');
     else if (c === 'mojie') this._setChaos('👿 魔劫入侵，物价飙升！', 'mojie');
     else this.ui.chaosBanner.style.display = 'none';
+  }
+
+  // 头像「寿元环」：空心圆环代表本境界寿元上限，按 当前年龄/寿元 占比填充赤色。
+  // 境界提升后寿元上限增大，占比自动回落——「突破延寿」的视觉联动即体现于此。
+  // 飞升为无量寿：整环显金，表示与天同寿；大限将至（占比≥100%）整环赤红并脉动警示。
+  _setAgeRing(p) {
+    const node = this.ui.avatar;
+    if (!node) return;
+    const lifespan = realmLifespan(p.tier);
+    let pct;
+    if (p.ascended || !Number.isFinite(lifespan)) {
+      pct = 100;                                   // 与天同寿：金环满
+      node.style.setProperty('--age-ring', 'var(--gold)');
+    } else {
+      const max = lifespan > 0 ? lifespan : 1;
+      pct = Math.max(0, Math.min(100, ((p.age || 0) / max) * 100));
+      node.style.setProperty('--age-ring', 'var(--bad)'); // 寿元消耗：赤色占比
+    }
+    node.style.setProperty('--age-pct', `${pct}%`);
+    node.classList.toggle('dying', isDying(p));
+    node.title = (p.ascended || !Number.isFinite(lifespan))
+      ? `${ageDetailLabel(p)} · 与天同寿（点击查看人物档案）`
+      : `${ageDetailLabel(p)} · 寿元 ${Math.floor(p.age || 0)}/${lifespan}岁（点击查看人物档案）`;
   }
 
   _setVitality(p) {

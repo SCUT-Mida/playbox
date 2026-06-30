@@ -67,15 +67,17 @@
   background: linear-gradient(180deg, #1c150d, var(--bg-2));
   border-bottom: 1px solid var(--line);
 }
-/* 顶行：头像 / 境界 收拢于左，右侧工具组靠右。
-   开启自动挂机后多出「🤖自动」徽丸，窄屏一行放不下时整组工具换行到第二行——
-   绝不任由最右侧的设置/成就按钮被挤出可视区（根容器 overflow:hidden 会裁掉溢出部分，
-   导致设置按钮点不到，即「自动挂机占住导航栏、设置按钮按不了」的 bug）。 */
+/* 顶行：头像 / 境界 / 资源徽丸（自动挂机·年龄·活力·灵石）作为独立 flex 项顺势排开，
+   仅操作按钮（成就 / 设置）收拢成右侧一组。
+   窄屏一行放不下时，只让操作按钮组换行到第二行——资源徽丸仍与头像境界同处首行，
+   形成均衡的两行布局，而非旧版「境界后即断行、首行只剩头像+境界」。
+   同时操作按钮组保持 nowrap，绝不任由最右侧的设置/成就按钮被挤出可视区
+   （根容器 overflow:hidden 会裁掉溢出部分，导致设置按钮点不到）。 */
 .frxx .status-row {
   display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;
   padding-right: env(safe-area-inset-right);
 }
-/* 右侧工具组：作为整体右对齐；窄屏换行时整组落到第二行，设置按钮随之可见可达 */
+/* 操作按钮组：作为整体右对齐；窄屏放不下时整组落到第二行右端，设置按钮随之可见可达 */
 .frxx .status-tools {
   display: flex; align-items: center; gap: 0.35rem; flex-wrap: nowrap;
   margin-left: auto; justify-content: flex-end;
@@ -188,15 +190,45 @@
 }
 
 /* —— 日志条 —— */
+/* 容器作为锚点（position:relative），承载可滚动的正文区 + 右下角悬浮「历史记录」按钮 */
 .frxx .log-strip {
-  flex: none; max-height: 76px; overflow-y: auto;
-  padding: 0.35rem 0.8rem; font-size: 0.75rem; color: var(--muted);
+  position: relative;
+  flex: none; max-height: 76px; overflow: hidden;
   background: var(--bg-2); border-bottom: 1px solid var(--line);
 }
+/* 日志正文：自身滚动；右侧留出余量，避免长文案被右下角悬浮按钮压住 */
+.frxx .log-strip__lines {
+  max-height: 76px; overflow-y: auto;
+  padding: 0.35rem 2.5rem 0.35rem 0.8rem;
+  font-size: 0.75rem; color: var(--muted);
+}
+.frxx .log-strip__lines::-webkit-scrollbar { width: 4px; }
+.frxx .log-strip__lines::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
 .frxx .log-strip .ln { padding: 1px 0; }
 .frxx .log-strip .ln.good { color: var(--good); }
 .frxx .log-strip .ln.bad { color: var(--bad); }
 .frxx .log-strip .ln.epic { color: var(--epic); font-weight: 600; }
+/* 右下角「查看历史」悬浮按钮：钉在日志框右下角，不随正文滚动 */
+.frxx .log-strip__btn {
+  position: absolute; right: 0.35rem; bottom: 0.3rem; z-index: 2;
+  width: 26px; height: 26px; padding: 0; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.85rem; line-height: 1;
+  background: var(--card-2); border: 1px solid var(--gold-dim); color: var(--gold);
+  box-shadow: 0 1px 5px rgba(0,0,0,0.45);
+}
+.frxx .log-strip__btn:active { transform: scale(0.94); }
+
+/* —— 历史记录弹窗：呈现日志框的全部记录（旧 → 新）—— */
+.frxx .log-history {
+  background: #0a0703; border: 1px solid var(--line); border-radius: 8px;
+  padding: 0.5rem 0.65rem; max-height: 52vh; overflow-y: auto;
+  font-size: 0.82rem;
+}
+.frxx .log-history .ln { padding: 2px 0; }
+.frxx .log-history .ln.good { color: var(--good); }
+.frxx .log-history .ln.bad { color: var(--bad); }
+.frxx .log-history .ln.epic { color: var(--epic); font-weight: 600; }
 
 /* —— 内容区 —— */
 .frxx .content { flex: 1; overflow-y: auto; padding: 0.8rem; }

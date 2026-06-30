@@ -334,7 +334,14 @@ export class GameUI {
     clear(this.modalRoot);
     this.gameRoot = h('div', { class: 'frxx-game' });
     this.statusEl = h('div', { class: 'status-bar' });
-    this.logEl = h('div', { class: 'log-strip' });
+    // 日志条：可滚动的正文区 + 右下角悬浮「查看全部历史记录」按钮（按钮钉在容器角落，不随正文滚动）
+    this.logEl = h('div', { class: 'log-strip' },
+      h('div', { class: 'log-strip__lines' }),
+      h('button', {
+        class: 'log-strip__btn', title: '查看全部历史记录',
+        onClick: () => this.showLogHistory(),
+      }, '📜'),
+    );
     this.content = h('div', { class: 'content' });
     this.tabBar = h('div', { class: 'tab-bar' });
     this.gameRoot.append(this.statusEl, this.logEl, this.content, this.tabBar);
@@ -370,16 +377,20 @@ export class GameUI {
     this.ui.xpBar = bar(p.xp, p.xpMax, { class: 'xp', label: `修为 ${Math.floor(p.xp)}/${p.xpMax}` });
 
     this.statusEl.append(
+      // 顶行：头像 / 境界 / 资源徽丸（自动挂机·年龄·活力·灵石）顺势排开，
+      // 仅把「操作按钮（成就 / 设置）」收拢成右侧一组。
+      // 窄屏一行放不下时，仅这组操作按钮整体换到第二行——头像境界与各资源徽丸仍同处首行，
+      // 避免旧版「境界后即断行、首行只剩头像+境界」的稀疏观感（即「在境界后换行」的问题）。
+      // 操作按钮组保持 nowrap + 右对齐，确保设置按钮永不被挤出可视区（根容器 overflow:hidden 会裁掉溢出）。
       h('div', { class: 'status-row' },
         this.ui.avatar,
         this.ui.realmBadge,
-        // 右侧工具收拢成一组：窄屏放不下时整组换行，确保设置按钮永不被挤出可视区
+        this.ui.autoBadge,
+        this.ui.age,
+        this.ui.vitality,
+        this.ui.stones,
         // 音效开关已移入「设置」弹窗，状态栏不再占用工具位。
         h('div', { class: 'status-tools' },
-          this.ui.autoBadge,
-          this.ui.age,
-          this.ui.vitality,
-          this.ui.stones,
           h('button', { class: 'icon-btn', title: '成就与称号', onClick: () => this.showAchievements() }, '🏆'),
           h('button', { class: 'icon-btn', title: '设置 / 存档', onClick: () => this.showSettings() }, '⚙️'),
         ),
@@ -574,10 +585,34 @@ export class GameUI {
     if (this.logEl) this.renderLog();
   }
   renderLog() {
-    clear(this.logEl);
+    // 只清刷正文区（保留右下角悬浮的历史记录按钮）
+    const box = this.logEl.querySelector('.log-strip__lines') || this.logEl;
+    clear(box);
     const recent = this.log.slice(-10);
-    for (const ln of recent) this.logEl.appendChild(h('div', { class: `ln ${ln.type}` }, ln.text));
-    this.logEl.scrollTop = this.logEl.scrollHeight;
+    for (const ln of recent) box.appendChild(h('div', { class: `ln ${ln.type}` }, ln.text));
+    box.scrollTop = box.scrollHeight;
+  }
+
+  // 历史记录弹窗：日志条本身只显示最近 10 条，此处展示全部记录（按时间顺序，旧 → 新）。
+  showLogHistory() {
+    const all = this.log;
+    const box = h('div', { class: 'log-history' });
+    if (!all.length) {
+      box.appendChild(h('div', { class: 'muted' }, '尚无任何记录。'));
+    } else {
+      for (const ln of all) box.appendChild(h('div', { class: `ln ${ln.type}` }, ln.text));
+    }
+    this.showSheet({
+      title: '修仙历程 · 全部记录',
+      body: [
+        h('div', { class: 'muted', style: { marginBottom: '0.4rem' } },
+          `共 ${all.length} 条记录，按时间顺序排列（旧 → 新）。`),
+        box,
+      ],
+      foot: [h('button', { class: 'btn-ghost', onClick: () => this.closeModal() }, '关闭')],
+    });
+    // 等弹窗 DOM 落定后再滚到最新一条（requestAnimationFrame 在冒烟测试中已 polyfill）
+    requestAnimationFrame(() => { box.scrollTop = box.scrollHeight; });
   }
 
   // —— 内容面板路由 ——

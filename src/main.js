@@ -20,6 +20,14 @@ const GAMES = [
     desc: '从凡人起步，修炼突破、探索机缘、炼丹渡劫，直至白日飞升。一款竖屏文字挂机修仙游戏。',
     loader: () => import('../apps/fan-ren-xiu-xian/src/main.js'),
   },
+  {
+    key: 'mnrs',
+    title: '模拟人生',
+    subtitle: '模拟 · 文字人生',
+    emblem: '生',
+    desc: '从呱呱坠地到垂垂老矣，一周一周推进岁月，在健康、智力、财富、心情、社交间权衡抉择，过完这一生。',
+    loader: () => import('../apps/mo-ni-ren-sheng/src/main.js'),
+  },
 ]
 
 const app = document.getElementById('app')

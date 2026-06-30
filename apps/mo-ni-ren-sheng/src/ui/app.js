@@ -568,7 +568,9 @@ function stageEmoji(p) {
   return stageForAge(ageYearsFromWeeks(p.weeks)).emoji;
 }
 function milestoneHead(stageKey) {
-  return ({ infant: '幼年结束', child: '步入成年', adult: '迈入晚年', elder: '人生新篇' })[stageKey] || '人生新篇';
+  // 按进入的新阶段给出里程碑标题，须与 config 中各阶段语义对齐：
+  // child（学龄期）→ 步入校园；adult（成年期）→ 步入社会；elder（老年期）→ 迈入晚年。
+  return ({ infant: '幼年时光', child: '步入校园', adult: '步入社会', elder: '迈入晚年' })[stageKey] || '人生新章';
 }
 function attrPreview(key, val, adj) {
   const meta = ATTR_META[key];

@@ -74,8 +74,9 @@ export function isDead(p) {
 }
 
 // 「下一回合」核心结算：推进时间、施加被动漂移、检测阶段跨越，返回回合摘要。
-//   返回 { stageChanged, fromStage, toStage, drift（漂移实际变化）, milestone }
+//   返回 { stageChanged, fromStage, toStage, drift（漂移实际变化）, beforeAge }
 // 注意：本函数只推进时间与被动漂移，不结算随机事件（事件由 events 模块单独抽取并结算）。
+// 阶段跨越的里程碑文案由 UI 层（pushLog）统一产出并落盘，避免此处与 UI 各写一次造成重复。
 export function stepTime(p, rng) {
   const r = rng || Math.random;
   const before = stageOf(p);
@@ -90,11 +91,6 @@ export function stepTime(p, rng) {
 
   // 被动漂移：让世界在抉择之外也「活着」，体现属性间的动态关联与制约。
   const drift = passiveDrift(p, r, before, after);
-
-  // 阶段跨越：写入里程碑式人生大事记。
-  if (stageChanged) {
-    p.log.push({ turn: p.turn, text: milestoneText(before, after), type: 'milestone' });
-  }
 
   return {
     stageChanged,
@@ -141,16 +137,6 @@ function passiveDrift(p, r, fromStage, toStage) {
   }
 
   return applyChanges(p, changes);
-}
-
-function milestoneText(from, to) {
-  // 按进入的新阶段（to.key）描述这一人生节点。
-  const map = {
-    child: '背上书包踏入校园，学龄时光开始了。',
-    adult: '告别校园，步入社会，开启独立人生。',
-    elder: '告别职场，鬓角染霜，步入晚年。',
-  };
-  return map[to.key] || '人生翻开了新的一页。';
 }
 
 // —— 结局评价：据最终属性与里程碑生成评价标签与人生总结 ——

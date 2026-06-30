@@ -65,6 +65,8 @@ export function importSave(str) {
 function migrate(player) {
   if (!player) return player;
   if (typeof player.name !== 'string') player.name = '无名氏';
+  // 与 newPlayer 保持一致：姓名截断到 8 字，避免旧档/导入档携带超长姓名撑破 UI。
+  player.name = player.name.slice(0, 8) || '无名氏';
   player.gender = player.gender === 'female' ? 'female' : 'male';
   if (!Number.isFinite(player.weeks) || player.weeks < 0) player.weeks = 0;
   if (!Number.isFinite(player.turn) || player.turn < 0) player.turn = 0;

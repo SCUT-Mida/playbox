@@ -257,14 +257,30 @@ export function upgradeRoot(player) {
 // 并获得「前世记忆」修炼加成；此后年龄属性前标注（轮回）。
 export function reincarnate(player, rng) {
   if (!canReincarnate(player)) return false;
+  applyReincarnation(player, rng);
+  return true;
+}
+
+// 飞升后「再入轮回」：已登仙绝顶者主动重入红尘、转世重修（圆满后的 New Game+）。
+// 不受大限 / 轮回次数限制——飞升本即寿元圆满，此乃自愿再启征程；同样携带前世资质与记忆加成。
+export function reincarnateAscended(player, rng) {
+  if (!player || !player.ascended) return false;
+  applyReincarnation(player, rng);
+  return true;
+}
+
+// 轮回共通落地：携带前世资质（灵根档次与属性、气运、首个天赋、称号 / 成就），
+// 重置境界 / 修为 / 年龄，赋予「前世记忆」修炼加成，并脱离飞升终局态（再入红尘）。
+function applyReincarnation(player, rng) {
   const r = rng || Math.random;
   player.reincarnations = (player.reincarnations || 0) + 1;
   // 携带：灵根（保持前世档次与属性）、气运、首个天赋、称号与成就（生平履历）
   player.talentIds = (player.talentIds || []).slice(0, 1);
-  // 重置：境界、修为、年龄
+  // 重置：境界、修为、年龄；脱离飞升态（大限重修本就未飞升，此处为幂等兜底）
   player.tier = 0;
   player.sub = 0;
   player.xp = 0;
+  player.ascended = false;
   player.age = START_AGE_MIN + Math.floor(r() * (START_AGE_MAX - START_AGE_MIN + 1));
   player.ageMonth = ageMonthFromKey(cycleKey());
   player.bornKey = cycleKey();
@@ -280,7 +296,6 @@ export function reincarnate(player, rng) {
   player.lastVitalityDate = cycleKey();
   player.hp = player.maxHp;
   player.mp = player.maxMp;
-  return true;
 }
 
 // —— 修为 ——

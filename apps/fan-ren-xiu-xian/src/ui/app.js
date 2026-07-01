@@ -21,7 +21,7 @@ import {
   equip, unequip, expandBag, bagExpandCost, countItem, hasItem, removeItem, addItemOrLog,
   distinctItems, learnTechnique, upgradeRoot,
   equippedList, equippedId, equippedIds, isEquipped, hasAnyEquipped,
-  rollCharacter, effectiveQiyun, reincarnate,
+  rollCharacter, effectiveQiyun, reincarnate, reincarnateAscended,
   rolloverVitality, canAffordVitality, spendVitality, restToNextDay, vitalityDepleted,
 } from '../core/player.js';
 import { activeCultivate, passiveTick } from '../core/cultivate.js';
@@ -2010,8 +2010,37 @@ export class GameUI {
       h('h1', null, '⛩️ 白日飞升'),
       h('div', { class: 'sub' }, '九重天劫尽数渡过，你霞举飞升，得道成仙！'),
       h('div', { class: 'muted' }, `累计突破 ${this.player.stats.breakthroughs} 次 · 战胜 ${this.player.stats.battlesWon} 战 · 探索 ${this.player.stats.exploreCount} 次`),
-      h('button', { class: 'btn-primary big-btn', style: { maxWidth: '200px' }, onClick: () => this.confirmReset() }, '再入轮回'),
+      h('button', { class: 'btn-primary big-btn', style: { maxWidth: '200px' }, onClick: () => this.confirmAscendedReincarnate() }, '再入轮回'),
     ));
+  }
+
+  // 飞升结局 · 再入轮回：携带前世资质与「前世记忆」加成转世重修（圆满后的 New Game+），
+  // 不走 confirmReset 全清——飞升者应得其前世积累，再踏仙途。
+  confirmAscendedReincarnate() {
+    this.showSheet({
+      title: '再入轮回？',
+      body: [
+        h('div', { class: 'muted' }, '已登仙绝顶，你愿舍去仙体，一缕真灵重入红尘，再踏修仙之途。'),
+        h('div', { class: 'muted', style: { marginTop: '0.3rem' } }, '境界与修为归零、年龄重置；携带前世灵根档次与属性、气运、一项天赋，并获得「前世记忆」修炼加成。此后你的年龄将标注（轮回）。'),
+      ],
+      foot: [
+        h('button', { class: 'btn-jade', onClick: () => { this.closeModal(); this.doAscendedReincarnate(); } }, '♻ 再入轮回'),
+        h('button', { class: 'btn-ghost', onClick: () => this.closeModal() }, '再留仙界片刻'),
+      ],
+    });
+  }
+
+  doAscendedReincarnate() {
+    const p = this.player;
+    if (!reincarnateAscended(p, Math.random)) { this.toast('尚不可再入轮回', 'bad'); return; }
+    this.closeModal();
+    this.log = [];
+    this.pushLog('♻ 仙路圆满，你舍去仙体，一缕真灵重入轮回……', 'epic');
+    this.pushLog(`前世记忆尚存，资质（${rootInfo(p).name}）与气运得以延续，自此再踏仙途。`, 'epic');
+    this.toast('再入轮回，重踏仙途', 'epic');
+    playSfx('breakthrough');
+    this.buildStatus();
+    this.afterAction();
   }
 
   // ============ 通用：弹窗 / 提示 / 循环 ============

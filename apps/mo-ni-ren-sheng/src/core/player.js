@@ -10,7 +10,7 @@ import {
 import { randInt } from './rng.js';
 
 // 创建一名新角色。
-//   opts: { name, gender, weeks?, attrs?, maxAge? }
+//   opts: { name, gender, weeks?, attrs?, maxAge?, background? }
 // 婴儿期起步（weeks=0），属性据性别/出身有轻微随机倾向，皆在 30~60 区间。
 export function newPlayer(rng, opts = {}) {
   const r = rng || Math.random;
@@ -33,19 +33,34 @@ export function newPlayer(rng, opts = {}) {
     turn: 0,
     maxAge,
     attrs: normalizeAttrs(attrs),
+    background: typeof opts.background === 'string' ? opts.background : 'ordinary', // 家庭出身，影响可触发事件
     career: null,        // 成年后的职业，影响事件
     careerLevel: 0,      // 职级（1 起），影响被动收入与升职事件
     log: [],             // 人生大事记（精简，仅里程碑 / 结算）
     flags: {},           // 杂项标志位（如是否成家 / 育儿 / 购房）
+    recent: [],          // 最近触发过的事件 id（去重冷却，缓解抉择重复）
+    autoplay: defaultAutoplayConfig(), // 挂机配置（默认关闭，绝不擅自开启）
     born: 0,             // 创建时间戳（存档展示用）
     lastSeen: 0,
   };
+}
+
+// 挂机配置默认值（与 core/autoplay.js 的 defaultAutoPlay 保持一致）。
+// 此处内联一份，避免 player ↔ autoplay 循环依赖；save.migrate 会用 normalizeAutoPlay 兜底。
+function defaultAutoplayConfig() {
+  return { enabled: false, intervalMs: 1200, policy: 'balanced' };
 }
 
 export function normalizeAttrs(attrs) {
   const out = {};
   for (const k of ATTRS) out[k] = clampAttr(attrs?.[k] ?? 50);
   return out;
+}
+
+// 深拷贝角色（玩家状态皆为可序列化纯数据）。供挂机模式「克隆采样」择优时使用，
+// 避免在评估各选项时污染真实角色状态。
+export function clonePlayer(p) {
+  return JSON.parse(JSON.stringify(p));
 }
 
 export function ageYears(p) { return ageYearsFromWeeks(p.weeks); }
@@ -133,10 +148,11 @@ function passiveDrift(p, r, fromStage, toStage) {
     if (a.social < 20) changes.mood = (changes.mood || 0) - 1;
   } else if (stage === 'elder') {
     // 老年：健康不可逆地加速衰退（80 岁后更甚），财富缓慢消耗，老友渐少。
-    const frail = age > 80 ? 2 : 1;
-    changes.health = -frail;
-    changes.wealth = -1;
-    changes.social = (changes.social || 0) - 1;
+    // 月度周期下用概率施放（约「每年数次」而非每月必跌），避免健康骤降致过早离世。
+    const frail = age > 80 ? 0.42 : 0.22;
+    if (r() < frail) changes.health = -1;
+    if (r() < 0.3) changes.wealth = -1;
+    if (r() < 0.3) changes.social = (changes.social || 0) - 1;
   }
 
   return applyChanges(p, changes);

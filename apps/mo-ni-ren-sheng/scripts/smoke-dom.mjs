@@ -137,7 +137,41 @@ exportBtn.click();
 await sleep(5);
 const ioVal = document.querySelector('[data-id="io"]')?.value || '';
 ok(ioVal.length > 20, `导出生成存档字符串（长度 ${ioVal.length}）`);
-document.querySelector('.sheet__foot .btn-primary').click(); // 关闭
+// 多槽位存档管理：从设置进入，应列出 ≥5 个槽位行
+const slotMgrBtn = [...document.querySelectorAll('.sheet__body button')].find((b) => /存档管理/.test(b.textContent));
+ok(!!slotMgrBtn, '设置含「存档管理」入口');
+slotMgrBtn.click();
+await sleep(8);
+ok(/存档管理/.test(document.querySelector('.sheet__head .t')?.textContent || ''), '打开存档管理弹窗');
+const slotRows = document.querySelectorAll('.slot-row');
+ok(slotRows.length >= 5, `存档管理列出 ≥5 个槽位（实际 ${slotRows.length}）`);
+ok([...slotRows].some((r) => r.classList.contains('empty')), '存在空槽位可供新存档');
+document.querySelector('.sheet__foot .btn-ghost').click(); // 关闭存档管理（返回游戏）
+await sleep(5);
+
+// ---------- 9b) 挂机模式弹窗：策略可切换，不抛错 ----------
+document.querySelector('.bottom-tools .icon-btn[title="挂机模式"]').click();
+await sleep(10);
+ok(/挂机模式/.test(document.querySelector('.sheet__head .t')?.textContent || ''), '打开挂机模式弹窗');
+ok(document.querySelectorAll('.policy-opt').length === 3, `挂机策略有 3 个（实际 ${document.querySelectorAll('.policy-opt').length}）`);
+// 切换策略不报错
+document.querySelectorAll('.policy-opt')[2]?.click();
+await sleep(8);
+// 开启挂机 → 徽丸显示、按钮变为挂机中
+const toggleBtn = document.querySelector('.auto-toggle');
+ok(!!toggleBtn, '挂机弹窗含开关按钮');
+toggleBtn.click();
+await sleep(10);
+ok(ui.player.autoplay.enabled === true, '开启后 autoplay.enabled=true');
+ok(document.querySelector('.auto-badge')?.style.display !== 'none', '开启后挂机徽丸显示');
+ok(/挂机中/.test(document.querySelector('.turn-btn')?.textContent || ''), '开启后下一回合按钮变为挂机中');
+// 关闭挂机，恢复正常
+document.querySelector('.bottom-tools .icon-btn[title="挂机模式"]').click();
+await sleep(10);
+document.querySelector('.auto-toggle').click();
+await sleep(10);
+ok(ui.player.autoplay.enabled === false, '关闭后 autoplay.enabled=false');
+document.querySelector('.sheet__foot .btn-ghost').click(); // 关闭
 await sleep(5);
 
 // ---------- 10) 持久化：重开实例后可「继续游戏」 ----------
@@ -154,13 +188,13 @@ ok(ui.player && ui.player.name === savedName, `继续游戏载入正确（${ui.p
 ok(document.querySelector('.status-bar') !== null, '继续后渲染游戏界面');
 
 // ---------- 11) 寿终正寝 → 人生总结结算 ----------
-// 把年龄拨到大限前夕，再推进一步即达大限，触发 endGame
-ui.player.weeks = 64 * WEEKS_PER_YEAR;        // 64 岁，成年末（一步 48 周即 65 岁）
+// 月度周期下每回合推进 1 个月（4 周）：把年龄拨到大限前夕，再推进一步即达大限，触发 endGame
+ui.player.weeks = 65 * WEEKS_PER_YEAR - 1;   // 64.98 岁，一步（+4 周）即跨过 65 岁大限
 ui.player.maxAge = 65;
 ui.rng = () => 0;
 document.querySelector('.turn-btn').click();
 await sleep(15);
-// 若弹了事件先关掉再继续——大限判定在事件之前，理论上直接结算
+// 大限判定在事件之前，理论上直接结算
 ok(document.querySelector('.launcher.over') !== null, '达大限时进入人生总结结算');
 ok(document.querySelector('.over-grade') !== null, '结算页展示综合评级');
 ok(document.querySelectorAll('.over-tags .tag').length >= 4, `结算页含评价标签（${document.querySelectorAll('.over-tags .tag').length} 个）`);

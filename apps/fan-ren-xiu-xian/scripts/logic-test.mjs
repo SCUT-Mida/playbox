@@ -17,7 +17,7 @@ import { EVENTS, eligibleEvents } from '../src/data/events.js';
 import {
   newPlayer, recompute, addXp, isXpFull, addItem, removeItem, countItem, hasItem,
   equip, unequip, expandBag, bagExpandCost, upgradeRoot, distinctItems, realmInfo, START_BAG_CAPACITY,
-  restToNextDay, vitalityDepleted, rolloverVitality, rollRoot, reincarnate,
+  restToNextDay, vitalityDepleted, rolloverVitality, rollRoot, reincarnate, reincarnateAscended,
 } from '../src/core/player.js';
 import { activeCultivate, passiveTick } from '../src/core/cultivate.js';
 import { rollExplore, applyReward, chaosActive } from '../src/core/explore.js';
@@ -866,6 +866,32 @@ console.log('— reincarnation —');
   q.age = realmLifespan(q.tier) + 10;
   ok(canReincarnate(q) === false, '已轮回过，再无轮回次数');
   ok(reincarnate(q, makeRng(2)) === false, '用尽轮回后 reincarnate 返回 false');
+}
+// 飞升后「再入轮回」：不受大限 / 轮回次数限制，携带前世资质与记忆加成，脱离飞升态。
+{
+  const q = newPlayer(() => 0);
+  q.root = { grade: 'tian', count: 'single', els: ['fire'] };
+  q.qiyun = 91;
+  q.talentIds = ['tal_wuxing', 'tal_wanshou'];
+  q.tier = ASCEND_INDEX; q.ascended = true; recompute(q);
+  // 已飞升者既未大限、也非「可轮回重修」——旧路径下「再入轮回」按钮等于无响应。
+  ok(isDying(q) === false, '飞升者不判大限');
+  ok(canReincarnate(q) === false, '飞升者不满足 canReincarnate');
+  ok(reincarnate(q, makeRng(1)) === false, '飞升者走旧 reincarnate 被拒（无响应根因）');
+  // 飞升专属轮回：成功
+  ok(reincarnateAscended(q, makeRng(1)) === true, '飞升者「再入轮回」成功');
+  ok(q.ascended === false, '再入轮回后脱离飞升终局态');
+  ok(q.tier === 0 && q.sub === 0 && q.xp === 0, '境界 / 修为归零');
+  ok(q.reincarnations === 1, '轮回次数 +1');
+  ok(q.reincarnationBonus === REINCARNATION_CULT_BONUS, '获得前世记忆修炼加成');
+  ok(q.root.grade === 'tian' && q.root.els.includes('fire'), '携带前世灵根档次与属性');
+  ok(q.qiyun === 91, '携带前世气运');
+  ok(q.talentIds.length === 1, '携带一项天赋');
+  ok(/（轮回）/.test(ageLabel(q)), '年龄标注（轮回）');
+  ok(q.maxVitality === MAX_VITALITY && q.vitality === q.maxVitality, '活力上限按截断后天赋重算且回满');
+  // 非飞升者不可走飞升专属轮回（避免误用绕过大限守卫）
+  const m = newPlayer(() => 0);
+  ok(reincarnateAscended(m, makeRng(1)) === false, '未飞升者不可走「再入轮回」');
 }
 
 // ---------- 旧版存档迁移（rootId → 三轴灵根 + 年龄）----------

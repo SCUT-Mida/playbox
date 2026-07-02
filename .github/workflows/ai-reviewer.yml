@@ -1,4 +1,17 @@
-name: 🕵️ AI Code Reviewer
+# AI Review & Fix Pipeline（审查→修复→合并 一体化）
+# ============================================================
+# 此工作流在同一个 job 内完成 PR 的审查、修复与合并：
+#   1. 审查：Claude Code 审查 PR diff → APPROVE 或 REQUEST_CHANGES
+#   2. 修复：若不通过，在同一 job 内直接调用 Claude Code 修复代码并推送
+#      （推送触发 synchronize → 重新审查，循环直到通过或达到 MAX_ROUNDS）
+#   3. 合并：若通过，直接 squash 合并、删分支、关 Issue
+#
+# 设计说明：原独立的 ai-fixer.yml 通过 issue_comment 触发，但 GitHub 要求
+# 人工审批 issue_comment 事件（Approve and Run）。将修复逻辑内联到本工作流
+# 后，整个审查-修复循环仅需 pull_request 触发，无需人工介入。
+# ai-fixer.yml 保留为手动 fallback（人工在 PR 评论 /claude-fix 时触发）。
+# ============================================================
+name: 🕵️🔧 AI Review & Fix Pipeline
 
 on:
   pull_request:

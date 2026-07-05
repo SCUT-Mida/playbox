@@ -1,0 +1,662 @@
+/* ============================================================================
+   打卡 · 粉色系样式表
+   设计语言：柔和粉渐变 + 圆角卡片 + 心形点缀 + 微动效。
+   容器自适应：嵌入落地页时填满 .game-mount；独立运行时填满 #game-container。
+   所有选择器都收口在 .daka-root 下，避免与其它展品（其 CSS 一旦加载即全局常驻）
+   的通用类名（.toast/.stats/.progress/.sheet/.stat 等）互相污染。
+   ========================================================================== */
+
+.daka-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background:
+    radial-gradient(120% 60% at 50% -10%, #ffd6e4 0%, rgba(255, 214, 228, 0) 60%),
+    linear-gradient(180deg, #fff5f8 0%, #ffeef4 100%);
+  color: #5a3a44;
+  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+.daka-root * { box-sizing: border-box; }
+.daka-root::-webkit-scrollbar { width: 0; height: 0; }
+
+/* —— 色板变量 —— */
+.daka-root {
+  --pink-50:  #fff5f8;
+  --pink-100: #ffe6ee;
+  --pink-200: #ffc9d9;
+  --pink-300: #ffa6c0;
+  --pink-400: #ff7ea3;
+  --pink-500: #ff5d8f;
+  --pink-600: #f0427a;
+  --rose:     #e8336e;
+  --ink:      #5a3a44;
+  --ink-soft: #9a7480;
+  --white:    #ffffff;
+  --shadow:   0 8px 24px rgba(240, 66, 122, 0.12);
+  --shadow-lg: 0 16px 40px rgba(240, 66, 122, 0.18);
+  --radius:   18px;
+}
+
+/* ============================================================ 启动器 === */
+.daka-root .daka-launcher {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: clamp(20px, 6vmin, 40px);
+  text-align: center;
+}
+.daka-root .launcher-emoji {
+  font-size: 3.2rem;
+  color: var(--pink-500);
+  line-height: 1;
+  filter: drop-shadow(0 6px 12px rgba(240, 66, 122, 0.3));
+  animation: daka-heart-beat 1.8s ease-in-out infinite;
+}
+.daka-root .launcher-title {
+  margin: 0;
+  font-size: clamp(1.8rem, 6vmin, 2.4rem);
+  font-weight: 800;
+  color: var(--rose);
+  letter-spacing: 0.04em;
+}
+.daka-root .launcher-sub {
+  margin: 0.4rem 0 0;
+  font-size: 0.92rem;
+  line-height: 1.7;
+  color: var(--ink-soft);
+  max-width: 22em;
+}
+.daka-root .launcher-form {
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.daka-root .launcher-input {
+  width: 100%;
+  padding: 0.9rem 1.1rem;
+  border: 2px solid var(--pink-200);
+  border-radius: 999px;
+  background: var(--white);
+  font-size: 1rem;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  text-align: center;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.daka-root .launcher-input::placeholder { color: #c9a8b4; }
+.daka-root .launcher-input:focus {
+  border-color: var(--pink-400);
+  box-shadow: 0 0 0 4px rgba(255, 125, 163, 0.18);
+}
+.daka-root .launcher-btn {
+  width: 100%;
+  padding: 0.9rem 1.1rem;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--pink-500), var(--pink-600));
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: transform 0.12s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+.daka-root .launcher-btn:active { transform: translateY(1px) scale(0.99); }
+.daka-root .launcher-btn:hover { filter: brightness(1.04); box-shadow: var(--shadow-lg); }
+
+.daka-root .launcher-list {
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  text-align: left;
+}
+.daka-root .launcher-list__title {
+  margin: 0 0 0.2rem 0.4rem;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  letter-spacing: 0.08em;
+}
+.daka-root .profile-item {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--pink-200);
+  border-radius: 14px;
+  background: var(--white);
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.18s ease;
+}
+.daka-root .profile-item:active { transform: scale(0.99); }
+.daka-root .profile-item:hover { border-color: var(--pink-300); }
+.daka-root .profile-item__avatar {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--pink-300), var(--pink-500));
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.daka-root .profile-item__meta { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.daka-root .profile-item__name { font-weight: 600; color: var(--ink); }
+.daka-root .profile-item__sub { font-size: 0.76rem; color: var(--pink-500); }
+.daka-root .profile-item__go { color: var(--pink-300); font-size: 1.4rem; line-height: 1; }
+
+.daka-root .launcher-hint {
+  font-size: 0.74rem;
+  color: var(--ink-soft);
+  opacity: 0.8;
+}
+
+/* ============================================================ 主视图 === */
+.daka-root .daka-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: clamp(14px, 4vmin, 22px);
+  padding-bottom: max(28px, env(safe-area-inset-bottom));
+}
+
+.daka-root .daka-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+.daka-root .daka-nick { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.daka-root .daka-nick__name {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--rose);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 12em;
+}
+.daka-root .daka-nick__name::after { content: " ✎"; font-size: 0.7rem; color: var(--pink-300); font-weight: 400; }
+.daka-root .daka-nick__badge {
+  flex: none;
+  padding: 0.18rem 0.6rem;
+  border-radius: 999px;
+  background: var(--pink-100);
+  color: var(--pink-600);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.daka-root .daka-switch {
+  flex: none;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--pink-200);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--pink-600);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.daka-root .daka-switch:active { background: var(--pink-100); }
+
+/* —— 统计三宫格 —— */
+.daka-root .stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+}
+.daka-root .stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.7rem 0.4rem;
+  border-radius: 14px;
+  background: var(--white);
+  box-shadow: var(--shadow);
+}
+.daka-root .stat--accent {
+  background: linear-gradient(135deg, var(--pink-400), var(--pink-600));
+  color: #fff;
+}
+.daka-root .stat__num { font-size: 1.5rem; font-weight: 800; line-height: 1.1; }
+.daka-root .stat__lbl { font-size: 0.72rem; opacity: 0.8; }
+
+/* —— 今日打卡卡 —— */
+.daka-root .today-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 1rem 1.2rem;
+  border: none;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, var(--pink-500), var(--pink-600));
+  color: #fff;
+  cursor: pointer;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  transition: transform 0.12s ease, filter 0.18s ease;
+}
+.daka-root .today-card:active { transform: scale(0.99); }
+.daka-root .today-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(80% 120% at 90% 0%, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+.daka-root .today-card.is-checked {
+  background: linear-gradient(135deg, #ffb3c8, var(--pink-400));
+}
+.daka-root .today-card__date { font-size: 0.85rem; opacity: 0.92; position: relative; }
+.daka-root .today-card__btn {
+  font-size: 1.05rem;
+  font-weight: 800;
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--rose);
+  position: relative;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+.daka-root .today-card:not(.is-checked) .today-card__btn {
+  animation: daka-pulse-btn 1.8s ease-in-out infinite;
+}
+
+/* —— 进度条 —— */
+.daka-root .progress { display: flex; flex-direction: column; gap: 0.4rem; }
+.daka-root .progress__top { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--ink-soft); }
+.daka-root .progress__cnt { color: var(--pink-600); font-weight: 700; }
+.daka-root .progress__bar {
+  height: 9px;
+  border-radius: 999px;
+  background: var(--pink-100);
+  overflow: hidden;
+}
+.daka-root .progress__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--pink-300), var(--pink-500));
+  transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* —— 日历 —— */
+.daka-root .calendar {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 0.9rem;
+  box-shadow: var(--shadow);
+}
+.daka-root .cal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+.daka-root .cal-nav__title { font-size: 1rem; font-weight: 700; color: var(--rose); }
+.daka-root .cal-nav__btn {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: var(--pink-100);
+  color: var(--pink-600);
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+.daka-root .cal-nav__btn:active { transform: scale(0.92); background: var(--pink-200); }
+.daka-root .cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 0.3rem;
+}
+.daka-root .cal-dow {
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  font-weight: 600;
+  padding: 0.25rem 0;
+}
+.daka-root .cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+.daka-root .day {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border: none;
+  border-radius: 10px;
+  background: var(--pink-50);
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.daka-root .day:active { transform: scale(0.93); }
+.daka-root .day--out { color: #d8b8c4; background: transparent; }
+.daka-root .day.is-future { color: #e0c3cf; background: transparent; cursor: not-allowed; }
+.daka-root .day.is-today {
+  box-shadow: inset 0 0 0 2px var(--pink-400);
+  font-weight: 800;
+}
+.daka-root .day.is-checked {
+  background: linear-gradient(135deg, var(--pink-400), var(--pink-600));
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(240, 66, 122, 0.3);
+}
+.daka-root .day.is-checked.is-today { box-shadow: inset 0 0 0 2px #fff, 0 4px 10px rgba(240, 66, 122, 0.3); }
+.daka-root .day__heart {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  font-size: 0.62rem;
+  color: #fff;
+  line-height: 1;
+  animation: daka-heart-pop 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.daka-root .day.is-checked:active .day__heart { animation: none; }
+
+/* —— 爱心收藏 —— */
+.daka-root .hearts {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 0.9rem;
+  box-shadow: var(--shadow);
+}
+.daka-root .hearts__head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.5rem; }
+.daka-root .hearts__title { font-size: 0.92rem; font-weight: 700; color: var(--rose); }
+.daka-root .hearts__cnt { font-size: 0.76rem; color: var(--ink-soft); }
+.daka-root .hearts__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: 0.5rem;
+}
+.daka-root .heart-slot {
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: var(--pink-50);
+  font-size: 1.3rem;
+  color: #e6c3d2;
+  transition: transform 0.2s ease;
+}
+.daka-root .heart-slot.is-on {
+  color: var(--pink-500);
+  background: var(--pink-100);
+  filter: drop-shadow(0 2px 6px rgba(240, 66, 122, 0.25));
+  animation: daka-heart-pop 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ============================================================ 档案弹层 === */
+.daka-root .sheet { position: absolute; inset: 0; z-index: 50; }
+.daka-root .sheet__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(90, 58, 68, 0);
+  transition: background 0.22s ease;
+}
+.daka-root .sheet.is-open .sheet__backdrop { background: rgba(90, 58, 68, 0.32); }
+.daka-root .sheet__panel {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  background: var(--pink-50);
+  border-radius: 22px 22px 0 0;
+  padding: 0.9rem 1rem max(1rem, env(safe-area-inset-bottom));
+  transform: translateY(100%);
+  transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 -10px 30px rgba(240, 66, 122, 0.18);
+  max-height: 80%;
+  overflow-y: auto;
+}
+.daka-root .sheet.is-open .sheet__panel { transform: translateY(0); }
+.daka-root .sheet__head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+.daka-root .sheet__title { font-size: 1rem; font-weight: 800; color: var(--rose); }
+.daka-root .sheet__close {
+  width: 30px; height: 30px;
+  border: none; border-radius: 50%;
+  background: var(--pink-100); color: var(--pink-600);
+  font-size: 0.9rem; cursor: pointer;
+}
+.daka-root .sheet__body { display: flex; flex-direction: column; gap: 0.5rem; }
+.daka-root .sheet__empty { text-align: center; color: var(--ink-soft); padding: 1rem 0; }
+.daka-root .sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  border-radius: 12px;
+  background: var(--white);
+}
+.daka-root .sheet-row.is-active { box-shadow: inset 0 0 0 2px var(--pink-300); }
+.daka-root .sheet-row__main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  min-width: 0;
+}
+.daka-root .sheet-row__avatar {
+  flex: none;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--pink-300), var(--pink-500));
+  color: #fff;
+  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.daka-root .sheet-row__meta { display: flex; flex-direction: column; min-width: 0; }
+.daka-root .sheet-row__name { font-weight: 600; color: var(--ink); }
+.daka-root .sheet-row__name em { font-size: 0.72rem; color: var(--pink-500); font-style: normal; }
+.daka-root .sheet-row__sub { font-size: 0.74rem; color: var(--ink-soft); }
+.daka-root .sheet-row__icon {
+  flex: none;
+  width: 32px; height: 32px;
+  border: none; border-radius: 8px;
+  background: var(--pink-100); color: var(--pink-600);
+  cursor: pointer; font-size: 0.9rem;
+}
+.daka-root .sheet-row__icon--danger { background: #ffe0e0; color: #e05a5a; }
+.daka-root .sheet-row__icon--danger.is-armed { background: #e05a5a; color: #fff; }
+.daka-root .sheet-rename {
+  display: flex; gap: 0.4rem;
+  padding: 0.5rem 0.4rem 0.2rem;
+  width: 100%;
+}
+.daka-root .sheet-rename__input {
+  flex: 1;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--pink-200);
+  border-radius: 8px;
+  font-size: 0.92rem;
+  color: var(--ink);
+  outline: none;
+  background: var(--white);
+  user-select: text; -webkit-user-select: text;
+}
+.daka-root .sheet-rename__input:focus { border-color: var(--pink-400); }
+.daka-root .sheet-rename__ok {
+  padding: 0.5rem 0.9rem;
+  border: none; border-radius: 8px;
+  background: var(--pink-500); color: #fff;
+  font-weight: 700; cursor: pointer;
+}
+.daka-root .sheet__foot { padding-top: 0.7rem; }
+.daka-root .sheet__new {
+  width: 100%;
+  padding: 0.7rem;
+  border: 1.5px dashed var(--pink-300);
+  border-radius: 12px;
+  background: var(--white);
+  color: var(--pink-600);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ============================================================ 庆祝动画 === */
+.daka-root .celebrate {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 230, 238, 0);
+  pointer-events: none;
+  transition: background 0.3s ease;
+}
+.daka-root .celebrate.is-open {
+  background: rgba(255, 214, 228, 0.78);
+  pointer-events: auto;
+}
+.daka-root .celebrate__particles {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.daka-root .celebrate__particle {
+  position: absolute;
+  bottom: -10%;
+  font-size: 1.4rem;
+  color: var(--pink-500);
+  opacity: 0;
+  animation-name: daka-confetti-rise;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-fill-mode: forwards;
+}
+.daka-root .celebrate__card {
+  position: relative;
+  text-align: center;
+  padding: 1.6rem 2rem;
+  background: var(--white);
+  border-radius: 24px;
+  box-shadow: var(--shadow-lg);
+  transform: scale(0.6);
+  opacity: 0;
+  transition: transform 0.35s cubic-bezier(0.22, 1.4, 0.4, 1), opacity 0.3s ease;
+}
+.daka-root .celebrate.is-open .celebrate__card { transform: scale(1); opacity: 1; }
+.daka-root .celebrate__bigheart {
+  font-size: 4rem;
+  color: var(--pink-500);
+  line-height: 1;
+  filter: drop-shadow(0 8px 16px rgba(240, 66, 122, 0.4));
+  animation: daka-heart-beat 1s ease-in-out infinite;
+}
+.daka-root .celebrate__title { margin-top: 0.4rem; font-size: 1.5rem; font-weight: 800; color: var(--rose); }
+.daka-root .celebrate__sub { margin-top: 0.2rem; font-size: 0.95rem; color: var(--ink-soft); }
+.daka-root .celebrate__btn {
+  margin-top: 1rem;
+  padding: 0.6rem 1.6rem;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--pink-500), var(--pink-600));
+  color: #fff;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  pointer-events: auto;
+}
+.daka-root .celebrate__btn:active { transform: scale(0.96); }
+
+/* ============================================================ Toast === */
+.daka-root .toast-host {
+  position: absolute;
+  left: 0; right: 0; bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.daka-root .toast {
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
+  background: rgba(90, 58, 68, 0.92);
+  color: #fff;
+  font-size: 0.85rem;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+}
+.daka-root .toast.is-show { opacity: 1; transform: translateY(0); }
+
+/* ============================================================ 动效关键帧（daka- 前缀防全局撞名）=== */
+@keyframes daka-heart-beat {
+  0%, 100% { transform: scale(1); }
+  25% { transform: scale(1.12); }
+  40% { transform: scale(0.96); }
+  60% { transform: scale(1.08); }
+}
+@keyframes daka-heart-pop {
+  0% { transform: scale(0); }
+  60% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+@keyframes daka-pulse-btn {
+  0%, 100% { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 0 0 0 rgba(255, 93, 143, 0.5); }
+  50% { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 0 0 8px rgba(255, 93, 143, 0); }
+}
+@keyframes daka-confetti-rise {
+  0% { opacity: 0; transform: translateY(0) rotate(0deg); }
+  10% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-110vh) rotate(360deg); }
+}
+
+/* —— 窄屏微调 —— */
+@media (max-width: 360px) {
+  .daka-root .stat__num { font-size: 1.3rem; }
+  .daka-root .day { font-size: 0.78rem; }
+  .daka-root .launcher-title { font-size: 1.7rem; }
+}
+
+/* 尊重「减少动态效果」偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .daka-root .launcher-emoji,
+  .daka-root .today-card:not(.is-checked) .today-card__btn,
+  .daka-root .celebrate__bigheart,
+  .daka-root .heart-slot.is-on,
+  .daka-root .day__heart,
+  .daka-root .celebrate__particle { animation: none !important; }
+}

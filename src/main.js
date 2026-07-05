@@ -28,6 +28,14 @@ const GAMES = [
     desc: '从呱呱坠地到垂垂老矣，一月一回合推进岁月，在健康、智力、财富、心情、社交间权衡抉择；可多槽位存档、可挂机，过完这一生。',
     loader: () => import('../apps/mo-ni-ren-sheng/src/main.js'),
   },
+  {
+    key: 'daka',
+    title: '每日打卡',
+    subtitle: '习惯 · 粉色日历',
+    emblem: '♡',
+    desc: '粉色系打卡日历：点一点记录坚持的每一天，每累计 10 天收获一颗爱心并触发庆祝。输入昵称即可多档案存档，看你的连续打卡与爱心收藏。',
+    loader: () => import('../apps/da-ka/src/main.js'),
+  },
 ]
 
 const app = document.getElementById('app')

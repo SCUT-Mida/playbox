@@ -1,0 +1,52 @@
+# 打卡 · Daily Check-in
+
+一款粉色系的每日打卡日历。坚持的每一天都开出一朵小花 🌸，**每累计 10 天** 收获一颗爱心，并触发庆祝动画。可输入昵称、按昵称多档案存档。
+
+技术栈：**原生 DOM + Vite**（无框架），移动端优先，纯本地存储。
+
+## 本地运行
+
+```bash
+npm install
+npm run dev        # 开发服务器 http://localhost:5176
+npm run build      # 生产构建到 dist/
+npm run preview    # 预览生产构建
+npm test           # 纯逻辑自测（config / calendar / checkin / store）
+npm run test:dom   # jsdom DOM 冒烟测试
+```
+
+## 核心功能
+
+- **日历**：周一为首列的月历，可前后翻月；今日高亮，未来日禁用，上下月占位淡化。
+- **打卡 / 取消**：点击任意日期格切换打卡；今日另有醒目大按钮。再次点击即取消。
+- **爱心里程碑**：每累计 10 天解锁一颗爱心；第 10 / 20 / 30 … 天触发爱心飞散的庆祝动画。
+- **统计**：累计天数、连续打卡（今天没打也不算断）、历史最长连击；爱心收藏区可视化已解锁与未解锁占位。
+- **昵称存档**：输入昵称建档，数据按昵称归档于 `localStorage`；支持多档案切换、改名、删除（二次确认）。
+- **粉色色系**：柔和粉渐变 + 圆角卡片 + 心形点缀 + 微动效，尊重 `prefers-reduced-motion`。
+
+## 项目结构
+
+```
+src/
+  main.js            入口：导出 createGame(parent) 工厂
+  config.js          常量（昵称约束 / 爱心步长 / 星期月份 / 存档 key）
+  core/
+    calendar.js      纯日期函数：ISO 串、月历矩阵、连击日差、未来/今日判定
+    checkin.js       打卡逻辑：切换、里程碑、连击、爱心数、昵称规范化
+    store.js         localStorage 多档案存取（按昵称 key 归档）
+  ui/
+    app.js           CheckInUI：启动器 / 主视图 / 弹层 / 庆祝动画 / Toast
+    style.css        粉色系样式与动效
+scripts/
+  logic-test.mjs     纯逻辑自测
+  smoke-dom.mjs      jsdom DOM 冒烟测试
+  _css-loader.mjs    冒烟测试用：把 .css 视作空模块
+```
+
+## 数据与隐私
+
+所有打卡记录仅保存在**用户本设备的 `localStorage`**，不上传任何服务器。清除浏览器数据即丢失档案。
+
+## 部署（GitHub Pages）
+
+由主仓库 `deploy-pages.yml` 统一构建部署，本展品作为落地页的一个动态加载分片，无需单独配置。

@@ -230,6 +230,8 @@ ok(normalizeTaskName('  跑  步  ') === '跑 步', 'normalizeTaskName 压缩空
   ok(getTask(p, '跑步') === null && getTask(p, '晨跑') !== null, '改名后旧 key 消失、新 key 可取');
   // 改成已存在的任务名失败
   ok(renameTask(p, '晨跑', normalizeKey(DEFAULT_TASK_NAME)).ok === false, '改成已占用任务名失败');
+  // 回归：冲突失败后，源任务名不得被改写（原子性：失败即不改）
+  ok(getTask(p, '晨跑') !== null && getTask(p, '晨跑').name === '晨跑', '冲突失败后源任务名保持不变');
   // 空名失败
   ok(renameTask(p, '晨跑', '   ').ok === false, '改成空任务名失败');
 

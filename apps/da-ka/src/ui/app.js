@@ -106,6 +106,8 @@ export class CheckInUI {
         return;
       }
       if (e.key === 'Enter') {
+        // 中文输入法（拼音等）选词时的回车会以 key==='Enter' 冒泡，需忽略，否则会提前触发提交。
+        if (e.isComposing) return;
         // 任务改名 / 任务新建 / 档案改名框都不在 <form> 内，回车等价于点「保存 / 新建」，
         // 与启动器昵称表单的回车提交保持一致。
         const el = e.target;

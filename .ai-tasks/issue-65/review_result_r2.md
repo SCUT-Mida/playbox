@@ -1,0 +1,8 @@
+DECISION: REQUEST_CHANGES
+COMMENT: 第 1 轮提的三点（toast 顺序、改名预填改用原始数据源、回车提交）都已正确修复，逐处核对过：`_doRename`/`_onSheetDelete`/`_doTaskRename`/`_onTaskDelete`/`_onTaskNew` 的 `_toast` 都已挪到 `render()` 之后（`render` 末尾会重建 toast-host，故 toast 能正常显示）；`_onSheetRename`/`_onTaskRename` 改为从 `loadAll()`/`getTask()` 取原始名；`_bindGlobal` 已为三个输入框补回车提交并给 input 补了 `data-key`。但本轮发现一个第 1 轮遗漏的真实逻辑 Bug，建议修后再合：
+
+【主要 Bug·改名失败却已改写状态，违反原子性】`apps/da-ka/src/core/checkin.js:243-245` 的 `renameTask`：`task.name = norm;` 写在 `if (profile.tasks[newKey]) return { ok: false, error: 'dup' };` 之前。复现：档案里同时有「每日打卡」(默认) 和「跑步」两个任务，把「跑步」改名为「每日打卡」——`norm='每日打卡'`、`newKey='每日打卡'` 与默认任务冲突，函数返回 `{ok:false,error:'dup'}`，但此时 `tasks['跑步'].name` 已被改成「每日打卡」。于是内存里出现两个同名「每日打卡」（一个 key 仍为 `跑步`，一个 key 为 `每日打卡`）。`_doTaskRename` 见 `!r.ok` 直接 `return` 不 upsert，所以没立即落盘；但只要用户紧接着做任何会触发 `upsertProfile(this.profile)` 的操作（点任意日期打卡、再建/切/删一个任务等），这份错乱状态就会被持久化，重开后任务列表里就是两个「每日打卡」。现有单测之所以没爆，是因为 `renameTask(p,'晨跑',DEFAULT_TASK_NAME).ok===false` 之后没有任何断言再去查 `tasks['晨跑'].name`，corruption 被掩盖。修复：把 `task.name = norm;` 挪到 dup 校验通过之后（或先把 newKey 冲突校验做完再开始任何写操作），保证「失败即不改」。
+
+【次要·中文输入法回车误触发】`apps/da-ka/src/ui/app.js:108-123` 的回车提交未判断 `e.isComposing`（或 `e.keyCode === 229`）。本应用主力是中文用户，用拼音输入任务名（如打 "paobu" 选「跑步」）时，选词那一下回车在部分浏览器会以 `key==='Enter' && isComposing===true` 冒泡到 window，从而被这条 handler 当成「确认提交」提前触发 `_onTaskNew`/`_doTaskRename`/`_doRename`。建议在 Enter 分支最前面加 `if (e.isComposing) return;`。
+
+未涉及 `.github/` 下 CI/CD 或 workflows 变更，无需人工处理 GitHub Actions。

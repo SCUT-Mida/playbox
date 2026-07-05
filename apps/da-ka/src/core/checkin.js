@@ -240,13 +240,18 @@ export function renameTask(profile, taskKey, newName) {
   if (!isValidTaskName(newName)) return { ok: false, error: 'invalid' };
   const norm = normalizeTaskName(newName);
   const newKey = normalizeKey(norm);
-  task.name = norm;
+  // 先完成全部校验再开始写，保证「失败即不改」——否则改名冲突返回 {ok:false}
+  // 时 task.name 已被改写，会在内存里留下两个同名任务，被后续 upsert 落盘。
   if (newKey !== k) {
     if (profile.tasks[newKey]) return { ok: false, error: 'dup' };
+    task.name = norm;
     task.key = newKey;
     delete profile.tasks[k];
     profile.tasks[newKey] = task;
     if (profile.activeTaskKey === k) profile.activeTaskKey = newKey;
+  } else {
+    // key 未变（仅大小写/空白差异），只更新展示名。
+    task.name = norm;
   }
   return { ok: true, error: null };
 }

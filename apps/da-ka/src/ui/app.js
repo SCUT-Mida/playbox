@@ -355,6 +355,12 @@ export class CheckInUI {
   }
 
   _onInput(e) {
+    // 中文输入法（拼音等）合成期冒泡的 input 事件需跳过——
+    // 此时 [...el.value] 计数的是合成段原始拉丁字符（如「每天读书打卡」的拼音 meitiandushudaka），
+    // 一旦超长就 program 改写 el.value，会强制提交 / 取消当前合成段，候选窗关闭，用户看到乱码拉丁字母。
+    // 最终长度由提交期的 normalizeTaskName / normalizeNickname（slice 到 max）+ 原生 maxlength 兜底，故合成期不截断是安全的。
+    // 与 app.js 的 Enter 处理（if (e.isComposing) return;）保持一致。
+    if (e.isComposing) return;
     const el = e.target;
     if (el.dataset.id === 'rename-input'
         || el.dataset.id === 'sheet-rename-input'
@@ -415,8 +421,12 @@ export class CheckInUI {
 
   _onToggleDay(iso) {
     if (!this.profile) return;
-    // 今日格可直点；【过去日期】需二次确认才能补卡 / 取消，避免误触改历史。
     const dt = parseISO(iso);
+    // 防御：未来日格本就 disabled（_renderCalendarInner），此处再次显式拒绝，
+    // 让 toggleCheckin 对未来日返回的空操作不再走到 _applyToggle（避免弹「已取消打卡」错文案 + 多余落盘）。
+    // 闭合「失败即不改、不提示」的契约。
+    if (dt && diffDays(this.today, dt) > 0) return;
+    // 今日格可直点；【过去日期】需二次确认才能补卡 / 取消，避免误触改历史。
     const isPast = dt && diffDays(this.today, dt) < 0;
     if (!isPast) {
       this._applyToggle(iso);

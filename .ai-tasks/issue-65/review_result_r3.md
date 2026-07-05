@@ -1,0 +1,10 @@
+两个测试套件均已通过（156 个逻辑测试 + 73 个 DOM 冒烟测试），且第 2 轮的两个阻塞性问题已确认修复并包含回归测试覆盖（`checkin.js:243-255` 处的 `renameTask` 原子性问题 + `logic-test.mjs:233-234` 处的测试；`app.js:110` 处的 Enter 键 `e.isComposing` 防护）。然而，我在同样的 IME 类别中发现了另一个真实存在的 Bug，它影响了主要（中文）用户群——这正是第 2 轮要求修复的那个 Bug 的同类型问题。
+
+DECISION: REQUEST_CHANGES
+COMMENT: 第 2 轮的两个阻塞点均已正确修复并有回归测试覆盖：`renameTask`（checkin.js:243-255）已把 `task.name = norm` 挪到 `dup` 校验之后，失败即不改，且 logic-test.mjs:233-234 补了「冲突失败后源任务名保持不变」的断言；Enter 提交已在 app.js:110 加了 `if (e.isComposing) return;`。但本轮发现一个**同类 IME Bug**，仍会影响中文用户主力场景，建议修后再合：
+
+【主要 Bug·实时截断破坏中文输入法合成】`apps/da-ka/src/ui/app.js:357-368` 的 `_onInput` 在每次 `input` 事件里都用 `[...el.value]` 计数并在超长时直接改写 `el.value`，但**没有判断 `e.isComposing`**。复现：打开任务管理弹层，在「新任务名」框用拼音输入一个 6 字任务名「每天读书打卡」（拼音 `meitiandushudaka` 共 16 个原始拉丁字符）。当原始输入累积到第 13 个字符（`meitiandushuda`）时，`chars.length(13) > TASK_NAME_MAX_LEN(12)` 命中，执行 `el.value = chars.slice(0,12).join('')` 把输入框值截成 `meitiandushu`。在输入法**处于合成态（isComposing）时程序化改写 `input.value`**，会被 Chrome/Edge/Firefox 强制提交或取消当前合成段、候选窗关闭，用户看到的是一串乱码拉丁字母 `meitiandushu` 而非「每天读书打…」，必须清空重打。换言之——凡是拼音长度超过 12 的中文任务名/昵称（粗略对应 3~4 个汉字以上的名字，如「每天坚持跑步」「读书笔记本」）都打不进去。这与第 2 轮已修复的 Enter 误触发是**同一类合成态未拦截问题**，且本轮新引入的「实时截断」逻辑正是元凶。注意：原生 `maxlength="${MAX_LEN*2}"`（=24）本身对合成态是友好的（浏览器允许合成期临时溢出、提交时才裁剪），反而是这条 JS 截断比原生更激进、抢先破坏了合成。修复：在 `_onInput` 最前面加 `if (e.isComposing) return;`（与 app.js:110 的 Enter 处理保持一致）；最终长度已有提交期的 `normalizeTaskName/normalizeNickname`（slice 到 max）兜底，原生 maxlength=24 兜硬上限，故跳过合成期实时截断是安全的。
+
+【次要·未来日分支为不可达死代码但文案错误，建议顺手收口】`_onToggleDay`（app.js:416-435）里 `isPast = dt && diffDays(this.today, dt) < 0`，未来日时 `isPast=false` 会落到 `_applyToggle(iso)`，而 `toggleCheckin` 对未来日返回 unchanged（`checked=false, milestone=false`），随后 `_applyToggle` 走 else 分支弹出「已取消打卡」并触发一次 `upsertProfile` 落盘——逻辑上对一个空操作给出了错误文案。当前因渲染层对未来日格加了 `disabled`（app.js:291）使该路径不可达，不构成线上 Bug；但作为防御，建议在 `_onToggleDay` 入口显式 `if (dt && diffDays(this.today, dt) > 0) return;` 直接拒绝未来日，让「失败即不改、不提示」的契约闭合。
+
+未涉及 `.github/` 下 CI/CD 或 workflows 变更，无需人工处理 GitHub Actions。`npm test`（156 通过）与 `npm run test:dom`（73 通过）本地均跑通。

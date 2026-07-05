@@ -180,6 +180,26 @@ document.querySelector('[data-act="task-open"][data-key="晨跑"]').click();
 await sleep(15);
 ok(/晨跑/.test(document.querySelector('.task-bar__name')?.textContent || ''), '任务改名生效为「晨跑」');
 
+// ---------- 10.5) IME 合成期不截断（保护中文拼音输入） ----------
+// 回归：拼音长度超过 12 的中文任务名（如「每天读书打卡」→拼音 meitiandushudaka=16），
+// 合成期 _onInput 若改写 el.value 会强制提交/取消合成段，候选窗关闭，用户看到乱码拉丁字母。
+document.querySelector('[data-act="task-sheet"]').click();
+await sleep(20);
+const imeInput = document.querySelector('[data-id="task-new-input"]');
+ok(imeInput !== null, 'IME 测试：任务新建输入框存在');
+// 合成态：超长原始拉丁字符不应被截断
+imeInput.value = 'meitiandushudaka'; // 16 字符 > TASK_NAME_MAX_LEN(12)
+imeInput.dispatchEvent(new window.InputEvent('input', { bubbles: true, isComposing: true }));
+ok(imeInput.value === 'meitiandushudaka', `合成期(isComposing=true)不截断输入（实际: ${imeInput.value}）`);
+// 非合成态：同样超长值应被实时截断到 12
+imeInput.value = 'meitiandushudaka';
+imeInput.dispatchEvent(new window.InputEvent('input', { bubbles: true, isComposing: false }));
+ok(imeInput.value === 'meitiandushu', `非合成期超长值被截断到 12（实际: ${imeInput.value}）`);
+document.querySelector('[data-act="close-task-sheet"]').click();
+// _closeTaskSheet 的 DOM 移除有 200ms 动画延时；等足 210ms 确保旧 sheet 节点彻底离场，
+// 否则后续 section 11 重开 sheet 时旧节点仍在 DOM，querySelector 会命中旧按钮导致断言错乱。
+await sleep(210);
+
 // ---------- 11) 任务删除（二次确认，最后一个拒绝删） ----------
 document.querySelector('[data-act="task-sheet"]').click();
 await sleep(20);

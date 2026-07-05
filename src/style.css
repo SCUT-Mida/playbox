@@ -96,6 +96,14 @@ header {
   margin-bottom: 3rem;
 }
 
+/* 顶栏：返回按钮 + 当前层级标题 */
+.exhibit-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
 .section-title {
   font-family: var(--font-display);
   font-weight: 700;
@@ -103,7 +111,33 @@ header {
   color: var(--text);
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  margin-bottom: 1rem;
+}
+
+/* 返回大类按钮：首页视图下隐藏，进入大类后出现 */
+.back-btn {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg-card);
+  color: var(--accent);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.back-btn:hover {
+  background: #1f1d18;
+  border-color: var(--accent-dim);
+}
+
+.back-btn[hidden] {
+  display: none;
 }
 
 .card {
@@ -116,6 +150,48 @@ header {
 /* ── Exhibit card（展品卡片）── */
 .card--exhibit {
   padding: 1.5rem;
+}
+
+/* 大类卡片：可点击的导航磁贴，整体可点进入子列表 */
+.card--category {
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.12s ease, background 0.15s ease;
+}
+
+.card--category:hover,
+.card--category:focus-visible {
+  border-color: var(--accent-dim);
+  background: #18171b;
+  outline: none;
+}
+
+.card--category:active {
+  transform: translateY(1px);
+}
+
+/* 大类标题右侧的箭头，提示可进入下一级 */
+.card-chevron {
+  margin-left: auto;
+  align-self: center;
+  color: var(--accent);
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0.8;
+}
+
+/* 大类底部的进入提示，复用主按钮视觉但非独立按钮（整卡可点） */
+.enter-btn {
+  display: inline-block;
+  margin-top: 0.25rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(212, 168, 75, 0.12);
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 
 /* 多展品纵向堆叠 */

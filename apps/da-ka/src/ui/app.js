@@ -79,6 +79,11 @@ export class CheckInUI {
       window.removeEventListener('keydown', this._keyHandler);
       this._keyHandler = null;
     }
+    if (this._vvHandler && window.visualViewport) {
+      window.visualViewport.removeEventListener('resize', this._vvHandler);
+      this._vvHandler = null;
+    }
+    this._focusTarget = null;
     if (this.root && this.root.parentNode) this.root.parentNode.removeChild(this.root);
     this.root = null;
   }
@@ -138,6 +143,65 @@ export class CheckInUI {
       }
     };
     this.root.addEventListener('submit', this._submitHandler);
+    // 视觉视口（键盘）跟踪 + 聚焦滚动修正：键盘弹起时把根容器收口到「键盘以上的可见区」，
+    // 并把聚焦的输入框滚到可见区内，避免 iOS 默认把输入框推到屏幕上半部分的中间。
+    this._focusTarget = null;
+    this._focusInHandler = (e) => this._onFocusIn(e);
+    this._focusOutHandler = (e) => { if (e.target === this._focusTarget) this._focusTarget = null; };
+    this.root.addEventListener('focusin', this._focusInHandler);
+    this.root.addEventListener('focusout', this._focusOutHandler);
+    this._vvHandler = () => this._syncShell();
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', this._vvHandler);
+  }
+
+  // 把根容器收口到「视觉视口（键盘以上可见区）与父容器的交集」。
+  // getBoundingClientRect 与 visualViewport.offsetTop 同处一个坐标系
+  // （iOS 均相对布局视口；Chrome 上 offsetTop≈0、bcr 相对视觉视口），可直接相减。
+  _syncShell() {
+    if (!this.root) return;
+    const vv = window.visualViewport;
+    const parent = this.root.parentElement;
+    if (!vv || !parent) {
+      this.root.style.top = '';
+      this.root.style.height = '';
+      return;
+    }
+    const pRect = parent.getBoundingClientRect();
+    const visTop = vv.offsetTop - pRect.top;
+    const visBottom = vv.offsetTop + vv.height - pRect.top;
+    const top = Math.max(0, visTop);
+    const bottom = Math.min(parent.clientHeight, visBottom);
+    const height = Math.max(0, bottom - top);
+    this.root.style.top = top + 'px';
+    this.root.style.height = height + 'px';
+    if (this._focusTarget && this.root.contains(this._focusTarget)) {
+      this._scrollFocusVisible(this._focusTarget);
+    }
+  }
+
+  _onFocusIn(e) {
+    const el = e.target;
+    if (!el || (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA')) return;
+    this._focusTarget = el;
+    // 先按当前视觉视口收口容器，再延后两帧修正滚动（等键盘动画 / 容器重排落定）。
+    this._syncShell();
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (this._focusTarget === el) this._scrollFocusVisible(el);
+    }));
+  }
+
+  // 把聚焦的输入框滚到根容器（即键盘以上可见区）的中部。
+  // 用 offsetTop 链累加，规避 getBoundingClientRect 在不同浏览器间坐标系不一致的问题。
+  _scrollFocusVisible(el) {
+    if (!this.root || !this.root.contains(el)) return;
+    let top = 0, node = el;
+    while (node && node !== this.root) {
+      top += node.offsetTop;
+      node = node.offsetParent;
+    }
+    if (node !== this.root) return;
+    const target = top - (this.root.clientHeight - el.offsetHeight) / 2;
+    this.root.scrollTo({ top: Math.max(0, target) });
   }
 
   // ===================== 渲染入口 =====================

@@ -250,7 +250,8 @@
 .mnrs .save-io {
   width: 100%; height: 64px; resize: vertical; padding: 0.5rem; border-radius: 8px;
   border: 1px solid var(--line); background: var(--bg); color: var(--text);
-  font-family: ui-monospace, monospace; font-size: 0.72rem; word-break: break-all;
+  /* ≥16px：避免 iOS 聚焦输入框时自动放大整页且不回弹。 */
+  font-family: ui-monospace, monospace; font-size: 1rem; word-break: break-all;
 }
 
 /* —— 多槽位存档管理 —— */

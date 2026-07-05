@@ -510,7 +510,8 @@
 .frxx .talent-chip .nm { font-weight: 600; font-size: 0.82rem; }
 
 .frxx .name-input {
-  width: 100%; padding: 0.55rem 0.7rem; font-size: 0.95rem;
+  /* ≥16px：避免 iOS 聚焦输入框时自动放大整页且不回弹。 */
+  width: 100%; padding: 0.55rem 0.7rem; font-size: 1rem;
   background: #0a0703; color: var(--text); border: 1px solid var(--line); border-radius: 8px;
   font-family: inherit;
 }

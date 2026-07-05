@@ -9,11 +9,18 @@
 :root {
   --bg: #0b0b0e;
   --bg-card: #141417;
-  --text: #e8e6e3;
+  --bg-card-hi: #1b1a20;
+  --text: #ece9e3;
   --text-muted: #8a8883;
-  --accent: #d4a84b;
+  --accent: #d4a84b;       /* 香槟金 */
+  --accent-hi: #ecc878;
   --accent-dim: #b8912e;
   --border: #222227;
+  --line: #24232b;
+  --gold-line: rgba(212, 168, 75, 0.32);
+  --gold-glow: rgba(212, 168, 75, 0.14);
+  --shadow-card: 0 12px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  --shadow-card-hi: 0 20px 48px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(212, 168, 75, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   --font-display: 'Playfair Display', Georgia, serif;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
 }
@@ -26,7 +33,10 @@ html {
 }
 
 body {
-  background: var(--bg);
+  /* 顶部一抹香槟金辉光，营造轻奢氛围；其余维持近黑底，凸显金字与卡片质感。 */
+  background:
+    radial-gradient(125% 80% at 50% -12%, rgba(212, 168, 75, 0.10), rgba(212, 168, 75, 0) 55%),
+    var(--bg);
   color: var(--text);
   font-family: var(--font-body);
   font-weight: 400;
@@ -64,9 +74,14 @@ header {
   font-style: italic;
   font-size: 3.5rem;
   line-height: 1.1;
-  color: var(--accent);
   letter-spacing: -0.02em;
   margin-bottom: 0.75rem;
+  /* 香槟金竖向渐变描色，保留 color 作旧浏览器回退。 */
+  color: var(--accent);
+  background: linear-gradient(180deg, #f3d98a 0%, #d4a84b 58%, #b1892c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .subtitle {
@@ -81,9 +96,23 @@ header {
 .description {
   margin-bottom: 2.5rem;
   padding: 1rem 0;
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  position: relative;
 }
+
+/* 上下细金线（两端淡出），替代纯灰描边，更精致。 */
+.description::before,
+.description::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold-line), transparent);
+}
+.description::before { top: 0; }
+.description::after { bottom: 0; }
 
 .description p {
   font-size: 0.875rem;
@@ -109,8 +138,23 @@ header {
   font-weight: 700;
   font-size: 1.125rem;
   color: var(--text);
-  letter-spacing: 0.05em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
+  position: relative;
+  padding-left: 0.85rem;
+}
+
+/* 标题左侧一道短金竖线，作为轻奢的克制度量点缀。 */
+.section-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 0.95em;
+  background: linear-gradient(180deg, var(--accent-hi), var(--accent-dim));
+  border-radius: 2px;
 }
 
 /* 返回大类按钮：首页视图下隐藏，进入大类后出现 */
@@ -121,19 +165,20 @@ header {
   justify-content: center;
   width: 28px;
   height: 28px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 50%;
   background: var(--bg-card);
   color: var(--accent);
   font-size: 1rem;
   line-height: 1;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .back-btn:hover {
   background: #1f1d18;
   border-color: var(--accent-dim);
+  box-shadow: 0 0 0 3px var(--gold-glow);
 }
 
 .back-btn[hidden] {
@@ -142,32 +187,60 @@ header {
 
 .card {
   background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
   padding: 2rem 1.5rem;
 }
 
 /* ── Exhibit card（展品卡片）── */
 .card--exhibit {
   padding: 1.5rem;
+  background: linear-gradient(155deg, var(--bg-card-hi) 0%, var(--bg-card) 72%);
+  box-shadow: var(--shadow-card);
 }
 
 /* 大类卡片：可点击的导航磁贴，整体可点进入子列表 */
 .card--category {
-  padding: 1.5rem;
+  position: relative;
+  overflow: hidden;
+  padding: 1.75rem 1.5rem;
   cursor: pointer;
-  transition: border-color 0.15s ease, transform 0.12s ease, background 0.15s ease;
+  background: linear-gradient(155deg, #1b1a21 0%, #131317 72%);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow-card);
+  transition: border-color 0.2s ease, transform 0.18s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+
+/* 卡顶一道两端淡出的金线，hover 时加亮——克制的轻奢细节。 */
+.card--category::before {
+  content: "";
+  position: absolute;
+  left: 1.25rem;
+  right: 1.25rem;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold-line), transparent);
+  opacity: 0.65;
+  transition: opacity 0.25s ease;
 }
 
 .card--category:hover,
 .card--category:focus-visible {
-  border-color: var(--accent-dim);
-  background: #18171b;
+  border-color: rgba(212, 168, 75, 0.42);
+  background: linear-gradient(155deg, #211f28 0%, #171619 72%);
+  box-shadow: var(--shadow-card-hi);
+  transform: translateY(-2px);
   outline: none;
 }
 
+.card--category:hover::before,
+.card--category:focus-visible::before {
+  opacity: 1;
+}
+
 .card--category:active {
-  transform: translateY(1px);
+  transform: translateY(0);
 }
 
 /* 大类标题右侧的箭头，提示可进入下一级 */
@@ -179,19 +252,28 @@ header {
   font-weight: 700;
   line-height: 1;
   opacity: 0.8;
+  transition: transform 0.2s ease, opacity 0.2s ease, color 0.2s ease;
+}
+
+.card--category:hover .card-chevron,
+.card--category:focus-visible .card-chevron {
+  color: var(--accent-hi);
+  opacity: 1;
+  transform: translateX(3px);
 }
 
 /* 大类底部的进入提示，复用主按钮视觉但非独立按钮（整卡可点） */
 .enter-btn {
   display: inline-block;
   margin-top: 0.25rem;
-  padding: 0.4rem 0.9rem;
+  padding: 0.42rem 1rem;
   border-radius: 999px;
-  background: rgba(212, 168, 75, 0.12);
-  color: var(--accent);
+  background: linear-gradient(135deg, rgba(236, 200, 120, 0.16), rgba(212, 168, 75, 0.10));
+  color: var(--accent-hi);
   font-size: 0.8rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
+  border: 1px solid var(--gold-line);
 }
 
 /* 多展品纵向堆叠 */
@@ -210,17 +292,19 @@ header {
 
 .card-emblem {
   flex: none;
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(145deg, #3a2e22, #1f1812);
-  border: 1px solid #6b5430;
-  border-radius: 10px;
-  color: #ead9b6;
+  /* 金边深底的小铭牌：内高光 + 暖色描边，质感更精致。 */
+  background: linear-gradient(150deg, #4a3a26 0%, #2a2016 60%, #1b140d 100%);
+  border: 1px solid rgba(212, 168, 75, 0.36);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 224, 160, 0.20), 0 6px 16px rgba(0, 0, 0, 0.45);
+  color: #f1dca0;
   font-family: serif;
-  font-size: 1.6rem;
+  font-size: 1.65rem;
   line-height: 1;
 }
 
@@ -233,14 +317,16 @@ header {
 .card-title {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.25rem;
+  font-size: 1.3rem;
   color: var(--text);
+  letter-spacing: 0.005em;
 }
 
 .card-subtitle {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--accent);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .card-desc {
@@ -251,25 +337,34 @@ header {
 }
 
 .play-btn {
+  position: relative;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.75rem 1rem;
+  padding: 0.8rem 1rem;
   border: none;
-  border-radius: 8px;
-  background: var(--accent);
+  border-radius: 10px;
+  /* 金色渐变面 + 顶部内高光，呈现金属质感的「轻奢」主按钮。 */
+  background: linear-gradient(180deg, #ecc878 0%, #d4a84b 55%, #bd9333 100%);
   color: #1a1410;
   font-family: var(--font-body);
   font-weight: 600;
   font-size: 0.95rem;
+  letter-spacing: 0.02em;
   cursor: pointer;
-  transition: background 0.15s ease, opacity 0.15s ease;
+  box-shadow: inset 0 1px 0 rgba(255, 240, 200, 0.45), 0 8px 20px rgba(212, 168, 75, 0.22);
+  transition: filter 0.18s ease, box-shadow 0.22s ease, opacity 0.15s ease, transform 0.12s ease;
 }
 
 .play-btn:hover:not(:disabled) {
-  background: #e6ba5a;
+  filter: brightness(1.05);
+  box-shadow: inset 0 1px 0 rgba(255, 240, 200, 0.5), 0 10px 26px rgba(212, 168, 75, 0.32);
+}
+
+.play-btn:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .play-btn:disabled {
@@ -456,9 +551,19 @@ header {
 
 /* ── Footer ── */
 .footer {
+  position: relative;
   text-align: center;
   padding-top: 1.5rem;
-  border-top: 1px solid var(--border);
+}
+
+.footer::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--line), transparent);
 }
 
 .footer p {

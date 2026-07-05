@@ -7,9 +7,11 @@
    ========================================================================== */
 
 .daka-root {
-  position: relative;
-  width: 100%;
-  height: 100%;
+  /* position:absolute 让 top/height 可被 JS 按视觉视口（键盘）精确收口：
+     键盘弹起时把容器高度限定在「键盘以上的可见区」，原生聚焦滚动才会落在真正可见区内，
+     而不是把输入框推到屏幕上半部分的中间。默认 inset:0 仍填满父容器。 */
+  position: absolute;
+  inset: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   background:
@@ -550,7 +552,8 @@
   padding: 0.5rem 0.7rem;
   border: 1px solid var(--pink-200);
   border-radius: 8px;
-  font-size: 0.92rem;
+  /* ≥16px：iOS Safari 在聚焦小于 16px 的输入框时会自动放大整页且不回弹，是「页面缩放变奇怪」的主因。 */
+  font-size: 1rem;
   color: var(--ink);
   outline: none;
   background: var(--white);
@@ -576,7 +579,8 @@
   padding: 0.65rem 0.8rem;
   border: 1.5px solid var(--pink-200);
   border-radius: 12px;
-  font-size: 0.92rem;
+  /* ≥16px：避免 iOS 聚焦时自动放大整页（同 .sheet-rename__input）。 */
+  font-size: 1rem;
   color: var(--ink);
   outline: none;
   background: var(--white);

@@ -102,7 +102,8 @@ await sleep(5);
 // 再往后翻应被拦（已是当月，未来月禁止）
 document.querySelector('[data-act="next-month"]').click();
 await sleep(5);
-ok(/最新月份/.test(document.querySelector('.toast')?.textContent || '') || true, '已是当月时下一月被拦截');
+ok(/最新月份/.test(document.querySelector('.toast')?.textContent || ''), `已是当月时下一月被拦截并提示（toast: ${document.querySelector('.toast')?.textContent || '∅'}）`);
+ok(/2026 年 七月/.test(document.querySelector('.cal-nav__title')?.textContent || ''), '视图未跳到未来月，仍停在当月');
 // 回到当月视图
 while (!/2026 年 七月/.test(document.querySelector('.cal-nav__title')?.textContent || '')) {
   document.querySelector('[data-act="next-month"]').click();

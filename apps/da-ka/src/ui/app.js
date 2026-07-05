@@ -33,7 +33,12 @@ export class CheckInUI {
     this.profile = null; // 当前激活档案
     this._sheetOpen = false; // 档案管理弹层是否展开
     this._celebrating = false;
+    // 各类延时句柄（toast / 弹层移除 / 庆祝自动收场），destroy 时统一清理。
     this._toastTimer = null;
+    this._toastRemoveTimer = null;
+    this._sheetTimer = null;
+    this._celebrateTimer = null;
+    this._celebrateRemoveTimer = null;
     // 暴露存档注入器，便于单测 / 调试
     this._setStorage = _setStorage;
   }
@@ -48,7 +53,14 @@ export class CheckInUI {
   }
 
   destroy() {
-    if (this._toastTimer) { clearTimeout(this._toastTimer); this._toastTimer = null; }
+    // 先停下进行中的动画 / 弹层（会各自重置状态），再统一清理所有未触发的定时器，
+    // 避免回调在实例销毁后命中已移除的 DOM / 旧引用。
+    if (this._sheetOpen) this._closeSheet(true);
+    if (this._celebrating) this._endCelebrate(true);
+    for (const id of [this._toastTimer, this._toastRemoveTimer, this._sheetTimer, this._celebrateTimer, this._celebrateRemoveTimer]) {
+      if (id) clearTimeout(id);
+    }
+    this._toastTimer = this._toastRemoveTimer = this._sheetTimer = this._celebrateTimer = this._celebrateRemoveTimer = null;
     if (this._keyHandler) {
       window.removeEventListener('keydown', this._keyHandler);
       this._keyHandler = null;
@@ -348,7 +360,7 @@ export class CheckInUI {
     const before = isChecked(this.profile, iso);
     const { profile, checked, milestone } = toggleCheckin(this.profile, iso, this.today);
     this.profile = profile;
-    upsertProfile(profile);
+    const saved = upsertProfile(profile);
     // 仅刷新日历格子 + 今日卡 + 统计 + 爱心 + 进度（局部刷新，体验顺滑）。
     this._refreshInteractive();
     if (milestone && checked) {
@@ -358,6 +370,8 @@ export class CheckInUI {
     } else {
       this._toast('已取消今日打卡');
     }
+    // 持久化失败（配额满 / 隐私模式）：内存态已切换但落盘失败，提示用户避免虚假成功。
+    if (!saved) this._toast('存储写入失败，请检查浏览器存储空间');
   }
 
   // 局部刷新：日历 + 今日卡 + 统计 + 进度 + 爱心。比整页重渲染更稳。
@@ -480,12 +494,29 @@ export class CheckInUI {
     this._sheetEl = null;
     this._sheetOpen = false;
     el.classList.remove('is-open');
-    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 200);
+    if (this._sheetTimer) clearTimeout(this._sheetTimer);
+    this._sheetTimer = setTimeout(() => {
+      this._sheetTimer = null;
+      if (el.parentNode) el.parentNode.removeChild(el);
+    }, 200);
     void silent;
   }
 
+  // 在档案弹层内按 act + 精确 key 查找按钮。
+  // 不把用户态 key 拼进 CSS 选择器——key 含 " \ ] 等字符会让
+  // querySelector('[data-key="…"]') 抛 SyntaxError，导致改名/删除静默失效。
+  _findSheetBtn(act, key) {
+    if (!this._sheetEl) return null;
+    const btns = this._sheetEl.querySelectorAll(`[data-act="${act}"]`);
+    for (const b of btns) {
+      if (b.dataset.key === key) return b;
+    }
+    return null;
+  }
+
   _onSheetRename(key) {
-    const row = this._sheetEl && this._sheetEl.querySelector(`[data-act="sheet-rename"][data-key="${cssEscape(key)}"]`)?.closest('.sheet-row');
+    const btn = this._findSheetBtn('sheet-rename', key);
+    const row = btn && btn.closest('.sheet-row');
     if (!row) return;
     if (row.querySelector('.sheet-rename')) return; // 已展开
     const nameEl = row.querySelector('.sheet-row__name');
@@ -529,8 +560,7 @@ export class CheckInUI {
     const p = map[normalizeKey(key)];
     if (!p) return;
     // 二次确认：点一次变红「确认删除」，再点一次才真删。
-    const row = this._sheetEl && this._sheetEl.querySelector(`[data-act="sheet-delete"][data-key="${cssEscape(key)}"]`)?.closest('.sheet-row');
-    const delBtn = row && row.querySelector('[data-act="sheet-delete"]');
+    const delBtn = this._findSheetBtn('sheet-delete', key);
     if (delBtn && !delBtn.classList.contains('is-armed')) {
       delBtn.classList.add('is-armed');
       delBtn.textContent = '确认?';
@@ -590,7 +620,11 @@ export class CheckInUI {
     this._celebrateEl = null;
     this._celebrating = false;
     el.classList.remove('is-open');
-    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 300);
+    if (this._celebrateRemoveTimer) clearTimeout(this._celebrateRemoveTimer);
+    this._celebrateRemoveTimer = setTimeout(() => {
+      this._celebrateRemoveTimer = null;
+      if (el.parentNode) el.parentNode.removeChild(el);
+    }, 300);
     if (!skipToast) this._toast('继续加油，下一颗爱心在路上 ♡');
   }
 
@@ -606,6 +640,7 @@ export class CheckInUI {
   _toast(msg) {
     if (!msg || !this._toastHost) return;
     if (this._toastTimer) { clearTimeout(this._toastTimer); this._toastTimer = null; }
+    if (this._toastRemoveTimer) { clearTimeout(this._toastRemoveTimer); this._toastRemoveTimer = null; }
     this._toastHost.innerHTML = '';
     const t = document.createElement('div');
     t.className = 'toast';
@@ -613,8 +648,12 @@ export class CheckInUI {
     this._toastHost.appendChild(t);
     requestFrame(() => t.classList.add('is-show'));
     this._toastTimer = setTimeout(() => {
+      this._toastTimer = null;
       t.classList.remove('is-show');
-      setTimeout(() => { if (t.parentNode) t.parentNode.removeChild(t); }, 250);
+      this._toastRemoveTimer = setTimeout(() => {
+        this._toastRemoveTimer = null;
+        if (t.parentNode) t.parentNode.removeChild(t);
+      }, 250);
     }, 1800);
   }
 }
@@ -634,8 +673,6 @@ function firstChar(s) {
   const chars = [...String(s || '')];
   return chars[0] || '?';
 }
-// CSS 选择器转义：key 含特殊字符时 attribute selector 需引号包裹，无需额外转义。
-function cssEscape(s) { return String(s || ''); }
 // 下一帧（jsdom 下回退到 setTimeout）。
 function requestFrame(fn) {
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(fn);

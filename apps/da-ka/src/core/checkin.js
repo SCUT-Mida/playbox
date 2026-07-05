@@ -6,6 +6,7 @@
 //     nickname: string,          // 展示用昵称（保留原始大小写）
 //     key: string,               // 规范化 key（小写去空格），存档主键
 //     checkins: string[],        // 已打卡日期 'YYYY-MM-DD'（升序、唯一）
+//     maxHearts: number,         // 历史最高爱心数（高水位），用于防止重复庆祝
 //     createdAt: number,         // 创建时间（秒）
 //     lastSeen: number,          // 最近活跃时间（秒）
 //   }
@@ -25,6 +26,7 @@ export function newProfile(nickname, key) {
     nickname: nickname || '未命名',
     key: key || normalizeKey(nickname || '未命名'),
     checkins: [],
+    maxHearts: 0,
     createdAt: ts,
     lastSeen: ts,
   };
@@ -69,7 +71,7 @@ export function heartProgress(profile) {
 // 仅接受合法的过去或今天日期；未来日直接拒绝（返回 unchanged）。
 // 返回 { profile, checked, milestone }：
 //   checked  —— 切换后该日是否处于打卡态
-//   milestone—— 本次切换是否正好达成「第 N*HEARTS_STEP 天」（触发庆祝）
+//   milestone—— 本次切换是否让爱心数突破历史最高（触发庆祝，不重复庆祝已解锁爱心）
 export function toggleCheckin(profile, iso, today) {
   if (!profile) return { profile, checked: false, milestone: false };
   const dt = parseISO(iso);
@@ -82,15 +84,20 @@ export function toggleCheckin(profile, iso, today) {
 
   const set = new Set(profile.checkins || []);
   let milestone = false;
+  // 历史最高爱心数（高水位）：仅当本次打卡让爱心数突破历史最高才算里程碑，
+  // 避免「打卡到 10 → 取消一天 → 补打另一天到 10」对同一颗已解锁爱心重复庆祝。
+  let maxHearts = Number.isFinite(profile.maxHearts) ? profile.maxHearts : 0;
   if (set.has(iso)) {
     set.delete(iso);
   } else {
     set.add(iso);
-    milestone = set.size % HEARTS_STEP === 0; // 达到 10/20/30… 天
+    const newHearts = Math.floor(set.size / HEARTS_STEP);
+    milestone = newHearts > maxHearts; // 突破历史最高才触发庆祝
+    if (milestone) maxHearts = newHearts;
   }
   // 升序输出，保证持久化与展示稳定。
   const checkins = [...set].sort();
-  const next = { ...profile, checkins, lastSeen: nowSec() };
+  const next = { ...profile, checkins, maxHearts, lastSeen: nowSec() };
   return { profile: next, checked: set.has(iso), milestone };
 }
 

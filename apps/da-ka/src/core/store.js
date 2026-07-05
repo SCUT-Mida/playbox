@@ -165,6 +165,9 @@ function migrate(p) {
     }
   }
   p.checkins = clean.sort();
+  // 历史最高爱心数（高水位）：旧档无该字段时按当前进度回填，
+  // 避免升级后对已解锁爱心重复庆祝。已写入的高水位不会被这里的进度回退覆盖。
+  if (!Number.isFinite(p.maxHearts)) p.maxHearts = Math.floor(p.checkins.length / 10);
   if (!Number.isFinite(p.createdAt)) p.createdAt = 0;
   if (!Number.isFinite(p.lastSeen)) p.lastSeen = 0;
   return p;

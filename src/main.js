@@ -1,10 +1,20 @@
 import './style.css'
 
 // 落地页「橱窗」：把流水线产出的展品挂载进来。
-// 展品按需懒加载（动态 import），不游玩不拉取，保持落地页轻量。
+// 主菜单分两层：先呈现「大类」（学习 / 游戏），点击大类后再展开其中的应用。
+// 应用按需懒加载（动态 import），不游玩不拉取，保持落地页轻量。
 
-const GAMES = [
-  {
+// 展品定义：每个应用一份，按需懒加载（动态 import），不游玩不拉取，保持落地页轻量。
+const APPS = {
+  daka: {
+    key: 'daka',
+    title: '每日打卡',
+    subtitle: '习惯 · 粉色日历',
+    emblem: '♡',
+    desc: '粉色系打卡日历：点一点记录坚持的每一天，每累计 10 天收获一颗爱心并触发庆祝。输入昵称即可多档案存档，看你的连续打卡与爱心收藏。',
+    loader: () => import('../apps/da-ka/src/main.js'),
+  },
+  dzf: {
     key: 'dzf',
     title: '鼎足三分',
     subtitle: '三国 · 战略塔防',
@@ -12,7 +22,7 @@ const GAMES = [
     desc: '布置蜀汉武将、利用情义羁绊抵御蜂拥而至的敌军，在泼墨竹简的战场上守住阵地。',
     loader: () => import('../apps/ding-zu-san-fen/src/main.js'),
   },
-  {
+  frxx: {
     key: 'frxx',
     title: '凡人修仙录',
     subtitle: '仙侠 · 文字修仙',
@@ -20,7 +30,7 @@ const GAMES = [
     desc: '从凡人起步，修炼突破、探索机缘、炼丹渡劫，直至白日飞升。一款竖屏文字挂机修仙游戏。',
     loader: () => import('../apps/fan-ren-xiu-xian/src/main.js'),
   },
-  {
+  mnrs: {
     key: 'mnrs',
     title: '模拟人生',
     subtitle: '模拟 · 文字人生',
@@ -28,13 +38,25 @@ const GAMES = [
     desc: '从呱呱坠地到垂垂老矣，一月一回合推进岁月，在健康、智力、财富、心情、社交间权衡抉择；可多槽位存档、可挂机，过完这一生。',
     loader: () => import('../apps/mo-ni-ren-sheng/src/main.js'),
   },
+}
+
+// 大类：先呈现「学习」，再呈现「游戏」。点击大类进入后，才展开其中的具体应用。
+const CATEGORIES = [
   {
-    key: 'daka',
-    title: '每日打卡',
-    subtitle: '习惯 · 粉色日历',
-    emblem: '♡',
-    desc: '粉色系打卡日历：点一点记录坚持的每一天，每累计 10 天收获一颗爱心并触发庆祝。输入昵称即可多档案存档，看你的连续打卡与爱心收藏。',
-    loader: () => import('../apps/da-ka/src/main.js'),
+    key: 'learn',
+    title: '学习',
+    subtitle: '成长 · 习惯养成',
+    emblem: '学',
+    desc: '用轻量小工具把每一天的坚持记录下来，看见时间积累的力量。',
+    appKeys: ['daka'],
+  },
+  {
+    key: 'game',
+    title: '游戏',
+    subtitle: '休闲 · 互动娱乐',
+    emblem: '玩',
+    desc: '消磨时光的互动小品：修仙、人生、三国战场，挑一个开始吧。',
+    appKeys: ['dzf', 'frxx', 'mnrs'],
   },
 ]
 
@@ -52,7 +74,10 @@ app.innerHTML = `
     </section>
 
     <section class="exhibit">
-      <h2 class="section-title">展品陈列</h2>
+      <div class="exhibit-head">
+        <button class="back-btn" id="back-btn" type="button" aria-label="返回大类" hidden>←</button>
+        <h2 class="section-title" id="exhibit-title">展品陈列</h2>
+      </div>
       <div class="exhibit-list" id="exhibit-list"></div>
     </section>
 
@@ -84,8 +109,10 @@ app.innerHTML = `
   </div>
 `
 
-// 渲染展品卡片
+// 渲染大类 / 应用两层列表
 const exhibitList = document.getElementById('exhibit-list')
+const exhibitTitle = document.getElementById('exhibit-title')
+const backBtn = document.getElementById('back-btn')
 const prefetched = new Set()
 // 预取某展品的代码分片（动态 import 结果会被打包器缓存）：
 // 在玩家悬停/聚焦卡片时就后台拉取，等真正点击时 import() 已就绪，首屏近乎秒开。
@@ -96,29 +123,69 @@ function prefetch(def) {
   // 必须用 .catch() 兜底，否则预取失败会变成 unhandled rejection。
   def.loader().catch(() => { /* 预取失败不影响后续正常点击加载 */ })
 }
-for (const g of GAMES) {
-  const card = document.createElement('article')
-  card.className = 'card card--exhibit'
-  card.innerHTML = `
-    <div class="card-head">
-      <span class="card-emblem" aria-hidden="true">${g.emblem}</span>
-      <div class="card-titles">
-        <h3 class="card-title">${g.title}</h3>
-        <p class="card-subtitle">${g.subtitle}</p>
+
+// 大类视图：先呈现「学习 / 游戏」等大类，点击进入后才展开具体应用。
+function renderHome() {
+  exhibitTitle.textContent = '展品陈列'
+  backBtn.hidden = true
+  exhibitList.innerHTML = ''
+  for (const cat of CATEGORIES) {
+    const card = document.createElement('article')
+    card.className = 'card card--category'
+    card.dataset.category = cat.key
+    card.setAttribute('role', 'button')
+    card.setAttribute('tabindex', '0')
+    card.innerHTML = `
+      <div class="card-head">
+        <span class="card-emblem" aria-hidden="true">${cat.emblem}</span>
+        <div class="card-titles">
+          <h3 class="card-title">${cat.title}</h3>
+          <p class="card-subtitle">${cat.subtitle}</p>
+        </div>
+        <span class="card-chevron" aria-hidden="true">›</span>
       </div>
-    </div>
-    <p class="card-desc">${g.desc}</p>
-    <button class="play-btn" data-game="${g.key}" type="button">
-      <span class="play-btn__icon" aria-hidden="true">▶</span>
-      <span class="play-btn__label">开始游戏</span>
-    </button>
-  `
-  // 悬停 / 聚焦 / 触摸开始时预取，缩短点击后的等待
-  card.addEventListener('pointerenter', () => prefetch(g), { once: true })
-  card.addEventListener('focusin', () => prefetch(g), { once: true })
-  card.addEventListener('touchstart', () => prefetch(g), { once: true, passive: true })
-  exhibitList.appendChild(card)
+      <p class="card-desc">${cat.desc}</p>
+      <span class="enter-btn">进入${cat.title}</span>
+    `
+    exhibitList.appendChild(card)
+  }
 }
+
+// 应用视图：展开某个大类下的应用，提供返回大类的入口。
+function renderCategory(catKey) {
+  const cat = CATEGORIES.find((c) => c.key === catKey)
+  if (!cat) { renderHome(); return }
+  exhibitTitle.textContent = cat.title
+  backBtn.hidden = false
+  exhibitList.innerHTML = ''
+  for (const appKey of cat.appKeys) {
+    const g = APPS[appKey]
+    if (!g) continue
+    const card = document.createElement('article')
+    card.className = 'card card--exhibit'
+    card.innerHTML = `
+      <div class="card-head">
+        <span class="card-emblem" aria-hidden="true">${g.emblem}</span>
+        <div class="card-titles">
+          <h3 class="card-title">${g.title}</h3>
+          <p class="card-subtitle">${g.subtitle}</p>
+        </div>
+      </div>
+      <p class="card-desc">${g.desc}</p>
+      <button class="play-btn" data-game="${g.key}" type="button">
+        <span class="play-btn__icon" aria-hidden="true">▶</span>
+        <span class="play-btn__label">开始游戏</span>
+      </button>
+    `
+    // 悬停 / 聚焦 / 触摸开始时预取，缩短点击后的等待
+    card.addEventListener('pointerenter', () => prefetch(g), { once: true })
+    card.addEventListener('focusin', () => prefetch(g), { once: true })
+    card.addEventListener('touchstart', () => prefetch(g), { once: true, passive: true })
+    exhibitList.appendChild(card)
+  }
+}
+
+renderHome()
 // 不在首屏后一次性预取全部展品——那会拉取所有代码分片，实质抵消代码分割，
 // 并制造首屏后的带宽/内存峰值。改为只依赖上方「悬停 / 聚焦 / 触摸」这种用户意图驱动的预取，
 // 真正点击时再 import()（已有 loading 占位），分片按需加载。
@@ -238,13 +305,27 @@ function handleCloseClick() {
   }
 }
 
-// 展品按钮统一委托
+// 展品交互统一委托：点应用卡片上的「开始游戏」直接开玩；点大类卡片进入该大类。
 exhibitList.addEventListener('click', (e) => {
-  const btn = e.target.closest('.play-btn')
-  if (!btn) return
-  const def = GAMES.find((g) => g.key === btn.dataset.game)
-  if (def) openGame(def, btn)
+  const playBtn = e.target.closest('.play-btn')
+  if (playBtn) {
+    const def = APPS[playBtn.dataset.game]
+    if (def) openGame(def, playBtn)
+    return
+  }
+  const catCard = e.target.closest('.card--category')
+  if (catCard) renderCategory(catCard.dataset.category)
 })
+// 大类卡片键盘可达：Enter / Space 等同点击进入
+exhibitList.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return
+  const catCard = e.target.closest('.card--category')
+  if (catCard) {
+    e.preventDefault()
+    renderCategory(catCard.dataset.category)
+  }
+})
+backBtn.addEventListener('click', () => renderHome())
 closeBtn.addEventListener('click', handleCloseClick)
 // ESC 退出
 window.addEventListener('keydown', (e) => {

@@ -19,7 +19,7 @@ import {
   isValidNickname, normalizeNickname, normalizeKey,
   toggleCheckin, isChecked, totalDays, heartsEarned,
   daysToNextHeart, heartProgress, currentStreak, longestStreak,
-  listTasks, getActiveTask, setActiveTaskKey, ensureTask, renameTask, deleteTask,
+  listTasks, getTask, getActiveTask, setActiveTaskKey, ensureTask, renameTask, deleteTask,
   isValidTaskName, nowSec,
 } from '../core/checkin.js';
 import {
@@ -98,11 +98,29 @@ export class CheckInUI {
 
   _bindGlobal() {
     this._keyHandler = (e) => {
-      if (e.key !== 'Escape') return;
-      if (this._celebrating) this._endCelebrate();
-      else if (this._confirmOpen) this._closeConfirm();
-      else if (this._taskSheetOpen) this._closeTaskSheet();
-      else if (this._sheetOpen) this._closeSheet();
+      if (e.key === 'Escape') {
+        if (this._celebrating) this._endCelebrate();
+        else if (this._confirmOpen) this._closeConfirm();
+        else if (this._taskSheetOpen) this._closeTaskSheet();
+        else if (this._sheetOpen) this._closeSheet();
+        return;
+      }
+      if (e.key === 'Enter') {
+        // 任务改名 / 任务新建 / 档案改名框都不在 <form> 内，回车等价于点「保存 / 新建」，
+        // 与启动器昵称表单的回车提交保持一致。
+        const el = e.target;
+        const id = el && el.dataset && el.dataset.id;
+        if (id === 'task-rename-input') {
+          e.preventDefault();
+          this._doTaskRename(el.dataset.key, el.value);
+        } else if (id === 'task-new-input') {
+          e.preventDefault();
+          this._onTaskNew();
+        } else if (id === 'sheet-rename-input') {
+          e.preventDefault();
+          this._doRename(el.dataset.key, el.value);
+        }
+      }
     };
     window.addEventListener('keydown', this._keyHandler);
     // 事件委托：所有点击统一在此分发，避免每次 render 重建监听。
@@ -593,12 +611,14 @@ export class CheckInUI {
     const row = btn && btn.closest('.sheet-row');
     if (!row) return;
     if (row.querySelector('.sheet-rename')) return; // 已展开
-    const nameEl = row.querySelector('.sheet-row__name');
-    const current = nameEl ? nameEl.textContent.replace(/\s*当前.*$/, '').trim() : '';
+    // 回填值直接取原始数据源，而非从 DOM 文本反推——
+    // 否则昵称本身含「当前」二字（如「当前测试」）会被正则从内部截断。
+    const prof = loadAll()[normalizeKey(key)];
+    const current = prof ? prof.nickname : '';
     const wrap = document.createElement('div');
     wrap.className = 'sheet-rename';
     wrap.innerHTML = `
-      <input class="sheet-rename__input" data-id="sheet-rename-input" type="text" maxlength="${NICKNAME_MAX_LEN * 2}" value="${esc(current)}" aria-label="新昵称" />
+      <input class="sheet-rename__input" data-id="sheet-rename-input" data-key="${esc(key)}" type="text" maxlength="${NICKNAME_MAX_LEN * 2}" value="${esc(current)}" aria-label="新昵称" />
       <button class="sheet-rename__ok" data-act="sheet-rename-ok" data-key="${esc(key)}" type="button">保存</button>
     `;
     row.appendChild(wrap);
@@ -624,9 +644,11 @@ export class CheckInUI {
       this.profile = loadAll()[normalizeKey(name)] || this.profile;
       setActiveKey(this.profile.key);
     }
-    this._toast('已改名 ♡');
     this._closeSheet();
     this.render();
+    // toast 必须在 render() 之后：render 首行清空 root.innerHTML 会把旧 toast-host
+    //（连同刚 append 的 toast 元素）一并抹掉，requestFrame 还没触发元素就已离屏。
+    this._toast('已改名 ♡');
   }
 
   _onSheetDelete(key) {
@@ -650,9 +672,10 @@ export class CheckInUI {
     if (this.profile && normalizeKey(key) === this.profile.key) {
       this.profile = null;
     }
-    this._toast('已删除档案');
     this._closeSheet();
     this.render();
+    // toast 放在 render() 之后，避免被重渲染擦除（见 _doRename 同款注释）。
+    this._toast('已删除档案');
   }
 
   // ===================== 任务管理弹层（任务级，挂在当前昵称下）=====================
@@ -738,12 +761,14 @@ export class CheckInUI {
     const row = btn && btn.closest('.sheet-row');
     if (!row) return;
     if (row.querySelector('.sheet-rename')) return; // 已展开
-    const nameEl = row.querySelector('.sheet-row__name');
-    const current = nameEl ? nameEl.textContent.replace(/\s*当前.*$/, '').trim() : '';
+    // 回填值直接取原始数据源，而非从 DOM 文本反推——
+    // 否则任务名本身含「当前」二字（如「当前进度」）会被正则从内部截断。
+    const task = getTask(this.profile, key);
+    const current = task ? task.name : '';
     const wrap = document.createElement('div');
     wrap.className = 'sheet-rename';
     wrap.innerHTML = `
-      <input class="sheet-rename__input" data-id="task-rename-input" type="text" maxlength="${TASK_NAME_MAX_LEN * 2}" value="${esc(current)}" aria-label="新任务名" />
+      <input class="sheet-rename__input" data-id="task-rename-input" data-key="${esc(key)}" type="text" maxlength="${TASK_NAME_MAX_LEN * 2}" value="${esc(current)}" aria-label="新任务名" />
       <button class="sheet-rename__ok" data-act="task-rename-ok" data-key="${esc(key)}" type="button">保存</button>
     `;
     row.appendChild(wrap);
@@ -767,9 +792,10 @@ export class CheckInUI {
     }
     this.profile.lastSeen = nowSec();
     upsertProfile(this.profile);
-    this._toast('已改名 ♡');
     this._closeTaskSheet();
     this.render();
+    // toast 放在 render() 之后，避免被重渲染擦除（与 _onTaskNew 成功分支一致）。
+    this._toast('已改名 ♡');
   }
 
   _onTaskDelete(key) {
@@ -794,9 +820,10 @@ export class CheckInUI {
     }
     this.profile.lastSeen = nowSec();
     upsertProfile(this.profile);
-    this._toast('已删除任务');
     this._closeTaskSheet();
     this.render();
+    // toast 放在 render() 之后，避免被重渲染擦除（见 _doTaskRename 同款注释）。
+    this._toast('已删除任务');
   }
 
   _onTaskNew() {
@@ -809,12 +836,13 @@ export class CheckInUI {
     }
     const { task, created } = ensureTask(this.profile, raw);
     if (!task) { this._toast('新建失败'); return; }
-    if (!created) { this._toast('该任务已存在'); }
     this.profile.lastSeen = nowSec();
     upsertProfile(this.profile);
     this._closeTaskSheet();
     this.render();
+    // toast 放在 render() 之后：成功 / 重名两条分支都需在此提示，否则会被重渲染擦除。
     if (created) this._toast(`已新建任务「${task.name}」♡`);
+    else this._toast('该任务已存在');
   }
 
   // ===================== 二次确认弹层（过去日期补卡 / 取消）=====================

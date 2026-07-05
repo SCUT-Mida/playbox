@@ -166,6 +166,15 @@ export class CheckInUI {
       this.root.style.height = '';
       return;
     }
+    // 键盘未弹起（桌面端、或移动端无输入聚焦）时，视觉视口高度≈布局视口高度。
+    // 此时无需收口容器：清空 top/height 走回退分支，避免写入固定尺寸后窗口 resize
+    // 却没有后续 vv resize 事件、容器停留在陈旧值。clientHeight 取布局视口（不受键盘影响）。
+    const layoutH = document.documentElement.clientHeight;
+    if (vv.height >= layoutH - 1) {
+      this.root.style.top = '';
+      this.root.style.height = '';
+      return;
+    }
     const pRect = parent.getBoundingClientRect();
     const visTop = vv.offsetTop - pRect.top;
     const visBottom = vv.offsetTop + vv.height - pRect.top;

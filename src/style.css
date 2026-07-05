@@ -15,7 +15,6 @@
   --accent: #d4a84b;       /* 香槟金 */
   --accent-hi: #ecc878;
   --accent-dim: #b8912e;
-  --border: #222227;
   --line: #24232b;
   --gold-line: rgba(212, 168, 75, 0.32);
   --gold-glow: rgba(212, 168, 75, 0.14);
@@ -96,12 +95,12 @@ header {
 .description {
   margin-bottom: 2.5rem;
   padding: 1rem 0;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
   position: relative;
 }
 
-/* 上下细金线（两端淡出），替代纯灰描边，更精致。 */
+/* 上下细金线（两端淡出），替代纯灰描边，更精致。
+   不再保留 border-top/border-bottom，否则灰边与 top:0/bottom:0 的金线
+   会紧邻渲染成"双线重影"（伪元素 top/bottom 相对内边距盒，紧贴边框内侧）。 */
 .description::before,
 .description::after {
   content: "";

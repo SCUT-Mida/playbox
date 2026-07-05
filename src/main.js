@@ -5,13 +5,17 @@ import './style.css'
 // 应用按需懒加载（动态 import），不游玩不拉取，保持落地页轻量。
 
 // 展品定义：每个应用一份，按需懒加载（动态 import），不游玩不拉取，保持落地页轻量。
+// enterLabel：展品卡片「进入」按钮的文案。游戏类用「开始游戏」，
+// 工具类（如打卡）不是游戏，沿用「开始游戏」会误导，故按展品自定义。
+// continueLabel 由 enterLabel 派生（把「开始」换成「继续」），保证文案一致。
 const APPS = {
   daka: {
     key: 'daka',
     title: '每日打卡',
     subtitle: '习惯 · 粉色日历',
     emblem: '♡',
-    desc: '粉色系打卡日历：点一点记录坚持的每一天，每累计 10 天收获一颗爱心并触发庆祝。输入昵称即可多档案存档，看你的连续打卡与爱心收藏。',
+    enterLabel: '开始打卡',
+    desc: '粉色系打卡日历：点一点记录坚持的每一天，每累计 10 天收获一颗爱心并触发庆祝。一个昵称下可建多个打卡任务，看你的连续打卡与爱心收藏。',
     loader: () => import('../apps/da-ka/src/main.js'),
   },
   dzf: {
@@ -61,6 +65,15 @@ const CATEGORIES = [
 ]
 
 const app = document.getElementById('app')
+
+// 进入按钮文案：优先取展品自定义，缺省回退「开始游戏」（游戏类）。
+function enterLabelOf(def) {
+  return (def && def.enterLabel) || '开始游戏'
+}
+// 加载完成后的「继续」文案：把「开始」替换为「继续」，与进入文案风格统一。
+function continueLabelOf(def) {
+  return enterLabelOf(def).replace('开始', '继续')
+}
 
 app.innerHTML = `
   <main class="container">
@@ -172,9 +185,9 @@ function renderCategory(catKey) {
         </div>
       </div>
       <p class="card-desc">${g.desc}</p>
-      <button class="play-btn" data-game="${g.key}" type="button">
+      <button class="play-btn" data-game="${g.key}" data-enter-label="${enterLabelOf(g)}" type="button">
         <span class="play-btn__icon" aria-hidden="true">▶</span>
-        <span class="play-btn__label">开始游戏</span>
+        <span class="play-btn__label">${enterLabelOf(g)}</span>
       </button>
     `
     // 悬停 / 聚焦 / 触摸开始时预取，缩短点击后的等待
@@ -247,7 +260,7 @@ async function openGame(def, btn) {
     loading = false
     btn.disabled = false
     btn.classList.remove('is-loading')
-    if (game) playLabel.textContent = '继续游戏'
+    if (game) playLabel.textContent = continueLabelOf(def)
   }
 }
 
@@ -260,7 +273,8 @@ function closeGame() {
     b.disabled = false
     b.classList.remove('is-loading')
     const label = b.querySelector('.play-btn__label')
-    if (label) label.textContent = '开始游戏'
+    // 回退到按钮上记录的进入文案（每个展品可能不同），而非统一的「开始游戏」。
+    if (label) label.textContent = b.dataset.enterLabel || '开始游戏'
   })
 
   if (game) {
@@ -305,7 +319,7 @@ function handleCloseClick() {
   }
 }
 
-// 展品交互统一委托：点应用卡片上的「开始游戏」直接开玩；点大类卡片进入该大类。
+// 展品交互统一委托：点应用卡片上的「进入」按钮（文案随展品而定）直接开玩；点大类卡片进入该大类。
 exhibitList.addEventListener('click', (e) => {
   const playBtn = e.target.closest('.play-btn')
   if (playBtn) {

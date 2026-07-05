@@ -7,6 +7,13 @@
 export const NICKNAME_MIN_LEN = 1;
 export const NICKNAME_MAX_LEN = 12;
 
+// 打卡任务约束：一个昵称下可新建多个任务（如「跑步」「读书」「早睡」），
+// 每个任务有独立的打卡记录与爱心里程碑。
+export const TASK_NAME_MIN_LEN = 1;
+export const TASK_NAME_MAX_LEN = 12;
+// 新建昵称档案时自动创建的默认任务名；旧档（无 tasks 结构）迁移时也用它兜底。
+export const DEFAULT_TASK_NAME = '每日打卡';
+
 // 每累计 HEARTS_STEP 天打卡解锁一颗爱心。第 HEARTS_STEP 倍数日触发庆祝动画。
 export const HEARTS_STEP = 10;
 

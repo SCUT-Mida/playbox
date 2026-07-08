@@ -42,6 +42,14 @@ const APPS = {
     desc: '从呱呱坠地到垂垂老矣，一月一回合推进岁月，在健康、智力、财富、心情、社交间权衡抉择；可多槽位存档、可挂机，过完这一生。',
     loader: () => import('../apps/mo-ni-ren-sheng/src/main.js'),
   },
+  xhlz: {
+    key: 'xhlz',
+    title: '星骸旅者',
+    subtitle: '像素 · Roguelike',
+    emblem: '星',
+    desc: '迫降破碎星球，在漂浮的遗迹浮岛间拾荒探索。猜拳克制式战斗、装备强化与三天赋树、碎片化记忆叙事，集齐十枚星骸回响揭开真相。',
+    loader: () => import('../apps/xing-hai-lv-zhe/src/main.js'),
+  },
 }
 
 // 大类：先呈现「学习」，再呈现「游戏」。点击大类进入后，才展开其中的具体应用。
@@ -59,8 +67,8 @@ const CATEGORIES = [
     title: '游戏',
     subtitle: '休闲 · 互动娱乐',
     emblem: '玩',
-    desc: '消磨时光的互动小品：修仙、人生、三国战场，挑一个开始吧。',
-    appKeys: ['dzf', 'frxx', 'mnrs'],
+    desc: '消磨时光的互动小品：修仙、人生、三国战场、星骸浮岛，挑一个开始吧。',
+    appKeys: ['dzf', 'frxx', 'mnrs', 'xhlz'],
   },
 ]
 

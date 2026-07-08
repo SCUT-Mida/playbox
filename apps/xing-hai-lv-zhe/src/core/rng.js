@@ -16,9 +16,18 @@ export function makeRng(source) {
   return Math.random;
 }
 
+// 钳制到 [0, 0.999999)：makeRng 的确定性数组序列可能返回任意值（含 ≥1），
+// 直接用于数组下标会越界取到 undefined（实测触发 `Cannot read properties of undefined`）。
+// 生产用 Math.random 永远合法，但此处兜底可提升种子 / 注入测试的鲁棒性。
+export function clampUnit(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(0.999999, Math.max(0, n));
+}
+
 // [min, max] 闭区间随机整数。
 export function randInt(rng, min, max) {
-  const r = rng();
+  const r = clampUnit(rng());
   return Math.floor(min + r * (max - min + 1));
 }
 
@@ -27,7 +36,7 @@ export function weightedPick(rng, weights) {
   const entries = Object.entries(weights).filter(([, w]) => w > 0);
   const total = entries.reduce((s, [, w]) => s + w, 0);
   if (total <= 0) return null;
-  let roll = rng() * total;
+  let roll = clampUnit(rng()) * total;
   for (const [k, w] of entries) {
     roll -= w;
     if (roll <= 0) return k;
@@ -38,5 +47,5 @@ export function weightedPick(rng, weights) {
 // 从数组中等概率取一个元素（空数组返回 undefined）。
 export function pick(rng, arr) {
   if (!Array.isArray(arr) || !arr.length) return undefined;
-  return arr[Math.floor(rng() * arr.length)];
+  return arr[Math.floor(clampUnit(rng()) * arr.length)];
 }

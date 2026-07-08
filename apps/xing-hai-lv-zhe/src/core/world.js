@@ -113,7 +113,7 @@ function takeCell(r, pool, occupied) {
   // 从可达池中随机取一个尚未占用的格子。
   const avail = pool.filter((c) => !occupied.has(key(c.x, c.y)));
   if (!avail.length) return null;
-  const c = avail[Math.floor(r() * avail.length)];
+  const c = pick(r, avail); // 复用 pick（内含 clampUnit 兜底），避免注入源 r()≥1 时下标越界取到 undefined
   occupied.add(key(c.x, c.y));
   return c;
 }
@@ -133,7 +133,7 @@ function pickFarReachable(r, reach, from, minDist) {
   entries.sort((a, b) => b.d - a.d);
   // 取前 1/3 中随机一个，避免每次都最远角落。
   const top = entries.slice(0, Math.max(1, Math.floor(entries.length / 3)));
-  return top[Math.floor(r() * top.length)];
+  return pick(r, top);
 }
 
 // 生成一个敌人实例（基于敌人定义池加权抽取）。

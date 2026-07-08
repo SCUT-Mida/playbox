@@ -103,6 +103,7 @@ export class GameUI {
     const p = loadFromSlot(slot);
     if (!p) { this.toast('读取存档失败', 'bad'); this.showLauncher(); return; }
     if (p.ending) { this.renderEnding(p.ending, true, p); return; }
+    if (isDead(p)) { this.player = p; this.activeSlot = slot; this.gameOver(); return; } // 陨落档直接展示终结画面，避免「继续」瞬间又死亡
     this.enterGame(p, slot);
   }
 
@@ -147,7 +148,7 @@ export class GameUI {
   renderSlotRow(s) {
     const head = s.exists
       ? h('div', { class: 'slot-info' },
-          h('div', { class: 'slot-name' }, `${s.name || '旅者'}${s.ending ? '  · 已通关' : ''}`),
+          h('div', { class: 'slot-name' }, `${s.name || '旅者'}${s.ending ? '  · 已通关' : s.dead ? ' · 已陨落' : ''}`),
           h('div', { class: 'slot-meta' }, `第 ${s.floor || 1} 层 · 最深 ${s.maxFloor || 1} · Lv${s.level || 1} · 💎${s.memoryCount || 0}/10 · ✨${s.stardust || 0}`),
         )
       : h('div', { class: 'slot-info' }, h('div', { class: 'muted' }, '空槽位'));
@@ -168,6 +169,7 @@ export class GameUI {
     if (!p) { this.toast('读取失败', 'bad'); return; }
     this.closeModal();
     if (p.ending) { this.renderEnding(p.ending, true, p); return; }
+    if (isDead(p)) { this.player = p; this.activeSlot = slot; this.gameOver(); return; } // 陨落档：避免读取后再次瞬间死亡
     this.enterGame(p, slot);
   }
 
@@ -600,6 +602,7 @@ export class GameUI {
     this.actionBtns = ['block', 'dodge', 'counter'].map((a) =>
       h('button', { class: `act ${a}`, dataset: { action: a }, onClick: () => this.chooseAction(a) },
         h('div', null, ACTIONS[a].emoji), h('div', null, ACTIONS[a].name)));
+    this.fleeBtn = h('button', { class: 'btn-ghost icon-btn', title: '撤退', onClick: () => this.confirmFlee() }, '🏃');
     this.autoToggle = h('button', { class: 'btn-ghost icon-btn', title: '自动战斗', onClick: () => this.toggleAuto() }, '🤖');
 
     this.hpFill = h('div', { class: 'bl-fill', style: { background: PALETTE.hp } });
@@ -609,7 +612,7 @@ export class GameUI {
 
     wrap.append(
       h('div', { class: 'battle__topbar' },
-        h('button', { class: 'btn-ghost icon-btn', onClick: () => this.confirmFlee() }, '🏃'),
+        this.fleeBtn,
         h('span', { class: 'title' }, '战斗'),
         this.autoToggle,
       ),
@@ -647,6 +650,7 @@ export class GameUI {
       this.stanceChip.textContent = '❓ 敌人意图难辨…';
     }
     for (const b of this.actionBtns) b.disabled = false;
+    if (this.fleeBtn) this.fleeBtn.disabled = false;
     if (this.timerEnabled && !this.battle.auto) {
       this.battle.timerEnd = nowMs() + BATTLE_TIME_MS;
     } else {
@@ -663,6 +667,7 @@ export class GameUI {
     if (!this.battle || this.battle.busy) return;
     this.battle.busy = true;
     for (const b of this.actionBtns) b.disabled = true;
+    if (this.fleeBtn) this.fleeBtn.disabled = true; // 结算窗口期间禁用撤退，避免与胜负结算交错
     this.resolveBattleRound(action);
   }
 
@@ -705,6 +710,13 @@ export class GameUI {
     if (this.battle.auto && !this.battle.busy) {
       const act = autoPickAction(this.battle.stance);
       setTimeout(() => { if (this.battle) this.chooseAction(act); }, 320);
+      return;
+    }
+    // 关闭自动时，若正等待玩家操作，重置一个完整限时窗口。
+    // 否则 timerEnd 仍停留在自动期间未更新的旧值（可能早已过期），
+    // onTick 会立刻判定 remain==0 → 瞬间失手，把「关自动」误判为玩家反应不及。
+    if (!this.battle.auto && this.timerEnabled && !this.battle.busy) {
+      this.battle.timerEnd = nowMs() + BATTLE_TIME_MS;
     }
   }
 
@@ -1201,6 +1213,7 @@ export class GameUI {
     if (this.running) return;
     this.running = true;
     this._lastFrame = nowMs();
+    this._prevTick = nowMs(); // 归零基线，避免从启动器/创角返回时首帧 delta 过大，一次性计入大段精力回补
     this._staminaAccum = 0;
     const tick = () => {
       if (!this.running) return;

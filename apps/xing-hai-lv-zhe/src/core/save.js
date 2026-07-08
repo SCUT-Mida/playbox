@@ -41,7 +41,7 @@ export function loadFromSlot(slot) {
 }
 
 // 列举所有槽位的概要信息，供存档管理 UI 展示。
-// 返回 [{ slot, exists, name, floor, maxFloor, level, stardust, memoryCount, ending, lastSeen }]
+// 返回 [{ slot, exists, name, floor, maxFloor, level, stardust, memoryCount, ending, dead, lastSeen }]
 export function listSaves() {
   const out = [];
   for (let i = 0; i < SAVE_SLOTS; i++) {
@@ -56,23 +56,24 @@ export function listSaves() {
       stardust: p ? p.stardust : null,
       memoryCount: p ? (p.memory || []).filter(Boolean).length : 0,
       ending: p ? p.ending : null,
+      dead: !!(p && p.hp <= 0 && !p.ending), // hp 归零且未通关：陨落档，不可「继续」
       lastSeen: p ? p.lastSeen : 0,
     });
   }
   return out;
 }
 
+// 是否存在可「继续旅程」的存档（陨落档 hp<=0 且未通关不算可继续）。
 export function hasAnySave() {
   try {
-    if (!storage) return false;
-    for (let i = 0; i < SAVE_SLOTS; i++) if (storage.getItem(slotKey(i)) != null) return true;
-    return false;
+    return listSaves().some((s) => s.exists && !s.dead);
   } catch (_) { return false; }
 }
 
 // 取最近游玩的槽位（lastSeen 最大者）；同值时槽位号大者优先（最后写入者胜出，结果确定）。
+// 陨落档不可继续，直接跳过。
 export function latestSlot() {
-  const list = listSaves().filter((s) => s.exists);
+  const list = listSaves().filter((s) => s.exists && !s.dead);
   if (!list.length) return null;
   let pick = list[0];
   for (const s of list) {

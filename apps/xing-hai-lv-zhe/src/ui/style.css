@@ -155,26 +155,44 @@
   border-radius: 12px;
   box-shadow: inset 0 0 0 2px rgba(0,0,0,0.3), 0 3px 0 var(--line-2);
   overflow: hidden;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+/* 生态着色：按楼层切换边框/内发光风味（纯视觉） */
+.xhlz .map-frame.biome-ruins  { border-color: #c9a36a; box-shadow: inset 0 0 0 2px rgba(0,0,0,0.3), inset 0 0 38px rgba(201,163,106,0.20), 0 3px 0 #9b7e4f; }
+.xhlz .map-frame.biome-cavern { border-color: #5fb0d8; box-shadow: inset 0 0 0 2px rgba(0,0,0,0.3), inset 0 0 38px rgba(95,176,216,0.22), 0 3px 0 #3e7e9b; }
+.xhlz .map-frame.biome-void   { border-color: #9d6edb; box-shadow: inset 0 0 0 2px rgba(0,0,0,0.3), inset 0 0 38px rgba(157,110,219,0.22), 0 3px 0 #5e44a0; }
+.xhlz .map-frame.biome-core   { border-color: #ffd93d; box-shadow: inset 0 0 0 2px rgba(0,0,0,0.3), inset 0 0 44px rgba(255,217,61,0.28), 0 3px 0 #b07d00; }
+/* 暗角：边缘渐暗，营造视野/洞穴纵深感（不拦截点击） */
+.xhlz .map-frame::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: radial-gradient(130% 110% at 50% 45%, transparent 52%, rgba(0,0,0,0.45) 100%);
 }
 .xhlz .map-grid {
   position: absolute; inset: 0;
   display: grid;
   grid-template-columns: repeat(16, 1fr);
   grid-template-rows: repeat(16, 1fr);
+  gap: 1px;                 /* 1px 缝隙 = 地砖勾勒线 */
+  background: rgba(0,0,0,0.28);
 }
 .xhlz .cell {
   position: relative;
   display: flex; align-items: center; justify-content: center;
   font-size: clamp(0.7rem, 2.6vw, 1rem);
   line-height: 1;
+  outline: 1px solid rgba(0,0,0,0.04); outline-offset: -1px;
 }
 /* 雾：未探索 = 全黑；已探索不可见 = 压暗 */
 .xhlz .cell.fog { background: #1a1c28; }
-.xhlz .cell.fog .ent { display: none; }
+.xhlz .cell.fog .ent, .xhlz .cell.fog .decor { display: none; }
 .xhlz .cell.dim { filter: brightness(0.5) saturate(0.6); }
 .xhlz .cell.dim .ent { opacity: 0.55; }
-.xhlz .cell.visible { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05); }
+.xhlz .cell.dim .decor { opacity: 0.4; }
+.xhlz .cell.visible { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); }
+/* 玩家格：蓝色调覆盖（置于 .visible 之后以覆盖其 box-shadow） */
+.xhlz .cell.player { box-shadow: inset 0 0 0 100px rgba(77,150,255,0.38), inset 0 0 0 1px rgba(255,255,255,0.2); }
 .xhlz .cell .ent { position: relative; z-index: 2; }
+.xhlz .cell .decor { position: relative; z-index: 1; opacity: 0.7; font-size: 0.78em; filter: saturate(0.85); }
 .xhlz .cell.player::after {
   content: ''; position: absolute; inset: 8%;
   border-radius: 30%; border: 2px solid #fff;
@@ -188,6 +206,20 @@
   border: 1px dashed rgba(77,150,255,0.7);
 }
 .xhlz .cell.stairs .ent { animation: xhlz-glow 1.4s ease-in-out infinite; }
+
+/* —— 地块纹理：基色 + 像素点缀（纯视觉，通行性由 config 决定）—— */
+.xhlz .cell.t-floor    { background-color: #f2f2f2; background-image: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.55), transparent 55%), radial-gradient(circle at 75% 75%, rgba(0,0,0,0.06), transparent 60%); }
+.xhlz .cell.t-floor2   { background-color: #f8f4e6; background-image: repeating-linear-gradient(45deg, rgba(0,0,0,0.04) 0 2px, transparent 2px 6px); }
+.xhlz .cell.t-sand     { background-color: #f7b731; background-image: radial-gradient(circle at 25% 30%, rgba(255,255,255,0.35), transparent 45%), radial-gradient(circle at 70% 65%, rgba(120,70,0,0.18), transparent 55%); }
+.xhlz .cell.t-grass    { background-color: #6bcb77; background-image: radial-gradient(circle at 30% 40%, rgba(255,255,255,0.22), transparent 40%), radial-gradient(circle at 70% 70%, rgba(0,80,30,0.22), transparent 50%); }
+.xhlz .cell.t-moss     { background-color: #7fae6b; background-image: repeating-linear-gradient(90deg, rgba(0,0,0,0.06) 0 2px, transparent 2px 5px), radial-gradient(circle at 60% 40%, rgba(255,255,255,0.2), transparent 50%); }
+.xhlz .cell.t-crystal  { background-color: #7fd6e0; background-image: linear-gradient(135deg, rgba(255,255,255,0.5) 0 30%, transparent 30% 60%, rgba(0,80,100,0.18) 60% 100%), radial-gradient(circle at 70% 30%, rgba(255,255,255,0.6), transparent 40%); }
+.xhlz .cell.t-rune     { background-color: #b08fd6; background-image: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.35), transparent 45%), radial-gradient(circle at 50% 50%, rgba(70,20,110,0.4) 0 18%, transparent 19%); }
+.xhlz .cell.t-water    { background-color: #4a90e2; background-image: repeating-linear-gradient(0deg, rgba(255,255,255,0.18) 0 2px, transparent 2px 6px); animation: xhlz-water 2.6s linear infinite; }
+.xhlz .cell.t-wall     { background-color: #5d5376; background-image: linear-gradient(rgba(0,0,0,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.18) 1px, transparent 1px); background-size: 50% 50%, 50% 50%; }
+.xhlz .cell.t-wallDark { background-color: #3a3a4a; background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 50% 50%, 50% 50%; }
+.xhlz .cell.t-stairs   { background-color: #ffd93d; background-image: repeating-linear-gradient(0deg, rgba(120,80,0,0.32) 0 2px, transparent 2px 5px); }
+@keyframes xhlz-water { from { background-position: 0 0; } to { background-position: 0 6px; } }
 @keyframes xhlz-bob { 0%,100% { transform: scale(1); } 50% { transform: scale(0.86); } }
 @keyframes xhlz-glow { 0%,100% { filter: drop-shadow(0 0 0 #ffd93d); } 50% { filter: drop-shadow(0 0 4px #ffd93d); } }
 
@@ -327,6 +359,20 @@
 .xhlz .slot-actions { flex: none; display: flex; gap: 0.3rem; }
 .xhlz .slot-act { padding: 0.35rem 0.55rem; font-size: 0.8rem; }
 .xhlz .save-io { width: 100%; height: 60px; resize: vertical; padding: 0.5rem; border-radius: 8px; border: 2px solid var(--line-2); background: var(--card); color: var(--ink); font-family: ui-monospace, monospace; font-size: 1rem; word-break: break-all; }
+
+/* —— 战利品（战斗胜利提示面板）—— */
+.xhlz .reward { text-align: center; }
+.xhlz .reward__head { display: flex; align-items: center; gap: 0.6rem; justify-content: center; margin-bottom: 0.6rem; }
+.xhlz .reward__emoji { font-size: 2.4rem; }
+.xhlz .reward__title { font-weight: 800; font-size: 1.05rem; }
+.xhlz .reward__list { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.4rem; }
+.xhlz .reward__item { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.6rem; border-radius: 10px; background: var(--card-2); border: 1px solid var(--line); font-weight: 700; }
+.xhlz .reward__item .reward__ic { font-size: 1.1rem; }
+.xhlz .reward__levelup { margin-top: 0.5rem; padding: 0.5rem; border-radius: 10px; background: linear-gradient(180deg, #ffe98a, #ffd93d); color: #3a2a00; border: 1px solid #d99a00; font-weight: 800; }
+.xhlz .ending__reward { margin: 0.4rem 0; padding: 0.4rem 0.6rem; border-radius: 10px; background: rgba(255,217,61,0.16); border: 1px solid var(--gold); color: #7a5a00; font-weight: 700; font-size: 0.9rem; text-align: center; }
+
+/* —— 通用行（设置项左右对齐）—— */
+.xhlz .row { display: flex; align-items: center; gap: 0.5rem; }
 
 /* —— Toast —— */
 .xhlz .toast-wrap { position: absolute; top: max(0.5rem, env(safe-area-inset-top)); left: 0; right: 0; z-index: 90; display: flex; flex-direction: column; align-items: center; gap: 0.3rem; pointer-events: none; }

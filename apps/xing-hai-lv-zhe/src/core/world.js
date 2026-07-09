@@ -5,6 +5,7 @@
 import {
   GRID, VISION_RADIUS, TILES, FLOOR_TILES, tileOf, isWalkable,
   floorConfig, enemyPoolFor, EVENT_TYPES, EVENT_META, MAX_FLOOR, MEMORY_CHAPTERS,
+  biomeFor, floorTilesFor, DECOR,
 } from '../config.js';
 import { randInt, weightedPick, pick } from './rng.js';
 
@@ -73,6 +74,8 @@ export function generateFloor(rng, floor, player) {
   if (cfg.memory) place('memory', () => ({ chapter: Math.min(f - 1, MEMORY_CHAPTERS.length - 1) }));
 
   state.entities = entities;
+  // 点缀层：稀疏地在可行走地块上撒装饰（纯视觉，不影响通行/实体/战斗）。
+  state.decor = makeDecor(r, state.grid, biomeFor(f));
   // explored 用普通对象（JSON 原生可序列化），随存档往返不丢失；key 形如 "x,y"。
   const explored = {};
   for (const k of visibleKeys(state.grid, state.pos.x, state.pos.y)) explored[k] = true;
@@ -82,8 +85,9 @@ export function generateFloor(rng, floor, player) {
 
 // 一次生成尝试：网格 + 障碍 + 出生点。
 function tryGenerate(r, f, isBoss, cfg) {
+  const floorPalette = floorTilesFor(f); // 按楼层生态选地块，给视觉层次
   const grid = Array.from({ length: GRID }, () =>
-    Array.from({ length: GRID }, () => pick(r, FLOOR_TILES)));
+    Array.from({ length: GRID }, () => pick(r, floorPalette)));
   // 边界石墙
   for (let i = 0; i < GRID; i++) {
     grid[0][i] = 'wall'; grid[GRID - 1][i] = 'wall';
@@ -116,6 +120,20 @@ function takeCell(r, pool, occupied) {
   const c = pick(r, avail); // 复用 pick（内含 clampUnit 兜底），避免注入源 r()≥1 时下标越界取到 undefined
   occupied.add(key(c.x, c.y));
   return c;
+}
+
+// 生成点缀矩阵（GRID×GRID，空串表示无点缀）。仅在内部可行走格上低密度撒，
+// 复用生态风味池；出生点 3×3 邻域不撒，避免遮挡角色。
+function makeDecor(r, grid, biome) {
+  const flavor = (biome && biome.decor) || ['spark'];
+  const decor = Array.from({ length: GRID }, () => Array.from({ length: GRID }, () => ''));
+  for (let y = 1; y < GRID - 1; y++) {
+    for (let x = 1; x < GRID - 1; x++) {
+      if (!isWalkable(grid[y][x])) continue;
+      if (r() < 0.13) decor[y][x] = pick(r, flavor);
+    }
+  }
+  return decor;
 }
 
 function pickFarReachable(r, reach, from, minDist) {

@@ -6,10 +6,9 @@
 #      （推送触发 synchronize → 重新审查，循环直到通过或达到 MAX_ROUNDS）
 #   3. 合并：若通过，直接 squash 合并、删分支、关 Issue
 #
-# 设计说明：原独立的 ai-fixer.yml 通过 issue_comment 触发，但 GitHub 要求
-# 人工审批 issue_comment 事件（Approve and Run）。将修复逻辑内联到本工作流
-# 后，整个审查-修复循环仅需 pull_request 触发，无需人工介入。
-# ai-fixer.yml 保留为手动 fallback（人工在 PR 评论 /claude-fix 时触发）。
+# 设计说明：修复逻辑内联在本工作流内，整个审查-修复循环仅需 pull_request 触发，
+# 无需任何人工介入。push 步骤使用 PAT_TOKEN 认证（而非默认的 GITHUB_TOKEN），
+# 以确保推送的提交能正常触发 synchronize 事件，驱动下一轮审查。
 # ============================================================
 name: 🕵️🔧 AI Review & Fix Pipeline
 
@@ -312,6 +311,12 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # ⚠️ 关键：切换 git remote 为 PAT_TOKEN 认证。
+          # actions/checkout 默认用 GITHUB_TOKEN，但其推送不会触发 workflow（GitHub 官方限制），
+          # 会导致 synchronize 事件无法触发 → 审查-修复循环断裂 → PR 卡住需人工介入。
+          # 用 PAT_TOKEN 后，push 能正常触发 synchronize → 自动开启下一轮审查。
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
           git add .
 

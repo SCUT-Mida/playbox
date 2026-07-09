@@ -33,7 +33,7 @@
                               └──────────────┘
 ```
 
-四个工作流自动接力，审查-修复循环全程无需人工介入。`ai-fixer.yml` 作为手动 fallback 保留（人工在 PR 评论 `/claude-fix` 时触发）。
+三个工作流自动接力，审查-修复循环全程无需人工介入。
 
 ---
 
@@ -43,12 +43,11 @@
 |---|---|---|---|
 | **AI Coder** | `ai-coder.yml` | Issue 被打上 `ai-task` 标签 | 读 Issue → Claude Code 实现 → 推送到 `ai-fix/issue-N` 分支 → 开 PR |
 | **AI Review & Fix** | `ai-reviewer.yml` | PR 创建 / PR 有新提交（synchronize） | 取 diff → Claude Code 审查 → APPROVE 则合并关单；REQUEST_CHANGES 则在同一 job 内修复代码并推送，触发新一轮审查 |
-| **AI Fixer (手动)** | `ai-fixer.yml` | PR 评论里出现 `/claude-fix`（人工触发） | 读审查意见 → Claude Code 修码 → 推送。仅用于人工介入，自动化流程不依赖此工作流 |
 | **Deploy Pages** | `deploy-pages.yml` | push 到 `main` | `npm ci && npm run build` → 部署 `dist/` 到 GitHub Pages |
 
-**审查-修复闭环**：Review & Fix Pipeline 审查不通过时，直接在同一个 workflow job 内调用 Claude Code 修复代码并推送。推送触发 PR 的 `synchronize` 事件，自动开启新一轮审查——审查→修复→推送→再审查，循环直到审查通过后自动合并。达到最大轮次（8 轮）时自动评论通知人工介入。
+**审查-修复闭环**：Review & Fix Pipeline 审查不通过时，直接在同一个 workflow job 内调用 Claude Code 修复代码并推送。推送使用 `PAT_TOKEN` 认证（而非默认的 `GITHUB_TOKEN`），确保能正常触发 PR 的 `synchronize` 事件，自动开启新一轮审查——审查→修复→推送→再审查，循环直到审查通过后自动合并。达到最大轮次（8 轮）时自动评论通知人工介入。
 
-> **为什么不单独拆 Fixer？** 原架构中 Fixer 通过 `issue_comment` 事件触发（Reviewer 在 PR 评论 `/claude-fix`），但 GitHub 对 `issue_comment` 触发的工作流要求人工点击「Approve and Run」。将修复逻辑内联到 Reviewer 后，整个循环仅依赖 `pull_request` 事件，无需任何人工审批。
+> **为什么不再有独立的 Fixer 工作流？** 原架构中 Fixer 通过 `issue_comment` 事件触发（Reviewer 在 PR 评论 `/claude-fix`），但 GitHub 对 `issue_comment` 触发的工作流强制要求人工点击「Approve and Run」。将修复逻辑内联到 Reviewer 后，整个循环仅依赖 `pull_request` 事件，配合 `PAT_TOKEN` 推送，实现零人工审批的全自动审查-修复循环。
 
 ---
 
@@ -139,7 +138,6 @@ playbox/
 ├── .github/workflows/
 │   ├── ai-coder.yml          # Issue → 写码 → PR
 │   ├── ai-reviewer.yml       # PR → 审查 → 修复 → 合并（一体化）
-│   ├── ai-fixer.yml          # 手动 fallback：/claude-fix → 修复
 │   └── deploy-pages.yml      # main → Pages 部署
 ├── .ai-tasks/                     # 运行时生成的提示词/审查文档（每 Issue 一个子目录）
 ├── .gitattributes            # 强制 YAML/sh 用 LF（防 CRLF 泄漏）

@@ -1259,7 +1259,7 @@ export class GameUI {
       body,
       foot: [
         h('button', { class: 'btn-primary', onClick: () => this.takeGear(gear) }, '装备'),
-        h('button', { class: 'btn-ghost', onClick: () => { this.closeModal(); this.pushLog(`丢弃 ${gear.name}${plusTxt}`, 'normal'); } }, '丢弃'),
+        h('button', { class: 'btn-ghost', onClick: () => { this.closeModal(); this.refreshInteract(); this.pushLog(`丢弃 ${gear.name}${plusTxt}`, 'normal'); } }, '丢弃'),
       ],
     });
     this.toast(`拾得${meta.label}！`, 'good');
@@ -1268,6 +1268,10 @@ export class GameUI {
   takeGear(gear) {
     const res = equipGear(this.player, gear);
     this.closeModal();
+    // 宝箱实体已在 resolveEntity 中移除，但 offerGear 流程 return true 跳过了 walkPath 末尾的
+    // refreshInteract()。这里关弹窗后手动刷新，避免陈旧 _interactMode({mode:'pickup',ent}) 仍指向
+    // 已删除实体，被 doInteract 重放而再次弹出同一件装备。
+    this.refreshInteract();
     if (!res.ok) { this.toast('无法装备', 'bad'); return; }
     saveToSlot(this.activeSlot, this.player);
     this.refreshStatus();

@@ -786,6 +786,13 @@ export class GameUI {
 
   // 退出战斗回到地图（恢复 game 屏）。
   exitBattle(save) {
+    // buildGame() 会 clear(modalRoot)，但 _sheet / _battlePauseRemain 不会随之重置。
+    // 战斗可能由「非 closeModal 路径」结束（自动战斗中开撤退弹窗时被自动回合击杀 →
+    // winBattle；或玩家方被击杀 → loseBattle→gameOver），若不在此同步清空，
+    // _sheet 会成为指向已脱离 DOM 节点的陈旧引用，导致回到地图后 onMapTap/dpadMove
+    // 因 this._sheet 真值提前 return 而软卡死，且会经 restart→enterGame 带入新一局。
+    this._sheet = null;
+    this._battlePauseRemain = null;
     this.battle = null;
     this.screen = 'game';
     this.buildGame();

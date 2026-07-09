@@ -7,11 +7,12 @@
 import './style.css';
 import { h, clear, bar } from './dom.js';
 import {
-  PALETTE, GRID, VISION_RADIUS, TILES, tileOf, isWalkable,
+  PALETTE, GRID, VISION_RADIUS, isWalkable,
   EQUIP_SLOTS, MAX_PLUS, AFFIX_AT, AFFIXES, enhanceCost,
   TALENTS, TALENT_BY_BRANCH, talentCost,
   STAMINA_COST_PER_ROUND, STAMINA_REGEN_PER_STEP, STAMINA_REGEN_INTERVAL_MS, STAMINA_TIRED,
   SHOP_ITEMS, DRONE_COST, EVENT_META, MEMORY_CHAPTERS, STORY, ENDINGS, MAX_FLOOR, expToNext,
+  biomeFor, DECOR,
 } from '../config.js';
 import {
   newPlayer, migrate, maxHp, maxStamina, effectiveAtk, effectiveDef, effectiveMoveRange,
@@ -42,6 +43,7 @@ export class GameUI {
     this.over = false;
     this.activeSlot = null;
     this.timerEnabled = true;      // 战斗限时（测试可关闭）
+    this.autoBattle = true;        // 战斗默认自动（单手摸鱼友好；可在设置/战斗中关闭）
     this._sheet = null;
     this.charName = '';
     this.cellNodes = [];           // 2D 地块 DOM 引用（脏更新）
@@ -284,7 +286,8 @@ export class GameUI {
     this.statusEl = h('div', { class: 'status-bar' });
     const mapWrap = h('div', { class: 'map-wrap' },
       this.floatLayer = h('div', { class: 'float-layer' }),
-      h('div', { class: 'map-frame' }, h('div', { class: 'map-grid', onClick: (e) => this.onMapTap(e) })),
+      this.mapFrame = h('div', { class: 'map-frame' },
+        h('div', { class: 'map-grid', onClick: (e) => this.onMapTap(e) })),
     );
     this.bottomBar = h('div', { class: 'bottom-bar' });
     game.append(this.statusEl, mapWrap, this.bottomBar);
@@ -359,7 +362,13 @@ export class GameUI {
     if (!st) return;
     const pos = st.pos;
     const reach = this.screen === 'game' && !this._sheet ? reachableTiles(st, pos, effectiveMoveRange(this.player)) : new Set();
+    // 生态着色：按楼层切换地图边框/底色风味（纯视觉）。
+    if (this.mapFrame) {
+      this.mapFrame.className = `map-frame biome-${biomeFor(this.player.floor).key}`;
+    }
+    const decor = st.decor || null;
     for (let y = 0; y < GRID; y++) {
+      const decorRow = decor && decor[y];
       for (let x = 0; x < GRID; x++) {
         const cell = this.cellNodes[y][x];
         const k = `${x},${y}`;
@@ -367,38 +376,33 @@ export class GameUI {
         const visible = isVisible(x, y, pos);
         const tileId = tileAt(st, x, y);
         const ent = entityAt(st, x, y);
-        let cls = 'cell';
-        if (!explored && !visible) cls += ' fog';
-        else if (!visible) cls += ' dim';
-        else cls += ' visible';
         const isPlayer = pos.x === x && pos.y === y;
+        const fog = !explored && !visible;
+        // 类名：雾格不挂地块纹理（保持纯黑）；其余挂 t-<tileId> 由 CSS 绘制纹理。
+        let cls = 'cell';
+        if (fog) cls += ' fog';
+        else {
+          cls += visible ? ' visible' : ' dim';
+          cls += ` t-${tileId}`;
+        }
         if (isPlayer) cls += ' player';
         if (tileId === 'stairs') cls += ' stairs';
         if (reach.has(k) && !isPlayer) cls += ' reachable';
-        cell.className = cls;
-        // 背景：地块色（玩家格叠加蓝色调）
-        if (!explored && !visible) {
-          cell.style.background = '';
-        } else {
-          cell.style.background = isPlayer
-            ? `linear-gradient(rgba(77,150,255,0.45), rgba(77,150,255,0.45)), ${tileOf(tileId).color}`
-            : tileOf(tileId).color;
+        if (cell.className !== cls) cell.className = cls;
+        cell.style.background = ''; // 纹理统一交由 CSS .t-<id>
+        // 内容优先级：玩家 > 实体 > 阶梯图标 > 点缀；雾格无内容。
+        let emoji = '', kind = '';
+        if (!fog && (visible || explored)) {
+          if (isPlayer) { emoji = '🧑‍🚀'; kind = 'ent'; }
+          else if (ent) { emoji = entityEmoji(ent, tileId); kind = 'ent'; }
+          else if (tileId === 'stairs') { emoji = '🪜'; kind = 'ent'; }
+          else if (decorRow && decorRow[x] && DECOR[decorRow[x]]) { emoji = DECOR[decorRow[x]].emoji; kind = 'decor'; }
         }
-        // 实体 emoji（陷阱不显示——踩到才发现）
-        let emoji = '';
-        if (visible || explored) {
-          if (isPlayer) emoji = '🧑‍🚀';
-          else if (ent) emoji = entityEmoji(ent, tileId);
-        }
-        // 仅在内容变化时更新，减少重排
-        const cur = cell.firstChild;
-        if (emoji) {
-          if (!cur || cur.textContent !== emoji) {
-            if (cur) cur.remove();
-            cell.appendChild(h('span', { class: 'ent' }, emoji));
-          }
-        } else if (cur) {
-          cur.remove();
+        const sig = kind ? `${kind}:${emoji}` : '';
+        if (cell.dataset.sig !== sig) {
+          cell.dataset.sig = sig;
+          while (cell.firstChild) cell.removeChild(cell.firstChild);
+          if (emoji) cell.appendChild(h('span', { class: kind }, emoji));
         }
         cell.dataset.x = String(x);
         cell.dataset.y = String(y);
@@ -604,7 +608,7 @@ export class GameUI {
     if (this.screen !== 'game') return;
     this.screen = 'battle';
     this.battle = {
-      enemy: enemyEntity, focus: false, auto: false, round: 0,
+      enemy: enemyEntity, focus: false, auto: !!this.autoBattle, round: 0,
       stance: null, telegraphed: false, timerEnd: 0, busy: false,
     };
     clear(this.modalRoot);
@@ -627,7 +631,7 @@ export class GameUI {
       h('button', { class: `act ${a}`, dataset: { action: a }, onClick: () => this.chooseAction(a) },
         h('div', null, ACTIONS[a].emoji), h('div', null, ACTIONS[a].name)));
     this.fleeBtn = h('button', { class: 'btn-ghost icon-btn', title: '撤退', onClick: () => this.confirmFlee() }, '🏃');
-    this.autoToggle = h('button', { class: 'btn-ghost icon-btn', title: '自动战斗', onClick: () => this.toggleAuto() }, '🤖');
+    this.autoToggle = h('button', { class: `icon-btn ${this.battle.auto ? 'btn-jade' : 'btn-ghost'}`, title: '自动战斗', onClick: () => this.toggleAuto() }, this.battle.auto ? '🤖✅' : '🤖');
 
     this.hpFill = h('div', { class: 'bl-fill', style: { background: PALETTE.hp } });
     this.hpVal = h('span', { class: 'bl-val' }, `${this.player.hp}/${maxHp(this.player)}`);
@@ -683,7 +687,8 @@ export class GameUI {
     if (this.battle.auto) {
       const act = autoPickAction(stance);
       // 不预置 busy=true：chooseAction 自带 busy 守卫，预置会令其立即返回，导致自动战斗死锁。
-      setTimeout(() => { if (this.battle) this.chooseAction(act); }, 320);
+      // 额外校验 auto：玩家若在 320ms 内关掉自动，挂起的代打动作不再执行（避免误触）。
+      setTimeout(() => { if (this.battle && this.battle.auto) this.chooseAction(act); }, 320);
     }
   }
 
@@ -728,12 +733,13 @@ export class GameUI {
   toggleAuto() {
     if (!this.battle) return;
     this.battle.auto = !this.battle.auto;
+    this.autoBattle = this.battle.auto; // 持久化偏好：下一场战斗沿用
     this.autoToggle.classList.toggle('btn-jade', this.battle.auto);
     this.autoToggle.textContent = this.battle.auto ? '🤖✅' : '🤖';
     this.toast(this.battle.auto ? '自动战斗：开' : '自动战斗：关');
     if (this.battle.auto && !this.battle.busy) {
       const act = autoPickAction(this.battle.stance);
-      setTimeout(() => { if (this.battle) this.chooseAction(act); }, 320);
+      setTimeout(() => { if (this.battle && this.battle.auto) this.chooseAction(act); }, 320);
       return;
     }
     // 关闭自动时，若正等待玩家操作，重置一个完整限时窗口。
@@ -774,8 +780,37 @@ export class GameUI {
     removeEntity(this.state(), e.id);
     this.pushLog(`🏆 击败 ${e.name}！获得 ✨${gained.stardust} 🔩${gained.parts}${gained.leveled ? ` · 升级至 Lv${this.player.level}！` : ''}`, 'milestone');
     this.exitBattle(true);
-    if (e.boss) { this.offerEnding(); return; }
+    if (e.boss) { this._lastGained = gained; this.offerEnding(); return; }
     this.toast(gained.leveled ? '升级！' : '胜利', 'good');
+    this.showReward(gained, reward, e);
+  }
+
+  // 战斗胜利后的战利品提示面板：星骸/零件/经验/升级一目了然。
+  showReward(gained, reward, enemy) {
+    const exp = reward && Number.isFinite(reward.exp) ? reward.exp : (enemy && enemy.exp) || 0;
+    const items = [];
+    if (gained.stardust) items.push(['✨', `星骸 +${gained.stardust}`]);
+    if (gained.parts) items.push(['🔩', `零件 +${gained.parts}`]);
+    items.push(['⭐', `经验 +${exp}`]);
+    const body = [
+      h('div', { class: 'reward' },
+        h('div', { class: 'reward__head' },
+          h('div', { class: 'reward__emoji' }, enemy.emoji || '👾'),
+          h('div', null,
+            h('div', { class: 'reward__title' }, `击败 ${enemy.name}`),
+            h('div', { class: 'muted' }, enemy.boss ? '强敌已倒下' : '战斗胜利'),
+          ),
+        ),
+        h('div', { class: 'reward__list' }, items.map(([ic, tx]) =>
+          h('div', { class: 'reward__item' },
+            h('span', { class: 'reward__ic' }, ic),
+            h('span', { class: 'reward__tx' }, tx)))),
+        ...(gained.leveled
+          ? [h('div', { class: 'reward__levelup' }, `⬆️ 升级至 Lv${this.player.level}！HP 上限与状态提升`)]
+          : []),
+      ),
+    ];
+    this.showSheet({ title: '🏆 战利品', body, foot: [h('button', { class: 'btn-primary', onClick: () => this.closeModal() }, '继续探索')] });
   }
 
   loseBattle() {
@@ -813,10 +848,12 @@ export class GameUI {
   // 这样即便玩家误触关闭弹窗，也能回到可交互的地图（Boss 已除、当前层无下行）。
   offerEnding() {
     saveToSlot(this.activeSlot, this.player);
+    const g = this._lastGained || { stardust: 0, parts: 0 };
     const body = [
       h('div', { class: 'ending' },
         h('div', { class: 'ending__emoji' }, '🌟'),
         h('h2', null, '星骸之核已寂灭'),
+        h('div', { class: 'ending__reward' }, `🏆 战利品：✨${g.stardust} 星骸 · 🔩${g.parts} 零件`),
         h('div', { class: 'ending__text' },
           `你集齐了 ${collectedMemoryCount(this.player)} 枚星骸回响。所有的记忆在掌心翻涌——现在，由你回答那个被整个文明搁置的问题。`),
       ),
@@ -1123,6 +1160,10 @@ export class GameUI {
       h('div', { class: 'card' },
         h('h4', null, '选项'),
         h('div', { class: 'row', style: { justifyContent: 'space-between' } },
+          h('span', null, '自动战斗（默认开启）'),
+          h('button', { class: `tab ${this.autoBattle ? 'active' : ''}`, onClick: () => { this.autoBattle = !this.autoBattle; this.showSettings(fromLauncher); } }, this.autoBattle ? '开' : '关'),
+        ),
+        h('div', { class: 'row', style: { justifyContent: 'space-between', marginTop: '0.4rem' } },
           h('span', null, '战斗限时（3 秒/回合）'),
           h('button', { class: `tab ${this.timerEnabled ? 'active' : ''}`, onClick: () => { this.timerEnabled = !this.timerEnabled; this.showSettings(fromLauncher); } }, this.timerEnabled ? '开' : '关'),
         ),

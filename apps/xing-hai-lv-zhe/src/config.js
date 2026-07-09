@@ -27,19 +27,48 @@ export const PALETTE = {
 export const GRID = 16;            // 16×16 地块
 export const VISION_RADIUS = 2;    // 视野半径（5×5 可见）
 
-// 地块类型枚举。walkable 决定能否踏入；color 为像素绘制色。
+// 地块类型枚举。walkable 决定能否踏入；color 为像素绘制色（纹理细节由 CSS .t-<id> 叠加）。
 export const TILES = {
   floor:    { id: 'floor',    name: '地砖', walkable: true,  color: PALETTE.light },
   floor2:   { id: 'floor2',   name: '石板', walkable: true,  color: PALETTE.parchment },
   sand:     { id: 'sand',     name: '沙地', walkable: true,  color: PALETTE.sand },
   grass:    { id: 'grass',    name: '草地', walkable: true,  color: PALETTE.grass },
+  moss:     { id: 'moss',     name: '苔石', walkable: true,  color: '#7fae6b' }, // 装饰性地砖（通行同地砖）
+  crystal:  { id: 'crystal',  name: '晶簇', walkable: true,  color: '#7fd6e0' }, // 装饰性地砖
+  rune:     { id: 'rune',     name: '符文', walkable: true,  color: '#b08fd6' }, // 装饰性地砖
   water:    { id: 'water',    name: '水域', walkable: false, color: PALETTE.water },
   wall:     { id: 'wall',     name: '石墙', walkable: false, color: PALETTE.stone },
   wallDark: { id: 'wallDark', name: '深墙', walkable: false, color: PALETTE.stoneDark },
   stairs:   { id: 'stairs',   name: '下行阶梯', walkable: true, color: PALETTE.gold },
 };
-// 随机生成时从中抽取的「可点缀」可行走地块（决定地砖纹理差异，不影响通行）。
-export const FLOOR_TILES = ['floor', 'floor2', 'sand', 'grass'];
+// 随机生成时的全部「可行走」地块候选（无重复）；具体楼层用 floorTilesFor 按生态筛选子集。
+export const FLOOR_TILES = ['floor', 'floor2', 'sand', 'grass', 'moss', 'crystal', 'rune'];
+
+// 楼层生态（按楼层分段）：仅影响地图配色、地块分布与点缀风味，不影响任何战斗/通行逻辑。
+export const BIOMES = [
+  { from: 1, to: 3, key: 'ruins',  name: '遗迹地表', accent: '#c9a36a', tint: 'rgba(201,163,106,0.10)', tiles: ['floor', 'floor2', 'sand', 'grass', 'moss'],     decor: ['plant', 'rubble', 'spark'] },
+  { from: 4, to: 6, key: 'cavern', name: '晶簇洞穴', accent: '#5fb0d8', tint: 'rgba(95,176,216,0.12)', tiles: ['floor', 'floor2', 'moss', 'crystal'],              decor: ['crystal', 'spark', 'rubble'] },
+  { from: 7, to: 9, key: 'void',   name: '虚空裂隙', accent: '#9d6edb', tint: 'rgba(157,110,219,0.12)', tiles: ['floor', 'floor2', 'crystal', 'rune'],             decor: ['rune', 'crystal', 'spark'] },
+  { from: 10, to: 10, key: 'core', name: '星骸之核', accent: '#ffd93d', tint: 'rgba(255,217,61,0.14)', tiles: ['floor2', 'crystal', 'rune'],                       decor: ['rune', 'crystal', 'spark'] },
+];
+export function biomeFor(floor) {
+  const f = Math.max(1, floor || 1);
+  return BIOMES.find((b) => f >= b.from && f <= b.to) || BIOMES[0];
+}
+// 按楼层生态返回地块候选子集（退化时回退到全集，保证总有可行走地块）。
+export function floorTilesFor(floor) {
+  const list = biomeFor(floor).tiles;
+  return list && list.length ? list : FLOOR_TILES;
+}
+
+// 地图点缀（纯装饰，不占实体、不阻挡）：key -> emoji。
+export const DECOR = {
+  plant:   { emoji: '🌿' },
+  rubble:  { emoji: '🪨' },
+  crystal: { emoji: '💠' },
+  spark:   { emoji: '✨' },
+  rune:    { emoji: '🔮' },
+};
 
 export function tileOf(id) { return TILES[id] || TILES.floor; }
 export function isWalkable(id) { return !!tileOf(id).walkable; }

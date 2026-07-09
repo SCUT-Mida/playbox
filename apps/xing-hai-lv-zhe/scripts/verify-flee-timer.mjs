@@ -58,6 +58,7 @@ ok(!!enemy, '楼层存在敌人实体可用于开战');
 // ============================================================================
 CLOCK = 10000;
 ui.timerEnabled = true;
+ui.autoBattle = false; // 战斗默认自动；此处显式切回手动，以测定时倒计时逻辑
 ui.startBattle(enemy);
 await sleep(5);
 ok(ui.screen === 'battle' && ui.battle && ui.battle.round === 1, 'startBattle 进入第 1 回合');

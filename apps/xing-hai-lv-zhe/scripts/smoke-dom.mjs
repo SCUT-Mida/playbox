@@ -114,9 +114,10 @@ function walkAdjacent(enemy) {
 }
 
 // 通用战斗取胜：读架势 → 点击克制应对，直到战斗结束
+// （自动战斗默认开启时按钮会被禁用，此处仅轮询；回合节奏由自动代打推进）
 async function winBattle() {
   let guard = 0;
-  while (document.querySelector('.battle') && guard++ < 80) {
+  while (document.querySelector('.battle') && guard++ < 200) {
     const chip = document.querySelector('.stance-chip');
     let act = 'counter';
     if (chip) {
@@ -150,18 +151,16 @@ const won = await winBattle();
 ok(won, '战斗取胜并退出战斗界面');
 ok(ui.player.stardust > sdBefore, `战斗获得星骸（${sdBefore}→${ui.player.stardust}）`);
 
-// ---------- 5b) 自动战斗：开启后能自动结算多回合直至取胜（防死锁） ----------
+// ---------- 5b) 自动战斗：默认开启，进入战斗后自动结算多回合直至取胜（防死锁） ----------
 const enemy2 = nearestEnemy();
 if (enemy2) {
   const reached2 = walkAdjacent(enemy2);
   if (reached2) {
     document.querySelector('.interact-btn').click(); // 攻击
     await sleep(15);
+    ok(ui.battle && ui.battle.auto === true, '进入战斗默认开启自动战斗（battle.auto=true）');
     const autoBtn = document.querySelector('[title="自动战斗"]');
     ok(!!autoBtn, '战斗界面有自动战斗开关');
-    if (autoBtn) autoBtn.click(); // 开启自动
-    await sleep(10);
-    ok(ui.battle && ui.battle.auto === true, '开启后 battle.auto=true');
     // 轮询等待自动战斗结束（防 5b 死锁回归）
     let guard = 0;
     while (document.querySelector('.battle') && guard++ < 200) { await sleep(70); }

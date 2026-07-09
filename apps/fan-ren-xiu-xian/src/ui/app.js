@@ -4,6 +4,7 @@
 // 并驱动每秒修炼循环、自动存档与离线结算。
 // ============================================================================
 import '../ui/style.css';
+import { attachKeyboardShell } from '../../../_lib/keyboard-shell.js';
 import { h, clear, bar } from './dom.js';
 import { portraitSVG } from './portrait.js';
 import {
@@ -96,6 +97,8 @@ export class GameUI {
     this.stage = h('div', { class: 'frxx-stage' });
     this.modalRoot = h('div', { class: 'frxx-modals' });
     this.root.append(this.toastWrap, this.stage, this.modalRoot);
+    // 软键盘收口：键盘弹起时把根容器限定在「键盘以上可见区」，输入框落在屏幕上半部分中部。
+    this._detachKeyboard = attachKeyboardShell(this.root);
     migrateLegacy();
     this.showSlots();
     return this;
@@ -2278,6 +2281,7 @@ export class GameUI {
   destroy() {
     this.stopLoop();
     try { if (this.player) saveGame(this.player); } catch (_) {}
+    if (this._detachKeyboard) { this._detachKeyboard(); this._detachKeyboard = null; }
     clear(this.parent);
   }
 }

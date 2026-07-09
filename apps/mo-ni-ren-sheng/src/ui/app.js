@@ -4,6 +4,7 @@
 // 以及随机事件抉择弹窗、人生总结结算弹窗、设置弹窗（存档 / 挂机）。驱动回合推进与自动存档。
 // ============================================================================
 import '../ui/style.css';
+import { attachKeyboardShell } from '../../../_lib/keyboard-shell.js';
 import { h, clear, bar } from './dom.js';
 import {
   ATTRS, ATTR_META, ageLabel, ageYearsFromWeeks, stageForAge, EVENT_CHANCE, stepLabel,
@@ -59,6 +60,8 @@ export class GameUI {
     this.stage = h('div', { class: 'mnrs-stage' });
     this.modalRoot = h('div', { class: 'mnrs-modals' });
     this.root.append(this.toastWrap, this.stage, this.modalRoot);
+    // 软键盘收口：键盘弹起时把根容器限定在「键盘以上可见区」，输入框落在屏幕上半部分中部。
+    this._detachKeyboard = attachKeyboardShell(this.root);
     this.showLauncher();
     return this;
   }
@@ -800,6 +803,7 @@ export class GameUI {
   destroy() {
     this.stopAutoLoop();
     try { if (this.player) saveToSlot(this.activeSlot, this.player); } catch (_) {}
+    if (this._detachKeyboard) { this._detachKeyboard(); this._detachKeyboard = null; }
     clear(this.parent);
     clear(this.modalRoot);
     clear(this.toastWrap);

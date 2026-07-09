@@ -220,12 +220,33 @@ export class GameUI {
     const name = (this.charName || '').trim().slice(0, 8);
     const p = newPlayer(this.rng, { name });
     const slot = this.pickSlotForNewSave();
+    // 全槽位已满时 pickSlotForNewSave 会返回最久未玩档（已存在）→ 覆盖前二次确认，避免误删旧档。
+    const target = listSaves()[slot];
+    if (target && target.exists) {
+      this.confirmOverwriteSlot(slot, () => this.finalizeCreate(p, slot));
+      return;
+    }
+    this.finalizeCreate(p, slot);
+  }
+
+  finalizeCreate(p, slot) {
     this.activeSlot = slot;
     p.floorState = generateFloor(this.rng, p.floor, p);
     this.enterGame(p, slot);
     this.pushLog(STORY.prologue, 'milestone');
     saveToSlot(this.activeSlot, this.player); // 序章写入后补存，避免重载前首条故事丢失
     this.toast(`已保存到 #${slot + 1} 号槽位`, 'good');
+  }
+
+  confirmOverwriteSlot(slot, onConfirm) {
+    this.showSheet({
+      title: '覆盖该存档？',
+      body: [h('div', { class: 'muted' }, `所有槽位已满，新旅程将覆盖 #${slot + 1} 号槽位（最久未玩）的存档，无法恢复。`)],
+      foot: [
+        h('button', { class: 'btn-danger', onClick: () => { this.closeModal(); onConfirm(); } }, '确认覆盖'),
+        h('button', { class: 'btn-ghost', onClick: () => this.closeModal() }, '取消'),
+      ],
+    });
   }
 
   pickSlotForNewSave() {
@@ -463,6 +484,9 @@ export class GameUI {
       return false;
     }
     if (ent.type === 'trap') {
+      // 一次性陷阱：触发即消失。先移除再传送，teleport() 内的 saveToSlot 会落盘移除结果，
+      // 否则陷阱（emoji '' 不可见）会永久残留于地图。
+      removeEntity(st, ent.id);
       this.teleport();
       return true;
     }
@@ -1153,6 +1177,13 @@ export class GameUI {
   // ===================== 通用弹窗 / 反馈 =====================
   showSheet({ title, body, foot, dismissable = true }) {
     clear(this.modalRoot);
+    // 限时战斗回合中开弹窗（如撤退确认）：onTick 倒计时分支因 !this._sheet 整体跳过，
+    // 视觉上「暂停」。这里同步记下开弹窗瞬间的剩余时间，关弹窗时据此顺延 timerEnd，
+    // 否则 timerEnd 这个绝对截止时间不会随暂停顺延 → 取消弹窗后 remain==0 → 瞬间失手，
+    // 把玩家的深思熟虑误判为反应不及（与 toggleAuto/nextRound 同源的计时器陈旧漏洞）。
+    if (this.screen === 'battle' && this.battle && this.timerEnabled && !this.battle.auto && !this.battle.busy) {
+      this._battlePauseRemain = Math.max(0, this.battle.timerEnd - nowMs());
+    }
     // dismissable=false 时遮罩不可点击关闭（用于必须做出选择的结局抉择，避免软锁）。
     const overlay = h('div', { class: 'sheet-overlay', onClick: () => { if (dismissable) this.closeModal(); } });
     const sheet = h('div', { class: 'sheet' },
@@ -1163,7 +1194,18 @@ export class GameUI {
     this.modalRoot.append(overlay, sheet);
     this._sheet = sheet;
   }
-  closeModal() { clear(this.modalRoot); this._sheet = null; }
+  closeModal() {
+    clear(this.modalRoot);
+    this._sheet = null;
+    // 关弹窗回到限时战斗回合：按开弹窗时记录的剩余时间顺延 timerEnd，
+    // 使「视觉暂停」与「绝对截止时间」一致（不会因 timerEnd 陈旧而瞬间失手）。
+    if (this._battlePauseRemain != null) {
+      if (this.screen === 'battle' && this.battle && this.timerEnabled && !this.battle.auto && !this.battle.busy) {
+        this.battle.timerEnd = nowMs() + this._battlePauseRemain;
+      }
+      this._battlePauseRemain = null;
+    }
+  }
 
   toast(text, type = 'normal') {
     const t = h('div', { class: `toast ${type}` }, text);

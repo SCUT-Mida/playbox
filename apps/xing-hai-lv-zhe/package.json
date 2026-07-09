@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview --host",
     "test": "node scripts/logic-test.mjs",
-    "test:dom": "node scripts/smoke-dom.mjs"
+    "test:dom": "node scripts/smoke-dom.mjs",
+    "test:flee-timer": "node scripts/verify-flee-timer.mjs"
   },
   "devDependencies": {
     "jsdom": "^29.1.1",

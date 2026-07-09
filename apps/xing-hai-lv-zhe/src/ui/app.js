@@ -5,6 +5,7 @@
 // 随机事件、双重结局、多槽位存档。requestAnimationFrame 驱动战斗计时与闲置回精。
 // ============================================================================
 import './style.css';
+import { attachKeyboardShell } from '../../../_lib/keyboard-shell.js';
 import { h, clear, bar } from './dom.js';
 import {
   PALETTE, GRID, VISION_RADIUS, isWalkable,
@@ -63,6 +64,8 @@ export class GameUI {
     this.stage = h('div', { class: 'xhlz-stage' });
     this.modalRoot = h('div', { class: 'xhlz-modals' });
     this.root.append(this.toastWrap, this.stage, this.modalRoot);
+    // 软键盘收口：键盘弹起时把根容器限定在「键盘以上可见区」，输入框落在屏幕上半部分中部。
+    this._detachKeyboard = attachKeyboardShell(this.root);
     this.showLauncher();
     return this;
   }
@@ -1348,6 +1351,7 @@ export class GameUI {
   destroy() {
     this.stopLoop();
     try { if (this.player) saveToSlot(this.activeSlot, this.player); } catch (_) {}
+    if (this._detachKeyboard) { this._detachKeyboard(); this._detachKeyboard = null; }
     clear(this.parent);
     clear(this.modalRoot);
     clear(this.toastWrap);

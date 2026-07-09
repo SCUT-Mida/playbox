@@ -1,5 +1,15 @@
 import './style.css'
 
+// 移动端软键盘「悬浮于页面」：在支持 VirtualKeyboard API 的浏览器（Chromium 系，
+// 含多数国产 WebView）上让键盘以 overlay 形式弹起，不再挤压布局视口。
+// 否则键盘弹起时布局视口高度变小，.game-frame 按 100vh 计算的尺寸会把整个竖屏舞台
+// 等比缩小（见 .ai-tasks/issue-73/context.md）。各展品内部再按视觉视口把输入框
+// 收口到键盘以上的可见区（apps/_lib/keyboard-shell.js）。
+if (typeof navigator !== 'undefined' && navigator.virtualKeyboard) {
+  navigator.virtualKeyboard.overlaysContent = true
+}
+
+
 // 落地页「橱窗」：把流水线产出的展品挂载进来。
 // 主菜单分两层：先呈现「大类」（学习 / 游戏），点击大类后再展开其中的应用。
 // 应用按需懒加载（动态 import），不游玩不拉取，保持落地页轻量。

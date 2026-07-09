@@ -1,0 +1,18 @@
+{
+  "name": "xing-hai-lv-zhe",
+  "version": "1.0.0",
+  "description": "《星骸旅者》开罗式像素 Roguelike 生存探索小游戏 - A Kairosoft-style pixel roguelike survival RPG",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "test": "node scripts/logic-test.mjs",
+    "test:dom": "node scripts/smoke-dom.mjs",
+    "test:flee-timer": "node scripts/verify-flee-timer.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^29.1.1",
+    "vite": "^5.4.0"
+  }
+}

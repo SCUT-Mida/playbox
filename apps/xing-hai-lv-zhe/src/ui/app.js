@@ -13,12 +13,12 @@ import {
   TALENTS, TALENT_BY_BRANCH, talentCost,
   STAMINA_COST_PER_ROUND, STAMINA_REGEN_PER_STEP, STAMINA_REGEN_INTERVAL_MS, STAMINA_TIRED,
   SHOP_ITEMS, DRONE_COST, EVENT_META, MEMORY_CHAPTERS, STORY, ENDINGS, MAX_FLOOR, expToNext,
-  biomeFor, DECOR,
+  biomeFor, DECOR, PLANETS, planetFor, GEAR_SLOT_META,
 } from '../config.js';
 import {
   newPlayer, migrate, maxHp, maxStamina, effectiveAtk, effectiveDef, effectiveMoveRange,
   enhanceEquipment, buyTalent, resetTalents, gainReward, healFull, regenStamina, spendStamina,
-  isDead, collectMemory, collectedMemoryCount,
+  isDead, collectMemory, collectedMemoryCount, equipGear,
 } from '../core/player.js';
 import {
   generateFloor, findPath, reachableTiles, entityAt, removeEntity, tileAt, descend,
@@ -115,9 +115,14 @@ export class GameUI {
   showAbout() {
     const body = [
       h('div', { class: 'card' },
+        h('h4', null, '🪐 星图 · 星球线路'),
+        h('div', { class: 'muted', style: { lineHeight: 1.7 } },
+          '四颗星球残骸连成一条航路。先着陆一颗进行浮岛探索；找到下行航点、越过边界，即可跃迁到下一颗星球。不同星球有不同的生物、地形与装备。点击顶部 🪐 可随时查看星图。'),
+      ),
+      h('div', { class: 'card' },
         h('h4', null, '🎮 核心循环'),
         h('div', { class: 'muted', style: { lineHeight: 1.7 } },
-          '浮岛探索（点击移动）→ 触发战斗 / 宝箱 / 陷阱 → 回到背包消耗零件强化装备、用星骸点亮天赋 → 挑战更深层浮岛。'),
+          '浮岛探索（点击移动）→ 触发战斗 / 宝箱 / 陷阱 → 回到背包消耗零件强化装备、用星骸点亮天赋 → 挑战更深层浮岛。宝箱偶尔会掉落命名装备，可在弹窗中选择穿戴或丢弃。'),
       ),
       h('div', { class: 'card' },
         h('h4', null, '⚔️ 战斗：猜拳克制'),
@@ -133,6 +138,68 @@ export class GameUI {
       ),
     ];
     this.showSheet({ title: '📖 关于 / 玩法', body, foot: [h('button', { class: 'btn-primary', onClick: () => this.closeModal() }, '明白')] });
+  }
+
+  // ===================== 星图（星球线路）=====================
+  // 三种模式：intro（创角后首现）、travel（跨星球跃迁）、overview（游戏中随时查看）。
+  // 星图是顶层导航：先呈现一条星球航路，进入某颗星球才是当前的浮岛探索；
+  // 探险完一颗（下行越过边界）即跃迁到下一颗。星球状态由最远到达楼层推导，无需额外存档字段。
+  showGalaxy(opts = {}) {
+    const mode = opts.intro ? 'intro' : opts.travel ? 'travel' : 'overview';
+    if (mode === 'overview' && this.screen !== 'game') return;
+    this.screen = 'galaxy';
+    this.stopLoop();
+    clear(this.modalRoot);
+    this._sheet = null;
+    this._battlePauseRemain = null;
+    clear(this.stage);
+    const p = this.player;
+    const cur = planetFor(p ? p.floor : 1);
+    const headTitle = mode === 'travel' ? '🛰️ 跃迁完成' : '🪐 星图 · 星球线路';
+    let sub;
+    if (mode === 'intro') sub = '破碎星球「墨比乌斯」的四片残骸连成一条航路。先着陆最近的一颗，再逐颗探索。';
+    else if (mode === 'travel') sub = `你穿越了裂隙，抵达「${cur.name}」。这里的生态与生物已截然不同。`;
+    else sub = `当前位于「${cur.name}」（第 ${p ? p.floor : 1} 层）。已寻回 ${p ? collectedMemoryCount(p) : 0}/10 枚星骸回响。`;
+
+    const route = h('div', { class: 'galaxy__route' }, PLANETS.map((pl) => {
+      const status = this.planetStatus(pl);
+      const tag = status === 'cleared' ? '✓ 已探索' : status === 'current' ? '● 探索中' : '🔒 未解锁';
+      return h('div', { class: `planet-node ${status}` },
+        h('div', { class: 'pn-emoji' }, pl.emoji),
+        h('div', { class: 'pn-info' },
+          h('div', { class: 'pn-name' }, pl.name),
+          h('div', { class: 'pn-floors muted' }, `第 ${pl.from}${pl.to > pl.from ? `–${pl.to}` : ''} 层`),
+          h('div', { class: 'pn-desc' }, pl.desc),
+        ),
+        h('div', { class: 'pn-tag' }, tag),
+      );
+    }));
+
+    const enter = () => this.enterGame(this.player, this.activeSlot);
+    const btnLabel = mode === 'intro' ? `🚀 着陆「${cur.name}」`
+      : mode === 'travel' ? `继续探索「${cur.name}」` : '返回探索';
+
+    const wrap = h('div', { class: 'launcher galaxy' },
+      h('div', { class: 'galaxy__head' },
+        h('h1', null, headTitle),
+        h('p', { class: 'sub' }, sub),
+      ),
+      route,
+      h('div', { class: 'create__foot' },
+        h('button', { class: 'btn-primary big-btn', onClick: enter }, btnLabel),
+      ),
+      h('p', { class: 'launcher__hint muted' }, '找到下行航点并跃迁，即可前往下一颗星球。不同星球栖息着不同的生物，也埋藏着不同的装备。'),
+    );
+    this.stage.appendChild(wrap);
+  }
+
+  // 星球在星图上的状态：已探索 / 探索中 / 未解锁。
+  planetStatus(pl) {
+    const p = this.player;
+    if (!p || !Number.isFinite(p.maxFloor)) return pl.from === 1 ? 'current' : 'locked';
+    if (p.maxFloor > pl.to) return 'cleared';
+    if (p.maxFloor >= pl.from) return 'current';
+    return 'locked';
   }
 
   // ===================== 存档管理（多槽位）=====================
@@ -236,11 +303,13 @@ export class GameUI {
 
   finalizeCreate(p, slot) {
     this.activeSlot = slot;
+    this.player = p;
     p.floorState = generateFloor(this.rng, p.floor, p);
-    this.enterGame(p, slot);
     this.pushLog(STORY.prologue, 'milestone');
     saveToSlot(this.activeSlot, this.player); // 序章写入后补存，避免重载前首条故事丢失
     this.toast(`已保存到 #${slot + 1} 号槽位`, 'good');
+    // 先呈现星图（星球线路），玩家「着陆」后再进入当前星球的探索。
+    this.showGalaxy({ intro: true });
   }
 
   confirmOverwriteSlot(slot, onConfirm) {
@@ -314,6 +383,8 @@ export class GameUI {
         h('span', { class: 'status-name' }, p.name),
         h('span', { class: 'status-lv' }, `Lv${p.level}`),
         h('span', { class: 'status-floor' }, '第 ', h('b', null, String(p.floor)), ` / ${MAX_FLOOR} 层`),
+        h('span', { class: 'grow' }),
+        h('button', { class: 'galaxy-btn', title: '星图 · 星球线路', onClick: () => this.showGalaxy({ overview: true }) }, '🪐'),
         h('span', { class: 'status-res' },
           h('span', { class: 'r' }, h('span', null, '✨'), this.sdEl = h('span', null, String(p.stardust))),
           h('span', { class: 'r' }, h('span', null, '🔩'), this.ptEl = h('span', null, String(p.parts))),
@@ -467,6 +538,16 @@ export class GameUI {
   resolveEntity(ent) {
     const st = this.state();
     if (ent.type === 'chest') {
+      // 装备宝箱：弹窗选择装备 / 丢弃（中止移动）。
+      if (ent.gear) {
+        const gear = ent.gear;
+        removeEntity(st, ent.id);
+        // 立即落盘「宝箱已开启」：装备/丢弃均在此后于弹窗内决定，
+        // 避免丢弃后重载又让该宝箱复现。
+        saveToSlot(this.activeSlot, this.player);
+        this.offerGear(gear);
+        return true;
+      }
       const r = ent.reward || {};
       // 用 gainReward 的实发量（含幸运加成）展示，避免飘字与状态栏不一致。
       const g = gainReward(this.player, r, this.rng);
@@ -595,14 +676,22 @@ export class GameUI {
   descendFloor() {
     const st = this.state();
     if (tileAt(st, st.pos.x, st.pos.y) !== 'stairs') { this.toast('需站在下行阶梯上', 'normal'); return; }
+    const fromPlanet = planetFor(this.player.floor);
     descend(this.player);
+    const toPlanet = planetFor(this.player.floor);
     this.player.floorState = generateFloor(this.rng, this.player.floor, this.player);
     this.pushLog(`⬇️ 降至第 ${this.player.floor} 层浮岛。`, 'milestone');
     if (this.player.floor === 3) this.pushLog(STORY.midpoint, 'milestone');
+    saveToSlot(this.activeSlot, this.player);
+    // 跨越星球边界：呈现星图跃迁（一个星球探索完，前往下一个星球）。
+    if (fromPlanet.key !== toPlanet.key) {
+      this.toast(`跃迁至「${toPlanet.name}」`, 'good');
+      this.showGalaxy({ travel: true });
+      return;
+    }
     this.refreshStatus();
     this.renderMap();
     this.refreshInteract();
-    saveToSlot(this.activeSlot, this.player);
     this.toast(`进入第 ${this.player.floor} 层`, 'good');
   }
 
@@ -1144,6 +1233,49 @@ export class GameUI {
     saveToSlot(this.activeSlot, this.player);
   }
 
+  // —— 装备宝箱：对比当前装备，选择穿戴或丢弃 ——
+  offerGear(gear) {
+    const p = this.player;
+    const meta = GEAR_SLOT_META[gear.slot];
+    if (!meta) { this.toast('未知装备', 'bad'); return; }
+    const curStat = statForSlot(p, gear.slot);
+    const newStat = statForSlot(p, gear.slot, gear);
+    const better = newStat >= curStat;
+    const plusTxt = gear.plus > 0 ? ` +${gear.plus}` : '';
+    const body = [
+      h('div', { class: 'gear-drop' },
+        h('div', { class: 'gd-emoji' }, meta.emoji),
+        h('div', { class: 'gd-name' }, gear.name, h('span', { class: 'plus' }, plusTxt)),
+        h('div', { class: 'muted', style: { fontSize: '0.8rem', marginTop: '0.15rem' } },
+          `${meta.label} · ${better ? '比当前更强' : '不及当前装备'}`),
+        h('div', { class: 'gd-compare' },
+          h('div', { class: 'gd-stat cur' }, `当前 ${meta.statName} ${curStat}`),
+          h('div', { class: 'gd-stat new' }, `新 ${meta.statName} ${newStat}`),
+        ),
+      ),
+    ];
+    this.showSheet({
+      title: `拾得${meta.label}`,
+      body,
+      foot: [
+        h('button', { class: 'btn-primary', onClick: () => this.takeGear(gear) }, '装备'),
+        h('button', { class: 'btn-ghost', onClick: () => { this.closeModal(); this.pushLog(`丢弃 ${gear.name}${plusTxt}`, 'normal'); } }, '丢弃'),
+      ],
+    });
+    this.toast(`拾得${meta.label}！`, 'good');
+  }
+
+  takeGear(gear) {
+    const res = equipGear(this.player, gear);
+    this.closeModal();
+    if (!res.ok) { this.toast('无法装备', 'bad'); return; }
+    saveToSlot(this.activeSlot, this.player);
+    this.refreshStatus();
+    const plusTxt = gear.plus > 0 ? ` +${gear.plus}` : '';
+    this.pushLog(`🛡️ 装备「${gear.name}${plusTxt}」`, 'good');
+    this.toast(`已装备 ${gear.name}`, 'good');
+  }
+
   // ===================== 设置 / 存档 =====================
   showSettings(fromLauncher) {
     const p = this.player;
@@ -1400,6 +1532,18 @@ function spentStardust(p) {
     for (let i = 0; i < rank; i++) s += talentCost(t.branch, i);
   }
   return s;
+}
+// 计算某部位在（可选）装备覆盖下的当前数值，用于装备掉落的前后对比。
+function statForSlot(p, slot, override) {
+  const eq = {
+    weapon: slot === 'weapon' && override ? override : p.equipment.weapon,
+    armor: slot === 'armor' && override ? override : p.equipment.armor,
+    booster: slot === 'booster' && override ? override : p.equipment.booster,
+  };
+  const mock = { ...p, equipment: eq };
+  if (slot === 'weapon') return effectiveAtk(mock);
+  if (slot === 'armor') return effectiveDef(mock);
+  return effectiveMoveRange(mock);
 }
 function nowMs() {
   try { return Date.now(); } catch (_) { return 0; }

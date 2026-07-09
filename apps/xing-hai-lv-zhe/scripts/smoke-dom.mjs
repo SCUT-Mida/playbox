@@ -56,7 +56,13 @@ if (nameInput) {
 }
 document.querySelector('.create__foot .btn-primary').click();
 await sleep(15);
-ok(document.querySelector('.xhlz-game') !== null, '迫降后进入游戏界面');
+// 创角后先呈现星图（星球线路），点击「着陆」进入当前星球的探索
+ok(document.querySelector('.galaxy') !== null, '创角后呈现星图（星球线路）');
+ok(document.querySelectorAll('.planet-node').length >= 4, '星图列出多颗星球航点');
+const landBtn = [...document.querySelectorAll('.galaxy .btn-primary')].find((b) => /着陆/.test(b.textContent || ''));
+if (landBtn) landBtn.click();
+await sleep(15);
+ok(document.querySelector('.xhlz-game') !== null, '着陆后进入游戏界面');
 ok(document.querySelector('.status-bar') !== null, '渲染顶部状态栏');
 ok(document.querySelector('.map-grid') !== null, '渲染像素地图');
 ok(document.querySelectorAll('.cell').length === GRID * GRID, `地图含 ${GRID * GRID} 个地块（实际 ${document.querySelectorAll('.cell').length}）`);
@@ -307,7 +313,11 @@ await sleep(10);
 const newBtn = [...document.querySelectorAll('.launcher__actions button')].find((b) => /新旅程/.test(b.textContent));
 (newBtn || document.querySelector('.launcher__actions .btn-primary')).click();
 await sleep(10);
-document.querySelector('.create__foot .btn-primary').click(); // 迫降进入游戏
+document.querySelector('.create__foot .btn-primary').click(); // 迫降
+await sleep(10);
+// 跳过星图介绍页，着陆进入游戏
+const landBtn2 = [...document.querySelectorAll('.galaxy .btn-primary')].find((b) => /着陆/.test(b.textContent || ''));
+if (landBtn2) landBtn2.click();
 await sleep(15);
 ok(ui.player && ui.screen === 'game', '开启新旅程进入游戏');
 ui.player.hp = 0;

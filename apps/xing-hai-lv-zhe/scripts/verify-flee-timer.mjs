@@ -45,6 +45,10 @@ document.querySelector('.launcher__actions .btn-primary').click();
 await sleep(5);
 document.querySelector('.create__foot .btn-primary').click(); // 迫降
 await sleep(10);
+// 跳过创角后呈现的星图（星球线路）介绍页
+const landBtn = [...document.querySelectorAll('.galaxy .btn-primary')].find((b) => /着陆/.test(b.textContent || ''));
+if (landBtn) landBtn.click();
+await sleep(10);
 ok(ui.screen === 'game' && ui.player, '已进入地图界面');
 
 const enemy = ui.player.floorState.entities.find((e) => e.type === 'enemy');

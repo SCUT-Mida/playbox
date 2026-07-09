@@ -225,11 +225,27 @@ const overlay = document.getElementById('game-overlay')
 const mount = document.getElementById('game-mount')
 const closeBtn = document.getElementById('game-close')
 const loadingEl = document.getElementById('game-loading')
+const gameFrame = document.querySelector('.game-frame')
 
 const GAME_KEY = '__PLAYBOX_GAME__' // 暴露实例便于调试 / 自动化冒烟测试
 let game = null
 let loading = false
 let loadSeq = 0 // 取消令牌：每次 closeGame / 重新 openGame 递增，使飞行中的加载作废
+
+// 锁定游戏舞台尺寸到「键盘弹起前」的视口大小（issue #73）。
+// CSS lvh 在现代浏览器上已解决此问题；此 JS 是旧浏览器（不支持 lvh /
+// interactive-widget）的兜底：在 overlay 打开瞬间（此时无键盘）捕获 innerHeight，
+// 把 .game-frame 的 max-width 写为显式像素值，键盘弹起后该值不变 → 舞台不缩小。
+function lockFrameSize() {
+  if (!gameFrame) return
+  const vh = window.innerHeight
+  const vw = window.innerWidth
+  const w = Math.min(vw * 0.96, (vh - 96) * 720 / 1280)
+  gameFrame.style.maxWidth = w + 'px'
+}
+function unlockFrameSize() {
+  if (gameFrame) gameFrame.style.maxWidth = ''
+}
 
 async function openGame(def, btn) {
   const playLabel = btn.querySelector('.play-btn__label')
@@ -246,6 +262,9 @@ async function openGame(def, btn) {
   btn.disabled = true
   btn.classList.add('is-loading')
   playLabel.textContent = '加载中…'
+
+  // 在 overlay 可见前锁定舞台尺寸（此时键盘未弹起，innerHeight 为完整值）。
+  lockFrameSize()
 
   // 顶栏展示当前展品名（关闭✕已移入顶栏，不再压住游戏右上角的控件）
   const topbarTitle = document.getElementById('game-topbar-title')
@@ -303,6 +322,7 @@ function closeGame() {
   mount.innerHTML = ''
   loadingEl.hidden = true
   overlay.hidden = true
+  unlockFrameSize()
   // 重置关闭按钮的二次确认态
   closeArmed = false
   closeBtn.classList.remove('is-armed')

@@ -7,19 +7,19 @@
 
 /* ── Variables ── */
 :root {
-  --bg: #0b0b0e;
-  --bg-card: #141417;
-  --bg-card-hi: #1b1a20;
-  --text: #ece9e3;
-  --text-muted: #8a8883;
-  --accent: #d4a84b;       /* 香槟金 */
-  --accent-hi: #ecc878;
-  --accent-dim: #b8912e;
-  --line: #24232b;
-  --gold-line: rgba(212, 168, 75, 0.32);
-  --gold-glow: rgba(212, 168, 75, 0.14);
-  --shadow-card: 0 12px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.03);
-  --shadow-card-hi: 0 20px 48px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(212, 168, 75, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --bg: #f8f4e6;
+  --bg-card: #fffaf0;
+  --bg-card-hi: #f6efde;
+  --text: #3a3a4a;
+  --text-muted: #6b6a78;
+  --accent: #ffb400;       /* 星金 */
+  --accent-hi: #ffd93d;
+  --accent-dim: #d99a00;
+  --line: #d9c9a3;
+  --gold-line: rgba(217, 201, 163, 0.5);
+  --gold-glow: rgba(255, 180, 0, 0.12);
+  --shadow-card: 0 2px 0 #c9b68a;
+  --shadow-card-hi: 0 3px 0 #c9b68a, 0 0 0 1px rgba(255, 180, 0, 0.15);
   --font-display: 'Playfair Display', Georgia, serif;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
 }
@@ -32,10 +32,11 @@ html {
 }
 
 body {
-  /* 顶部一抹香槟金辉光，营造轻奢氛围；其余维持近黑底，凸显金字与卡片质感。 */
+  /* 温暖羊皮纸底 + 45° 细线纹理，呼应 xhlz 开罗轻奢风。 */
   background:
-    radial-gradient(125% 80% at 50% -12%, rgba(212, 168, 75, 0.10), rgba(212, 168, 75, 0) 55%),
-    var(--bg);
+    radial-gradient(120% 60% at 50% -10%, #fffdf6 0%, transparent 55%),
+    repeating-linear-gradient(45deg, rgba(217,201,163,0.10) 0 2px, transparent 2px 6px),
+    #f8f4e6;
   color: var(--text);
   font-family: var(--font-body);
   font-weight: 400;
@@ -75,12 +76,13 @@ header {
   line-height: 1.1;
   letter-spacing: -0.02em;
   margin-bottom: 0.75rem;
-  /* 香槟金竖向渐变描色，保留 color 作旧浏览器回退。 */
+  /* 金色竖向渐变描色，浅底可读性用 drop-shadow 补光。 */
   color: var(--accent);
-  background: linear-gradient(180deg, #f3d98a 0%, #d4a84b 58%, #b1892c 100%);
+  background: linear-gradient(180deg, #ffd93d 0%, #ffb400 58%, #d99a00 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 1px 0 rgba(255,255,255,0.5));
 }
 
 .subtitle {
@@ -98,9 +100,6 @@ header {
   position: relative;
 }
 
-/* 上下细金线（两端淡出），替代纯灰描边，更精致。
-   不再保留 border-top/border-bottom，否则灰边与 top:0/bottom:0 的金线
-   会紧邻渲染成"双线重影"（伪元素 top/bottom 相对内边距盒，紧贴边框内侧）。 */
 .description::before,
 .description::after {
   content: "";
@@ -124,7 +123,6 @@ header {
   margin-bottom: 3rem;
 }
 
-/* 顶栏：返回按钮 + 当前层级标题 */
 .exhibit-head {
   display: flex;
   align-items: center;
@@ -143,7 +141,6 @@ header {
   padding-left: 0.85rem;
 }
 
-/* 标题左侧一道短金竖线，作为轻奢的克制度量点缀。 */
 .section-title::before {
   content: "";
   position: absolute;
@@ -156,7 +153,6 @@ header {
   border-radius: 2px;
 }
 
-/* 返回大类按钮：首页视图下隐藏，进入大类后出现 */
 .back-btn {
   flex: none;
   display: flex;
@@ -166,7 +162,7 @@ header {
   height: 28px;
   border: 1px solid var(--line);
   border-radius: 50%;
-  background: var(--bg-card);
+  background: #fffaf0;
   color: var(--accent);
   font-size: 1rem;
   line-height: 1;
@@ -175,7 +171,7 @@ header {
 }
 
 .back-btn:hover {
-  background: #1f1d18;
+  background: #f6efde;
   border-color: var(--accent-dim);
   box-shadow: 0 0 0 3px var(--gold-glow);
 }
@@ -185,7 +181,7 @@ header {
 }
 
 .card {
-  background: var(--bg-card);
+  background: #fffaf0;
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 2rem 1.5rem;
@@ -194,24 +190,22 @@ header {
 /* ── Exhibit card（展品卡片）── */
 .card--exhibit {
   padding: 1.5rem;
-  background: linear-gradient(155deg, var(--bg-card-hi) 0%, var(--bg-card) 72%);
+  background: linear-gradient(155deg, #f6efde 0%, #fffaf0 72%);
   box-shadow: var(--shadow-card);
 }
 
-/* 大类卡片：可点击的导航磁贴，整体可点进入子列表 */
 .card--category {
   position: relative;
   overflow: hidden;
   padding: 1.75rem 1.5rem;
   cursor: pointer;
-  background: linear-gradient(155deg, #1b1a21 0%, #131317 72%);
+  background: linear-gradient(155deg, #f6efde 0%, #f3ead6 72%);
   border: 1px solid var(--line);
   border-radius: 14px;
   box-shadow: var(--shadow-card);
   transition: border-color 0.2s ease, transform 0.18s ease, box-shadow 0.25s ease, background 0.25s ease;
 }
 
-/* 卡顶一道两端淡出的金线，hover 时加亮——克制的轻奢细节。 */
 .card--category::before {
   content: "";
   position: absolute;
@@ -226,8 +220,8 @@ header {
 
 .card--category:hover,
 .card--category:focus-visible {
-  border-color: rgba(212, 168, 75, 0.42);
-  background: linear-gradient(155deg, #211f28 0%, #171619 72%);
+  border-color: rgba(255, 180, 0, 0.42);
+  background: linear-gradient(155deg, #fff8e8 0%, #f6efde 72%);
   box-shadow: var(--shadow-card-hi);
   transform: translateY(-2px);
   outline: none;
@@ -242,7 +236,6 @@ header {
   transform: translateY(0);
 }
 
-/* 大类标题右侧的箭头，提示可进入下一级 */
 .card-chevron {
   margin-left: auto;
   align-self: center;
@@ -261,21 +254,19 @@ header {
   transform: translateX(3px);
 }
 
-/* 大类底部的进入提示，复用主按钮视觉但非独立按钮（整卡可点） */
 .enter-btn {
   display: inline-block;
   margin-top: 0.25rem;
   padding: 0.42rem 1rem;
   border-radius: 999px;
-  background: linear-gradient(135deg, rgba(236, 200, 120, 0.16), rgba(212, 168, 75, 0.10));
-  color: var(--accent-hi);
+  background: linear-gradient(135deg, rgba(255, 217, 61, 0.2), rgba(255, 180, 0, 0.12));
+  color: var(--accent-dim);
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 0.06em;
   border: 1px solid var(--gold-line);
 }
 
-/* 多展品纵向堆叠 */
 .exhibit-list {
   display: flex;
   flex-direction: column;
@@ -296,12 +287,12 @@ header {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* 金边深底的小铭牌：内高光 + 暖色描边，质感更精致。 */
-  background: linear-gradient(150deg, #4a3a26 0%, #2a2016 60%, #1b140d 100%);
-  border: 1px solid rgba(212, 168, 75, 0.36);
+  /* 浅底金边铭牌：暖色渐变 + solid bottom shadow，呼应 xhlz btn-primary 质感。 */
+  background: linear-gradient(150deg, #fff5d6 0%, #ffe98a 60%, #ffd93d 100%);
+  border: 2px solid #d99a00;
   border-radius: 12px;
-  box-shadow: inset 0 1px 0 rgba(255, 224, 160, 0.20), 0 6px 16px rgba(0, 0, 0, 0.45);
-  color: #f1dca0;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 3px 0 #c9b68a;
+  color: #3a2a00;
   font-family: serif;
   font-size: 1.65rem;
   line-height: 1;
@@ -343,23 +334,23 @@ header {
   justify-content: center;
   gap: 0.5rem;
   padding: 0.8rem 1rem;
-  border: none;
+  border: 2px solid #d99a00;
   border-radius: 10px;
-  /* 金色渐变面 + 顶部内高光，呈现金属质感的「轻奢」主按钮。 */
-  background: linear-gradient(180deg, #ecc878 0%, #d4a84b 55%, #bd9333 100%);
-  color: #1a1410;
+  /* 金色渐变面 + solid bottom shadow，xhlz btn-primary 风格。 */
+  background: linear-gradient(180deg, #ffd93d 0%, #ffb400 55%, #d99a00 100%);
+  color: #3a2a00;
   font-family: var(--font-body);
   font-weight: 600;
   font-size: 0.95rem;
   letter-spacing: 0.02em;
   cursor: pointer;
-  box-shadow: inset 0 1px 0 rgba(255, 240, 200, 0.45), 0 8px 20px rgba(212, 168, 75, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 2px 0 #b07d00;
   transition: filter 0.18s ease, box-shadow 0.22s ease, opacity 0.15s ease, transform 0.12s ease;
 }
 
 .play-btn:hover:not(:disabled) {
   filter: brightness(1.05);
-  box-shadow: inset 0 1px 0 rgba(255, 240, 200, 0.5), 0 10px 26px rgba(212, 168, 75, 0.32);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 4px 12px rgba(255, 180, 0, 0.3);
 }
 
 .play-btn:active:not(:disabled) {
@@ -391,19 +382,17 @@ header {
   align-items: center;
   justify-content: center;
   padding: clamp(8px, 2vmin, 24px);
-  background: rgba(0, 0, 0, 0.92);
+  background: rgba(30, 25, 15, 0.92);
 }
 
-/* 顶栏 + 画布 的纵向框架：关闭✕ 收进顶栏，置于画布之上方，
-   不再以悬浮✕压住游戏内右上角的控件（如倍速按钮）。 */
 .game-frame {
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 6px;
   width: 100%;
-  /* 顶栏(40) + 间距(6) + 安全边距，确保画布在视口高度内完整放下 */
   max-width: min(96vw, calc((100vh - 96px) * 720 / 1280));
+  max-width: min(96vw, calc((100lvh - 96px) * 720 / 1280));
 }
 
 .game-topbar {
@@ -413,7 +402,7 @@ header {
   height: 40px;
   padding: 0 6px;
   border-radius: 10px;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(30, 25, 15, 0.55);
   color: #ead9b6;
 }
 
@@ -432,7 +421,6 @@ header {
 .game-stage {
   position: relative;
   width: 100%;
-  /* 保持 720×1280 竖屏画布比例，宽度由 .game-frame 统一约束 */
   aspect-ratio: 720 / 1280;
   background: #1f1812;
   border-radius: 10px;
@@ -440,8 +428,6 @@ header {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
 }
 
-/* 横屏旋转提示：游戏为竖屏设计，横屏游玩时遮罩提示用户旋转设备。
-   仅在 overlay 打开（游戏进行中）且横屏时显示，不影响落地页本身。 */
 .orientation-hint {
   display: none;
   position: absolute;
@@ -479,7 +465,6 @@ header {
 
 .game-mount canvas {
   display: block;
-  /* 嵌入落地页时也禁用浏览器手势（滚动/缩放）抢占触摸，保证游戏内点击/拖拽可靠 */
   touch-action: none;
 }
 
@@ -493,7 +478,7 @@ header {
   justify-content: center;
   border: none;
   border-radius: 15px;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(30, 25, 15, 0.4);
   color: #ead9b6;
   font-size: 13px;
   font-family: var(--font-body);
@@ -503,10 +488,9 @@ header {
 }
 
 .game-close:hover {
-  background: rgba(0, 0, 0, 0.85);
+  background: rgba(30, 25, 15, 0.85);
 }
 
-/* 二次确认 armed 态：放大、变暖色并显示"再按退出"文案，提示需要再点一次才退出 */
 .game-close.is-armed {
   background: rgba(176, 58, 30, 0.92);
   color: #ffe6d8;

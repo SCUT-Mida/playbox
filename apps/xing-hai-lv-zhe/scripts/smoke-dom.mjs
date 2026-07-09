@@ -292,6 +292,36 @@ if (await exerciseGearChest('丢弃')) {
 }
 await sleep(5);
 
+// 「点击遮罩关闭」路径（r2 回归：第三条关闭路径此前未覆盖）
+// 踩上装备宝箱 → offerGear 弹窗 → 直接点 .sheet-overlay 关闭（非按钮路径）。
+// 修复前 closeModal 不重置 _interactMode，交互键仍停在「拾取宝箱」指向已删除实体，
+// 再次点击会重放装备弹窗；修复后 closeModal 统一清空并重算，须回退为「调查」。
+{
+  const chest = placeGearChestAdjacent();
+  if (chest) {
+    ui.tryMoveTo(chest.x, chest.y); // 踩上宝箱 → resolveEntity → offerGear
+    await sleep(10);
+    if (/拾得/.test(document.querySelector('.sheet__head .t')?.textContent || '')) {
+      const overlay = document.querySelector('.sheet-overlay');
+      if (overlay) overlay.click(); // 经遮罩关闭弹窗
+      await sleep(10);
+      ok(ui._sheet === null, '点击遮罩可关闭装备宝箱弹窗');
+      ok(!/拾取宝箱/.test(document.querySelector('.interact-btn')?.textContent || ''), '遮罩关闭后交互键不再停留为「拾取宝箱」');
+      ok(ui._interactMode && ui._interactMode.mode === 'investigate', '遮罩关闭后 _interactMode 已重置为 investigate（不再指向已删除实体）');
+      // 关键回归：再次点交互键不得重放已移除实体的装备弹窗
+      document.querySelector('.interact-btn').click();
+      await sleep(10);
+      ok(document.querySelector('.gear-drop') === null, '遮罩关闭后再次点击交互键不会重放装备宝箱弹窗（陈旧交互态已清除）');
+      if (ui._sheet) ui.closeModal();
+    } else {
+      fail++; console.error('  ✗ FAIL: 装备宝箱经遮罩关闭路径未能触发 offerGear 弹窗');
+    }
+  } else {
+    fail++; console.error('  ✗ FAIL: 未能放置装备宝箱以测试「遮罩关闭」路径');
+  }
+}
+await sleep(5);
+
 // ---------- 8) 下层 ----------
 // 走到阶梯并下行
 const findStairs = () => {

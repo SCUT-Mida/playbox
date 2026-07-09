@@ -1392,6 +1392,14 @@ export class GameUI {
       }
       this._battlePauseRemain = null;
     }
+    // 关闭弹窗时统一清空陈旧的交互态，并在游戏地图上重算中央交互键。
+    // 这是第 1/2 轮「return true 类实体被重放」缺陷的根治点：装备宝箱等实体在
+    // resolveEntity 中已被 removeEntity，但 offerGear return true 跳过了 walkPath 末尾的
+    // refreshInteract()，使 _interactMode 仍指向已删除实体；只要玩家经「点遮罩」「点关闭」
+    // 等任意非按钮路径关闭弹窗（按钮路径另由 takeGear/丢弃 显式 refreshInteract 兜底），
+    // doInteract 就会重放该实体（如再次弹出同一件装备）。此处一处覆盖所有此类隐患。
+    this._interactMode = null;
+    if (this.screen === 'game') this.refreshInteract();
   }
 
   toast(text, type = 'normal') {

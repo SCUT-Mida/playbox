@@ -34,6 +34,8 @@ import {
 
 const BATTLE_TIME_MS = 3000;       // 每回合限时（可于设置关闭）
 const IDLE_FRAME_MS = 1000 / 20;   // 闲置降帧至 ~20fps 节省电量
+const HOLD_INITIAL_MS = 240;       // 方向键长按：首次重复前的延迟（按下即走一步，停顿后再连发）
+const HOLD_REPEAT_MS = 120;        // 方向键长按：连发间隔（持续按住时每格移动节奏）
 
 export class GameUI {
   constructor(parent) {
@@ -493,16 +495,16 @@ export class GameUI {
     this.tryMoveTo(x, y);
   }
 
-  tryMoveTo(tx, ty) {
+  tryMoveTo(tx, ty, silent) {
     const st = this.state();
     if (!st) return;
     if (st.pos.x === tx && st.pos.y === ty) { this.refreshInteract(); return; }
     const ent = entityAt(st, tx, ty);
-    if (ent && ent.type === 'enemy') { this.toast('靠近敌人后用「攻击」交战', 'normal'); return; }
-    if (!isWalkable(tileAt(st, tx, ty))) { this.toast('那里无法通行', 'normal'); return; }
+    if (ent && ent.type === 'enemy') { if (!silent) this.toast('靠近敌人后用「攻击」交战', 'normal'); return; }
+    if (!isWalkable(tileAt(st, tx, ty))) { if (!silent) this.toast('那里无法通行', 'normal'); return; }
     const range = effectiveMoveRange(this.player);
     const path = findPath(st, st.pos, { x: tx, y: ty }, range);
-    if (!path || !path.length) { this.toast('超出移动步数', 'normal'); return; }
+    if (!path || !path.length) { if (!silent) this.toast('超出移动步数', 'normal'); return; }
     this.walkPath(path);
   }
 
@@ -605,23 +607,25 @@ export class GameUI {
     saveToSlot(this.activeSlot, this.player);
   }
 
-  // —— 方向键单步移动 ——
-  dpadMove(dx, dy) {
+  // —— 方向键移动 ——
+  // silent=true 时静音（长按连发撞墙不刷屏 toast）；单点轻触 silent 留空，保留反馈。
+  dpadMove(dx, dy, silent) {
     if (this.screen !== 'game' || this._sheet) return;
     const st = this.state();
+    if (!st) return;
     const nx = st.pos.x + dx, ny = st.pos.y + dy;
-    this.tryMoveTo(nx, ny);
+    this.tryMoveTo(nx, ny, silent);
   }
 
   // —— 中央交互键（随上下文动态）——
   buildBottomBar() {
     clear(this.bottomBar);
     const dpad = h('div', { class: 'dpad' },
-      h('button', { class: 'd-up', onClick: () => this.dpadMove(0, -1) }, '▲'),
-      h('button', { class: 'd-left', onClick: () => this.dpadMove(-1, 0) }, '◀'),
+      this.mkDirBtn('d-up', 0, -1, '▲'),
+      this.mkDirBtn('d-left', -1, 0, '◀'),
       h('button', { class: 'd-center', onClick: () => this.refreshInteract() }, '·'),
-      h('button', { class: 'd-right', onClick: () => this.dpadMove(1, 0) }, '▶'),
-      h('button', { class: 'd-down', onClick: () => this.dpadMove(0, 1) }, '▼'),
+      this.mkDirBtn('d-right', 1, 0, '▶'),
+      this.mkDirBtn('d-down', 0, 1, '▼'),
     );
     this.interactBtn = h('button', { class: 'btn-primary interact-btn', onClick: () => this.doInteract() }, '🔍 调查');
     const tools = h('div', { class: 'tool-col' },
@@ -629,6 +633,56 @@ export class GameUI {
       h('button', { class: 'icon-btn', title: '设置 / 存档', onClick: () => this.showSettings(false) }, '⚙️'),
     );
     this.bottomBar.append(dpad, h('div', { class: 'act-col' }, this.interactBtn), tools);
+    // 全局兜底：指针在按钮外释放（手指滑出方向键松开）时也终止连按，避免移动卡住。
+    this.bindGlobalHoldRelease();
+  }
+
+  // 方向键按钮：轻触走一步，长按连续移动（pointer 事件统一触屏与鼠标）。
+  mkDirBtn(cls, dx, dy, label) {
+    const btn = h('button', { class: cls }, label);
+    this.bindHoldMove(btn, dx, dy);
+    return btn;
+  }
+
+  bindHoldMove(btn, dx, dy) {
+    const start = (e) => {
+      if (e.button != null && e.button !== 0) return; // 仅主键 / 触摸 / 笔
+      e.preventDefault();
+      this.stopHold();
+      this._holdActive = true;
+      // 按下立即走一步（保留单点反馈）；之后停顿 HOLD_INITIAL_MS 再连发。
+      this.dpadMove(dx, dy, false);
+      // 捕获指针：手指/鼠标滑出按钮时，pointerup 仍回落到本按钮，确保能终止。
+      try { if (e.pointerId != null) btn.setPointerCapture(e.pointerId); } catch (_) {}
+      this._holdInitial = setTimeout(() => {
+        this._holdInitial = null;
+        if (!this._holdActive) return; // 已松开则不启动连发
+        this._holdRepeat = setInterval(() => {
+          // 离开地图屏 / 弹出面板 / 进入战斗 → 停止连发，避免越权操作。
+          if (!this._holdActive || this.screen !== 'game' || this._sheet) { this.stopHold(); return; }
+          this.dpadMove(dx, dy, true);
+        }, HOLD_REPEAT_MS);
+      }, HOLD_INITIAL_MS);
+    };
+    const end = () => { this._holdActive = false; this.stopHold(); };
+    btn.addEventListener('pointerdown', start);
+    btn.addEventListener('pointerup', end);
+    btn.addEventListener('pointerleave', end);
+    btn.addEventListener('pointercancel', end);
+  }
+
+  bindGlobalHoldRelease() {
+    if (this._holdGlobalBound) return;
+    this._holdGlobalBound = true;
+    const win = this.root && this.root.ownerDocument ? this.root.ownerDocument.defaultView : window;
+    win.addEventListener('pointerup', () => this.stopHold());
+    win.addEventListener('pointercancel', () => this.stopHold());
+  }
+
+  stopHold() {
+    this._holdActive = false;
+    if (this._holdInitial) { clearTimeout(this._holdInitial); this._holdInitial = null; }
+    if (this._holdRepeat) { clearInterval(this._holdRepeat); this._holdRepeat = null; }
   }
 
   // 依据周围上下文刷新中央键文案与可用性。
@@ -1494,6 +1548,7 @@ export class GameUI {
 
   destroy() {
     this.stopLoop();
+    this.stopHold();
     try { if (this.player) saveToSlot(this.activeSlot, this.player); } catch (_) {}
     if (this._detachKeyboard) { this._detachKeyboard(); this._detachKeyboard = null; }
     clear(this.parent);

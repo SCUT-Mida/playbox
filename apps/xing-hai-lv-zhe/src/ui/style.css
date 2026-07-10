@@ -219,6 +219,8 @@
 .xhlz .cell.t-wall     { background-color: #5d5376; background-image: linear-gradient(rgba(0,0,0,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.18) 1px, transparent 1px); background-size: 50% 50%, 50% 50%; }
 .xhlz .cell.t-wallDark { background-color: #3a3a4a; background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 50% 50%, 50% 50%; }
 .xhlz .cell.t-stairs   { background-color: #ffd93d; background-image: repeating-linear-gradient(0deg, rgba(120,80,0,0.32) 0 2px, transparent 2px 5px); }
+.xhlz .cell.t-ice      { background-color: #bfe9ff; background-image: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.7), transparent 50%), radial-gradient(circle at 70% 70%, rgba(120,170,220,0.32), transparent 55%); }
+.xhlz .cell.t-ash      { background-color: #c9b89a; background-image: radial-gradient(circle at 40% 40%, rgba(255,255,255,0.22), transparent 45%), radial-gradient(circle at 75% 65%, rgba(90,70,40,0.20), transparent 55%); }
 @keyframes xhlz-water { from { background-position: 0 0; } to { background-position: 0 6px; } }
 @keyframes xhlz-bob { 0%,100% { transform: scale(1); } 50% { transform: scale(0.86); } }
 @keyframes xhlz-glow { 0%,100% { filter: drop-shadow(0 0 0 #ffd93d); } 50% { filter: drop-shadow(0 0 4px #ffd93d); } }
@@ -382,3 +384,55 @@
 .xhlz .toast.hide { animation: xhlz-toast-out 0.3s ease forwards; }
 @keyframes xhlz-toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 @keyframes xhlz-toast-out { to { opacity: 0; transform: translateY(-8px); } }
+
+/* —— 顶部星图按钮 —— */
+.xhlz .galaxy-btn {
+  flex: none; padding: 0.2rem 0.5rem; font-size: 0.95rem; line-height: 1;
+  background: var(--card); border: 1px solid var(--line); box-shadow: 0 2px 0 var(--line-2);
+  border-radius: 9px;
+}
+.xhlz .galaxy-btn:active { transform: translateY(2px); box-shadow: none; }
+
+/* —— 星图（星球线路）—— */
+.xhlz .galaxy { justify-content: flex-start; }
+.xhlz .galaxy__head { text-align: center; margin-bottom: 0.7rem; }
+.xhlz .galaxy__head h1 { margin: 0; font-size: 1.25rem; }
+.xhlz .galaxy__head .sub { margin: 0.25rem 0 0; color: var(--ink-soft); font-size: 0.82rem; line-height: 1.55; }
+.xhlz .galaxy__route { display: flex; flex-direction: column; gap: 0.55rem; margin-bottom: 0.7rem; }
+.xhlz .planet-node {
+  position: relative; display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.6rem 0.7rem; border-radius: 14px; border: 2px solid var(--line);
+  background: linear-gradient(180deg, var(--card), var(--card-2));
+  transition: transform 0.12s ease;
+}
+.xhlz .planet-node:not(:last-child)::after {
+  content: ''; position: absolute; left: 1.55rem; bottom: -0.55rem; width: 3px; height: 0.55rem;
+  background: var(--line-2); border-radius: 2px;
+}
+.xhlz .planet-node .pn-emoji {
+  flex: none; width: 2.6rem; height: 2.6rem; display: flex; align-items: center; justify-content: center;
+  font-size: 1.7rem; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fffdf6, var(--bg-2));
+  border: 1px solid var(--line);
+}
+.xhlz .planet-node .pn-info { flex: 1; min-width: 0; }
+.xhlz .planet-node .pn-name { font-weight: 800; font-size: 0.98rem; }
+.xhlz .planet-node .pn-floors { font-size: 0.72rem; margin-top: 0.05rem; }
+.xhlz .planet-node .pn-desc { font-size: 0.78rem; color: var(--ink-soft); margin-top: 0.15rem; line-height: 1.45; }
+.xhlz .planet-node .pn-tag { flex: none; font-size: 0.7rem; font-weight: 800; padding: 0.18rem 0.5rem; border-radius: 999px; white-space: nowrap; }
+.xhlz .planet-node.cleared { border-color: var(--good); }
+.xhlz .planet-node.cleared .pn-tag { background: rgba(87,199,133,0.18); color: #2f9a72; }
+.xhlz .planet-node.current { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(255,217,61,0.30); }
+.xhlz .planet-node.current .pn-tag { background: rgba(255,217,61,0.22); color: #7a5a00; }
+.xhlz .planet-node.current .pn-emoji { animation: xhlz-bob 1.3s ease-in-out infinite; }
+.xhlz .planet-node.locked { opacity: 0.55; filter: saturate(0.6); }
+.xhlz .planet-node.locked .pn-tag { background: rgba(58,58,74,0.1); color: var(--muted); }
+
+/* —— 装备掉落弹窗 —— */
+.xhlz .gear-drop { text-align: center; }
+.xhlz .gear-drop .gd-emoji { font-size: 2.4rem; }
+.xhlz .gear-drop .gd-name { font-weight: 800; font-size: 1.05rem; margin-top: 0.2rem; }
+.xhlz .gear-drop .gd-name .plus { color: var(--gold); }
+.xhlz .gear-drop .gd-compare { margin-top: 0.55rem; display: flex; justify-content: center; gap: 0.6rem; }
+.xhlz .gear-drop .gd-stat { padding: 0.4rem 0.65rem; border-radius: 10px; background: var(--card-2); border: 1px solid var(--line); font-size: 0.85rem; font-weight: 700; }
+.xhlz .gear-drop .gd-stat.cur { color: var(--ink-soft); }
+.xhlz .gear-drop .gd-stat.new { color: #2f9a72; border-color: var(--good); }

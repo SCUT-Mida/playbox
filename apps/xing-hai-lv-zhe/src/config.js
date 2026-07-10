@@ -36,19 +36,21 @@ export const TILES = {
   moss:     { id: 'moss',     name: '苔石', walkable: true,  color: '#7fae6b' }, // 装饰性地砖（通行同地砖）
   crystal:  { id: 'crystal',  name: '晶簇', walkable: true,  color: '#7fd6e0' }, // 装饰性地砖
   rune:     { id: 'rune',     name: '符文', walkable: true,  color: '#b08fd6' }, // 装饰性地砖
+  ice:      { id: 'ice',      name: '冰面', walkable: true,  color: '#bfe9ff' }, // 装饰性地砖（晶穴/虚空风味）
+  ash:      { id: 'ash',      name: '灰烬', walkable: true,  color: '#c9b89a' }, // 装饰性地砖（遗迹风味）
   water:    { id: 'water',    name: '水域', walkable: false, color: PALETTE.water },
   wall:     { id: 'wall',     name: '石墙', walkable: false, color: PALETTE.stone },
   wallDark: { id: 'wallDark', name: '深墙', walkable: false, color: PALETTE.stoneDark },
   stairs:   { id: 'stairs',   name: '下行阶梯', walkable: true, color: PALETTE.gold },
 };
 // 随机生成时的全部「可行走」地块候选（无重复）；具体楼层用 floorTilesFor 按生态筛选子集。
-export const FLOOR_TILES = ['floor', 'floor2', 'sand', 'grass', 'moss', 'crystal', 'rune'];
+export const FLOOR_TILES = ['floor', 'floor2', 'sand', 'grass', 'moss', 'crystal', 'rune', 'ice', 'ash'];
 
 // 楼层生态（按楼层分段）：仅影响地图配色、地块分布与点缀风味，不影响任何战斗/通行逻辑。
 export const BIOMES = [
-  { from: 1, to: 3, key: 'ruins',  name: '遗迹地表', accent: '#c9a36a', tint: 'rgba(201,163,106,0.10)', tiles: ['floor', 'floor2', 'sand', 'grass', 'moss'],     decor: ['plant', 'rubble', 'spark'] },
-  { from: 4, to: 6, key: 'cavern', name: '晶簇洞穴', accent: '#5fb0d8', tint: 'rgba(95,176,216,0.12)', tiles: ['floor', 'floor2', 'moss', 'crystal'],              decor: ['crystal', 'spark', 'rubble'] },
-  { from: 7, to: 9, key: 'void',   name: '虚空裂隙', accent: '#9d6edb', tint: 'rgba(157,110,219,0.12)', tiles: ['floor', 'floor2', 'crystal', 'rune'],             decor: ['rune', 'crystal', 'spark'] },
+  { from: 1, to: 3, key: 'ruins',  name: '遗迹地表', accent: '#c9a36a', tint: 'rgba(201,163,106,0.10)', tiles: ['floor', 'floor2', 'sand', 'grass', 'moss', 'ash'], decor: ['plant', 'rubble', 'spark', 'flower', 'bone'] },
+  { from: 4, to: 6, key: 'cavern', name: '晶簇洞穴', accent: '#5fb0d8', tint: 'rgba(95,176,216,0.12)', tiles: ['floor', 'floor2', 'moss', 'crystal', 'ice'],         decor: ['crystal', 'spark', 'rubble', 'mushroom'] },
+  { from: 7, to: 9, key: 'void',   name: '虚空裂隙', accent: '#9d6edb', tint: 'rgba(157,110,219,0.12)', tiles: ['floor', 'floor2', 'crystal', 'rune', 'ice'],        decor: ['rune', 'crystal', 'spark', 'bone'] },
   { from: 10, to: 10, key: 'core', name: '星骸之核', accent: '#ffd93d', tint: 'rgba(255,217,61,0.14)', tiles: ['floor2', 'crystal', 'rune'],                       decor: ['rune', 'crystal', 'spark'] },
 ];
 export function biomeFor(floor) {
@@ -61,6 +63,24 @@ export function floorTilesFor(floor) {
   return list && list.length ? list : FLOOR_TILES;
 }
 
+// —— 星球（星球线路）：每颗星球对应一段楼层区间与一种生态，构成星图上的航点 ——
+// 仅决定星图的呈现与文案风味；战斗/通行/掉落仍由楼层与生态驱动，避免影响既有逻辑。
+export const PLANETS = [
+  { key: 'ruins',  name: '碎星遗迹带',   emoji: '🗿', from: 1, to: 3,  biomeKey: 'ruins',
+    desc: '上古文明崩解后漂浮的废墟。藤蔓与锈迹之间，低语般的回响时隐时现。' },
+  { key: 'cavern', name: '晶簇星穴',     emoji: '💠', from: 4, to: 6,  biomeKey: 'cavern',
+    desc: '洞穴深处，星骸晶簇自发脉动，照亮了古老矿道里潜伏的硬壳生物。' },
+  { key: 'void',   name: '虚空裂带',     emoji: '🌌', from: 7, to: 9,  biomeKey: 'void',
+    desc: '星球的裂口向虚空敞开，时间在此变得粘稠——这里栖息着最危险的掠食者。' },
+  { key: 'core',   name: '墨比乌斯之核', emoji: '🌟', from: 10, to: 10, biomeKey: 'core',
+    desc: '所有星骸的源头。文明的情感在此凝结为一颗缓慢搏动的心核。' },
+];
+// 按楼层返回所在星球（退化回退到首颗星球，保证总有归属）。
+export function planetFor(floor) {
+  const f = Math.max(1, floor || 1);
+  return PLANETS.find((p) => f >= p.from && f <= p.to) || PLANETS[0];
+}
+
 // 地图点缀（纯装饰，不占实体、不阻挡）：key -> emoji。
 export const DECOR = {
   plant:   { emoji: '🌿' },
@@ -68,6 +88,9 @@ export const DECOR = {
   crystal: { emoji: '💠' },
   spark:   { emoji: '✨' },
   rune:    { emoji: '🔮' },
+  mushroom:{ emoji: '🍄' },
+  flower:  { emoji: '🌸' },
+  bone:    { emoji: '🦴' },
 };
 
 export function tileOf(id) { return TILES[id] || TILES.floor; }
@@ -114,6 +137,43 @@ export function starterEquipment() {
   };
 }
 
+// —— 装备掉落池（武器 / 护甲 / 推进器多样性）：宝箱可掉落命名装备 ——
+// stat 为该部位的基础数值（推进器 stat 不直接生效，步数由 plus 驱动，但保留字段形状一致）。
+// minFloor 用于按楼层过滤可得品质，越深的星球越能拾到强力装备。
+export const WEAPONS = [
+  { name: '生锈砍刀', stat: 8,  minFloor: 1 },
+  { name: '合金短刀', stat: 11, minFloor: 1 },
+  { name: '晶簇长矛', stat: 14, minFloor: 4 },
+  { name: '电磁战锤', stat: 18, minFloor: 4 },
+  { name: '虚空裂刃', stat: 23, minFloor: 7 },
+  { name: '星骸圣剑', stat: 30, minFloor: 10 },
+];
+export const ARMORS = [
+  { name: '破布外衣', stat: 5,  minFloor: 1 },
+  { name: '皮甲外套', stat: 8,  minFloor: 1 },
+  { name: '晶鳞护胸', stat: 12, minFloor: 4 },
+  { name: '斥候轻甲', stat: 16, minFloor: 7 },
+  { name: '星骸战铠', stat: 22, minFloor: 10 },
+];
+export const BOOSTERS = [
+  { name: '滑轨推进器', stat: 0, minFloor: 1 },
+  { name: '弹射靴',     stat: 0, minFloor: 4 },
+  { name: '虚空滑翔翼', stat: 0, minFloor: 7 },
+];
+// 部位元信息：emoji / 中文名 / 数值名，供掉落与背包 UI 复用。
+export const GEAR_SLOT_META = {
+  weapon:  { emoji: '🗡️', label: '武器',   statName: '攻击' },
+  armor:   { emoji: '🛡️', label: '护甲',   statName: '防御' },
+  booster: { emoji: '🥾', label: '推进器', statName: '步数' },
+};
+// 按楼层返回某部位的可得装备候选（退化回退到全集，保证不空）。
+export function gearPoolFor(slot, floor) {
+  const all = slot === 'armor' ? ARMORS : slot === 'booster' ? BOOSTERS : WEAPONS;
+  const f = Math.max(1, floor || 1);
+  const pool = all.filter((g) => g.minFloor <= f);
+  return pool.length ? pool : all;
+}
+
 // —— 天赋树：三条分支（生存 / 战斗 / 幸运），消耗星骸点亮，可免费重置 ——
 export const TALENTS = [
   {
@@ -140,10 +200,14 @@ export function talentCost(branch, rank) { return (TALENT_BY_BRANCH[branch] || {
 export const ENEMIES = [
   { id: 'puppet',  name: '弃械傀儡', emoji: '🤖', minFloor: 1, hp: 26, atk: 7,  stances: { thrust: 4, slash: 3, smash: 2 }, stardust: 4,  parts: 2, exp: 6 },
   { id: 'wraith',  name: '游荡幽影', emoji: '👻', minFloor: 1, hp: 20, atk: 9,  stances: { thrust: 3, slash: 2, smash: 4 }, stardust: 5,  parts: 1, exp: 7 },
+  { id: 'spore',   name: '孢子蛛',   emoji: '🕷️', minFloor: 1, hp: 16, atk: 6,  stances: { thrust: 3, slash: 4, smash: 2 }, stardust: 3,  parts: 1, exp: 5 },
   { id: 'bat',     name: '锈翼蝠',   emoji: '🦇', minFloor: 4, hp: 34, atk: 11, stances: { thrust: 5, slash: 2, smash: 1 }, stardust: 7,  parts: 3, exp: 10 },
   { id: 'crab',    name: '晶甲蟹',   emoji: '🦀', minFloor: 4, hp: 46, atk: 10, stances: { thrust: 2, slash: 5, smash: 3 }, stardust: 8,  parts: 4, exp: 12 },
+  { id: 'shard',   name: '晶屑虫',   emoji: '🐛', minFloor: 4, hp: 30, atk: 13, stances: { thrust: 4, slash: 3, smash: 2 }, stardust: 6,  parts: 3, exp: 9 },
   { id: 'knight',  name: '残响骑士', emoji: '🛡️', minFloor: 7, hp: 60, atk: 14, stances: { thrust: 3, slash: 4, smash: 4 }, stardust: 11, parts: 5, exp: 16 },
   { id: 'stalker', name: '虚空潜行者', emoji: '👹', minFloor: 7, hp: 52, atk: 17, stances: { thrust: 4, slash: 3, smash: 3 }, stardust: 12, parts: 4, exp: 18 },
+  { id: 'warden',  name: '虚空典狱', emoji: '👁️', minFloor: 7, hp: 58, atk: 15, stances: { thrust: 3, slash: 5, smash: 2 }, stardust: 13, parts: 5, exp: 17 },
+  { id: 'reaver',  name: '星骸劫夺者', emoji: '💀', minFloor: 7, hp: 48, atk: 19, stances: { thrust: 5, slash: 2, smash: 4 }, stardust: 14, parts: 4, exp: 19 },
   { id: 'core',    name: '星骸之核', emoji: '🌟', minFloor: 10, hp: 160, atk: 20, stances: { thrust: 3, slash: 3, smash: 3 }, stardust: 60, parts: 30, exp: 100, boss: true },
 ];
 

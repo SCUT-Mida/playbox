@@ -7,6 +7,7 @@ import {
   MAX_PLUS, AFFIX_AT, AFFIXES, starterEquipment, enhanceCost,
   TALENTS, TALENT_BY_BRANCH, talentCost,
   expToNext, clamp, clampStat, MAX_FLOOR, MEMORY_CHAPTERS, GRID,
+  GEAR_SLOT_META,
 } from '../config.js';
 import { randInt, pick } from './rng.js';
 
@@ -164,6 +165,23 @@ export function enhanceEquipment(p, slot, rng) {
     affixed = e.affix;
   }
   return { ok: true, plus: e.plus, affixed, slot };
+}
+
+// 穿戴拾得的装备：整体替换对应槽位（保留 plus / 不继承旧词缀）。
+//   gear: { slot, name, stat, plus, affix } —— 来自 world.rollGearDrop。
+//   返回 { ok, slot, old, gear }，old 为被替换下的旧装备（供 UI 展示对比）。
+export function equipGear(p, gear) {
+  if (!p || !p.equipment) return { ok: false, reason: 'no-player' };
+  if (!gear || !GEAR_SLOT_META[gear.slot]) return { ok: false, reason: 'bad-gear' };
+  const slot = gear.slot;
+  const old = { ...p.equipment[slot] };
+  p.equipment[slot] = {
+    name: typeof gear.name === 'string' && gear.name ? gear.name : old.name,
+    stat: Number.isFinite(gear.stat) ? gear.stat : old.stat,
+    plus: clamp(gear.plus || 0, 0, MAX_PLUS),
+    affix: null, // 拾得装备为白板；词缀仍靠强化至 +5 触发
+  };
+  return { ok: true, slot, old, gear: p.equipment[slot] };
 }
 
 // 点亮天赋：消耗星骸。返回结果。

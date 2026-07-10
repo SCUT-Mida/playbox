@@ -5,7 +5,7 @@
 import {
   GRID, VISION_RADIUS, TILES, FLOOR_TILES, tileOf, isWalkable,
   floorConfig, enemyPoolFor, EVENT_TYPES, EVENT_META, MAX_FLOOR, MEMORY_CHAPTERS,
-  biomeFor, floorTilesFor, DECOR,
+  biomeFor, floorTilesFor, DECOR, gearPoolFor, MAX_PLUS,
 } from '../config.js';
 import { randInt, weightedPick, pick } from './rng.js';
 
@@ -67,7 +67,7 @@ export function generateFloor(rng, floor, player) {
     for (let i = 0; i < cfg.enemyCount; i++) {
       place('enemy', () => spawnEnemy(r, pool, f));
     }
-    for (let i = 0; i < cfg.chestCount; i++) place('chest', () => ({ reward: chestReward(r, f) }));
+    for (let i = 0; i < cfg.chestCount; i++) place('chest', () => chestContents(r, f));
     if (cfg.eventCount) place(pick(r, EVENT_TYPES));
   }
   // 每层 1 枚记忆回响（章节 = 楼层 - 1，对应 1..10 章）。
@@ -184,6 +184,25 @@ function chestReward(r, floor) {
   if (roll < 0.6) return { parts: randInt(r, 2, 4) + Math.floor(floor / 3) };
   if (roll < 0.9) return { stardust: randInt(r, 3, 6) };
   return { parts: randInt(r, 1, 3), stardust: randInt(r, 2, 4) };
+}
+
+// 宝箱内容：约 22% 概率掉落命名装备（武器/护甲/推进器），其余为资源奖励。
+// 返回 { gear } 或 { reward }，由 UI 的 resolveEntity 分别处理。
+function chestContents(r, floor) {
+  if (r() < 0.22) return { gear: rollGearDrop(r, floor) };
+  return { reward: chestReward(r, floor) };
+}
+
+// 随机生成一件掉落装备：按楼层过滤可得品质，武器权重最高；plus 随楼层缓升（不超上限）。
+export function rollGearDrop(rng, floor) {
+  const r = rng || Math.random;
+  const f = Math.max(1, floor || 1);
+  const slot = weightedPick(r, { weapon: 5, armor: 4, booster: 2 }) || 'weapon';
+  const pool = gearPoolFor(slot, f);
+  const def = pick(r, pool) || pool[0];
+  const plusMax = Math.min(MAX_PLUS, 1 + Math.floor(f / 3));
+  const plus = randInt(r, 0, plusMax);
+  return { slot, name: def.name, stat: def.stat, plus, affix: null };
 }
 
 // —— 视野（迷雾）：以 (x,y) 为中心的 5×5 切比雪夫窗口 ——

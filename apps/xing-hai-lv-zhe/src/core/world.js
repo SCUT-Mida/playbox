@@ -7,7 +7,7 @@ import {
   floorConfig, enemyPoolFor, EVENT_TYPES, EVENT_META, MAX_FLOOR, MEMORY_CHAPTERS,
   biomeFor, floorTilesFor, DECOR, gearPoolFor, MAX_PLUS,
 } from '../config.js';
-import { randInt, weightedPick, pick } from './rng.js';
+import { randInt, weightedPick, pick, clampUnit } from './rng.js';
 
 const key = (x, y) => `${x},${y}`;
 const inBounds = (x, y) => x >= 0 && y >= 0 && x < GRID && y < GRID;
@@ -83,11 +83,54 @@ export function generateFloor(rng, floor, player) {
   return state;
 }
 
+// 价值噪声地块：粗格点随机 + smoothstep 插值，让地块在空间上成片相连。
+// 取代「每格独立随机抽地块」——后者在 16×16 网格上呈现为无意义的彩色噪点（沙地/草地/苔石
+// 互相穿插），缺乏地形连贯性；插值后相邻格趋向同一地块，形成连贯的地形区块。
+function coherentFloorGrid(r, palette) {
+  const size = 4 + Math.floor(clampUnit(r()) * 3); // 4~6：每次生成的区块尺度略有变化
+  const field = valueNoiseField(r, size);
+  const grid = [];
+  for (let y = 0; y < GRID; y++) {
+    const row = [];
+    const fy = field[y];
+    for (let x = 0; x < GRID; x++) {
+      let idx = Math.floor(fy[x] * palette.length);
+      if (idx >= palette.length) idx = palette.length - 1;
+      if (idx < 0) idx = 0;
+      row.push(palette[idx]);
+    }
+    grid.push(row);
+  }
+  return grid;
+}
+
+// 二维价值噪声场（单 octave + smoothstep），返回 GRID×GRID 的 [0,1] 值矩阵。
+// 仅决定地块纹理，所有候选地块均可行走，故不影响连通性 / 通行逻辑。
+function valueNoiseField(r, size) {
+  const n = Math.ceil(GRID / size) + 2; // +2 保证末端插值有上界格点
+  const lat = Array.from({ length: n }, () => Array.from({ length: n }, () => clampUnit(r())));
+  const smooth = (t) => t * t * (3 - 2 * t);
+  const field = [];
+  for (let y = 0; y < GRID; y++) {
+    const fy = y / size, iy = Math.floor(fy), ty = smooth(fy - iy);
+    const row = [];
+    for (let x = 0; x < GRID; x++) {
+      const fx = x / size, ix = Math.floor(fx), tx = smooth(fx - ix);
+      const a = lat[iy][ix], b = lat[iy][ix + 1];
+      const c = lat[iy + 1][ix], d = lat[iy + 1][ix + 1];
+      const top = a + (b - a) * tx;
+      const bot = c + (d - c) * tx;
+      row.push(top + (bot - top) * ty);
+    }
+    field.push(row);
+  }
+  return field;
+}
+
 // 一次生成尝试：网格 + 障碍 + 出生点。
 function tryGenerate(r, f, isBoss, cfg) {
   const floorPalette = floorTilesFor(f); // 按楼层生态选地块，给视觉层次
-  const grid = Array.from({ length: GRID }, () =>
-    Array.from({ length: GRID }, () => pick(r, floorPalette)));
+  const grid = coherentFloorGrid(r, floorPalette); // 地块成片相连，避免逐格随机的噪点感
   // 边界石墙
   for (let i = 0; i < GRID; i++) {
     grid[0][i] = 'wall'; grid[GRID - 1][i] = 'wall';

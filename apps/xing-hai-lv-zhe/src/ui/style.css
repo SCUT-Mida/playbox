@@ -252,7 +252,12 @@
   display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
   gap: 0.25rem; width: 128px; height: 116px; flex: none;
 }
-.xhlz .dpad button { padding: 0; font-size: 1.1rem; }
+.xhlz .dpad button {
+  padding: 0; font-size: 1.1rem;
+  touch-action: none;            /* 长按方向键时禁止页面滚动/缩放抢占指针，保证连发移动 */
+  -webkit-touch-callout: none;   /* 禁止 iOS 长按弹出系统菜单 */
+  -webkit-user-select: none; user-select: none;
+}
 .xhlz .dpad .d-up { grid-area: 1 / 2; }
 .xhlz .dpad .d-left { grid-area: 2 / 1; }
 .xhlz .dpad .d-center { grid-area: 2 / 2; background: var(--card-2); }

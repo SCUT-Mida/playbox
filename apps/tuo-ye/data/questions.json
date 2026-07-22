@@ -1,0 +1,713 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2026-07-22",
+  "totalQuestions": 71,
+  "parts": {
+    "part5": {
+      "name": "Part 5 · Incomplete Sentences",
+      "questions": [
+        {
+          "id": "p5-001",
+          "stem": "The marketing team _____ the new campaign strategy yesterday.",
+          "options": ["approve", "approves", "approved", "approving"],
+          "answer": 2,
+          "explanation": "The time marker 'yesterday' requires the simple past tense 'approved'.",
+          "topic": "verb tenses"
+        },
+        {
+          "id": "p5-002",
+          "stem": "Ms. Tanaka _____ with the company since 2010.",
+          "options": ["works", "has worked", "is working", "worked"],
+          "answer": 1,
+          "explanation": "'Since 2010' indicates a period continuing to the present, requiring the present perfect 'has worked'.",
+          "topic": "verb tenses"
+        },
+        {
+          "id": "p5-003",
+          "stem": "The conference _____ place at the Grand Hyatt next month.",
+          "options": ["will take", "takes", "took", "has taken"],
+          "answer": 0,
+          "explanation": "The future time marker 'next month' requires the future tense 'will take'.",
+          "topic": "verb tenses"
+        },
+        {
+          "id": "p5-004",
+          "stem": "By the time the CEO arrives, the team _____ the presentation.",
+          "options": ["finishes", "will finish", "will have finished", "finished"],
+          "answer": 2,
+          "explanation": "'By the time' with a future reference requires the future perfect 'will have finished' to show completion before a future moment.",
+          "topic": "verb tenses"
+        },
+        {
+          "id": "p5-005",
+          "stem": "Each of the applicants _____ to submit a cover letter.",
+          "options": ["require", "requires", "are required", "requiring"],
+          "answer": 1,
+          "explanation": "'Each' is grammatically singular, so the verb must be 'requires' despite the plural noun 'applicants' that follows.",
+          "topic": "subject-verb agreement"
+        },
+        {
+          "id": "p5-006",
+          "stem": "The report, together with the supporting documents, _____ ready for review.",
+          "options": ["are", "is", "have been", "were"],
+          "answer": 1,
+          "explanation": "The true subject is 'report' (singular); the phrase 'together with the supporting documents' is an interrupter and does not affect the verb.",
+          "topic": "subject-verb agreement"
+        },
+        {
+          "id": "p5-007",
+          "stem": "The _____ of the new policy will take effect next week.",
+          "options": ["implement", "implementation", "implemented", "implementing"],
+          "answer": 1,
+          "explanation": "A noun is needed after the article 'the' to serve as the subject of the sentence, so 'implementation' is correct.",
+          "topic": "word forms"
+        },
+        {
+          "id": "p5-008",
+          "stem": "The candidate performed _____ during the interview.",
+          "options": ["exception", "exceptional", "exceptionally", "exceptionality"],
+          "answer": 2,
+          "explanation": "An adverb is needed to modify the verb 'performed', so 'exceptionally' is correct.",
+          "topic": "word forms"
+        },
+        {
+          "id": "p5-009",
+          "stem": "The detailed _____ showed a steady increase in quarterly sales.",
+          "options": ["analyze", "analysis", "analytical", "analytically"],
+          "answer": 1,
+          "explanation": "A noun is required as the subject of the verb 'showed'. 'Analysis' is the noun form.",
+          "topic": "word forms"
+        },
+        {
+          "id": "p5-010",
+          "stem": "We are looking forward _____ your response at your earliest convenience.",
+          "options": ["for", "to", "at", "on"],
+          "answer": 1,
+          "explanation": "The phrasal verb 'look forward to' is always followed by 'to'.",
+          "topic": "prepositions"
+        },
+        {
+          "id": "p5-011",
+          "stem": "The new policy will take effect _____ January 1 of next year.",
+          "options": ["in", "on", "at", "by"],
+          "answer": 1,
+          "explanation": "'On' is used with specific dates, while 'in' is used with months or years and 'at' with precise times.",
+          "topic": "prepositions"
+        },
+        {
+          "id": "p5-012",
+          "stem": "Please refer _____ the attached document for the complete report.",
+          "options": ["to", "for", "at", "with"],
+          "answer": 0,
+          "explanation": "The verb 'refer' is always followed by the preposition 'to' when directing someone to a source.",
+          "topic": "prepositions"
+        },
+        {
+          "id": "p5-013",
+          "stem": "The shipment was delayed _____ the bad weather conditions in the region.",
+          "options": ["because", "because of", "so", "although"],
+          "answer": 1,
+          "explanation": "'Because of' is followed by a noun phrase ('the bad weather conditions'), whereas 'because' requires a full clause.",
+          "topic": "conjunctions"
+        },
+        {
+          "id": "p5-014",
+          "stem": "_____ the budget was limited, the project was completed ahead of schedule.",
+          "options": ["Because", "Although", "Despite", "Unless"],
+          "answer": 1,
+          "explanation": "'Although' introduces a contrast between the limited budget and the early completion. 'Despite' would need a noun, not a clause.",
+          "topic": "conjunctions"
+        },
+        {
+          "id": "p5-015",
+          "stem": "The position requires strong communication skills _____ the ability to work under pressure.",
+          "options": ["as well as", "but also", "neither", "or"],
+          "answer": 0,
+          "explanation": "'As well as' is used to add information, connecting two equally important job requirements without implying a choice.",
+          "topic": "conjunctions"
+        },
+        {
+          "id": "p5-016",
+          "stem": "If the client _____ any changes to the contract, we will review them immediately.",
+          "options": ["proposes", "proposed", "will propose", "would propose"],
+          "answer": 0,
+          "explanation": "This is a first conditional (real possibility), which requires the simple present tense in the if-clause and 'will' in the main clause.",
+          "topic": "conditionals"
+        },
+        {
+          "id": "p5-017",
+          "stem": "We would have finished the project earlier if we _____ more staff available.",
+          "options": ["have", "had", "had had", "would have"],
+          "answer": 2,
+          "explanation": "This is a third conditional (past unreal situation), requiring the past perfect 'had had' in the if-clause.",
+          "topic": "conditionals"
+        },
+        {
+          "id": "p5-018",
+          "stem": "All applicants _____ of the test results by the end of the week.",
+          "options": ["will inform", "will be informed", "are informing", "have informed"],
+          "answer": 1,
+          "explanation": "Applicants receive the information (passive voice), and 'by the end of the week' indicates future time.",
+          "topic": "passive voice"
+        },
+        {
+          "id": "p5-019",
+          "stem": "The contract _____ by both parties at the meeting last Friday.",
+          "options": ["sign", "signed", "was signed", "was signing"],
+          "answer": 2,
+          "explanation": "The contract receives the action of signing (passive), and 'last Friday' indicates past time.",
+          "topic": "passive voice"
+        },
+        {
+          "id": "p5-020",
+          "stem": "It is recommended that all employees _____ the mandatory training session.",
+          "options": ["attend", "attends", "attended", "are attended"],
+          "answer": 0,
+          "explanation": "In the subjunctive structure 'It is recommended that...', the base form of the verb 'attend' is used regardless of the subject.",
+          "topic": "passive voice"
+        },
+        {
+          "id": "p5-021",
+          "stem": "The new software is _____ than the previous version we were using.",
+          "options": ["more efficient", "most efficient", "efficienter", "more efficiently"],
+          "answer": 0,
+          "explanation": "'Than' signals a comparative structure, and 'efficient' is a two-syllable adjective that forms the comparative with 'more'.",
+          "topic": "comparatives and superlatives"
+        },
+        {
+          "id": "p5-022",
+          "stem": "This is _____ restaurant in the downtown business district.",
+          "options": ["good", "better", "best", "the best"],
+          "answer": 3,
+          "explanation": "The superlative is needed with 'in the downtown business district' (a group of three or more), and 'the' must precede the superlative.",
+          "topic": "comparatives and superlatives"
+        },
+        {
+          "id": "p5-023",
+          "stem": "The company plans to _____ its operations into the European market next year.",
+          "options": ["expand", "extend", "exceed", "expire"],
+          "answer": 0,
+          "explanation": "'Expand its operations' is a standard business collocation meaning to increase the scope of business activities.",
+          "topic": "business vocabulary"
+        },
+        {
+          "id": "p5-024",
+          "stem": "The two companies signed a _____ to collaborate on the joint research project.",
+          "options": ["contract", "contact", "contrast", "context"],
+          "answer": 0,
+          "explanation": "A 'contract' is a legally binding agreement between parties, commonly used to formalize business collaborations.",
+          "topic": "business vocabulary"
+        },
+        {
+          "id": "p5-025",
+          "stem": "We need to _____ a meeting with the stakeholders to discuss the quarterly results.",
+          "options": ["schedule", "scheme", "schematic", "scholar"],
+          "answer": 0,
+          "explanation": "'Schedule a meeting' is a standard business collocation meaning to arrange or plan a meeting at a specific time.",
+          "topic": "business vocabulary"
+        },
+        {
+          "id": "p5-026",
+          "stem": "The consultant _____ we hired last month has already improved our workflow.",
+          "options": ["which", "what", "whom", "whose"],
+          "answer": 2,
+          "explanation": "'Whom' is the relative pronoun used as the object of the verb 'hired' and refers to the consultant (a person).",
+          "topic": "relative clauses"
+        },
+        {
+          "id": "p5-027",
+          "stem": "The company _____ headquarters are in Tokyo won the industry award this year.",
+          "options": ["which", "whose", "who", "that"],
+          "answer": 1,
+          "explanation": "'Whose' is the possessive relative pronoun showing that the headquarters belong to the company.",
+          "topic": "relative clauses"
+        },
+        {
+          "id": "p5-028",
+          "stem": "The manager suggested _____ the deadline to next Friday.",
+          "options": ["extend", "to extend", "extending", "extended"],
+          "answer": 2,
+          "explanation": "The verb 'suggest' is followed by a gerund ('extending'), not an infinitive or base form.",
+          "topic": "gerunds and infinitives"
+        },
+        {
+          "id": "p5-029",
+          "stem": "We decided _____ the project despite the budget concerns.",
+          "options": ["continue", "continuing", "continued", "to continue"],
+          "answer": 3,
+          "explanation": "The verb 'decide' is followed by the infinitive 'to continue', not a gerund or base form.",
+          "topic": "gerunds and infinitives"
+        },
+        {
+          "id": "p5-030",
+          "stem": "The new manager has _____ excellent understanding of our company procedures.",
+          "options": ["a", "an", "the", "no article"],
+          "answer": 1,
+          "explanation": "'Understanding' is a singular countable noun here, and 'excellent' begins with a vowel sound, so 'an' is required.",
+          "topic": "articles"
+        },
+        {
+          "id": "p5-031",
+          "stem": "We are looking for _____ experienced accountant to join our finance team.",
+          "options": ["a", "an", "the", "no article"],
+          "answer": 1,
+          "explanation": "'Accountant' is a singular countable noun introduced for the first time, and 'experienced' begins with a vowel sound, so 'an' is required.",
+          "topic": "articles"
+        }
+      ]
+    },
+    "part6": {
+      "name": "Part 6 · Text Completion",
+      "passages": [
+        {
+          "id": "p6-001",
+          "title": "Email: Office Relocation",
+          "text": "Dear Team,\n\nI am writing to inform you that we will be {{0}} to a new office building next quarter. The new space is {{1}} located in the central business district, which will make commuting easier for most employees. All departments {{2}} to complete the move by June 30. Please {{3}} your desk items in advance to ensure a smooth transition.\n\nBest regards,\nSarah Johnson\nOperations Manager",
+          "items": [
+            {
+              "id": "p6-001-0",
+              "stem": "(1)",
+              "options": ["relocated", "relocating", "relocate", "relocation"],
+              "answer": 1,
+              "explanation": "'Will be relocating' is the future continuous tense, used for a planned future action. 'Will be relocated' (passive) would also be grammatically possible but less natural here since 'we' are the ones actively moving."
+            },
+            {
+              "id": "p6-001-1",
+              "stem": "(2)",
+              "options": ["convenience", "convenient", "conveniently", "convened"],
+              "answer": 2,
+              "explanation": "An adverb is needed to modify the adjective 'located', so 'conveniently' (adverb form of 'convenient') is correct."
+            },
+            {
+              "id": "p6-001-2",
+              "stem": "(3)",
+              "options": ["expect", "are expected", "are expecting", "have expected"],
+              "answer": 1,
+              "explanation": "The departments are the recipients of the expectation (passive voice), so 'are expected' is correct."
+            },
+            {
+              "id": "p6-001-3",
+              "stem": "(4)",
+              "options": ["pack", "packed", "packing", "to pack"],
+              "answer": 0,
+              "explanation": "After 'please', the base form of the verb (imperative) is used to give a polite instruction."
+            }
+          ]
+        },
+        {
+          "id": "p6-002",
+          "title": "Memo: New Security Policy",
+          "text": "TO: All Staff\nFROM: IT Department\nDATE: July 15, 2026\nSUBJECT: Updated Security Protocols\n\nPlease be advised that new security protocols will {{0}} into effect starting next month. All employees {{1}} to change their passwords every 60 days. {{2}}, any unauthorized software must be removed from company devices immediately. Failure to comply {{3}} result in disciplinary action.\n\nThank you for your cooperation.",
+          "items": [
+            {
+              "id": "p6-002-0",
+              "stem": "(1)",
+              "options": ["come", "comes", "came", "coming"],
+              "answer": 0,
+              "explanation": "After the modal verb 'will', the base form of the verb 'come' is required: 'will come into effect'."
+            },
+            {
+              "id": "p6-002-1",
+              "stem": "(2)",
+              "options": ["require", "are required", "are requiring", "will require"],
+              "answer": 1,
+              "explanation": "Passive voice is needed because employees are the ones who receive the requirement. 'Are required to change' is the correct form."
+            },
+            {
+              "id": "p6-002-2",
+              "stem": "(3)",
+              "options": ["Addition", "Additionally", "Add", "Added"],
+              "answer": 1,
+              "explanation": "A sentence adverb is needed to introduce an additional point. 'Additionally' functions as a connector at the beginning of a sentence."
+            },
+            {
+              "id": "p6-002-3",
+              "stem": "(4)",
+              "options": ["will", "must", "may", "should"],
+              "answer": 0,
+              "explanation": "'Will' expresses certainty of consequence in formal policy language. 'Failure to comply will result in...' is a standard warning formula."
+            }
+          ]
+        },
+        {
+          "id": "p6-003",
+          "title": "Job Advertisement: Marketing Coordinator",
+          "text": "Position: Marketing Coordinator\n\nWe are looking for a motivated individual to join our {{0}} team. The ideal candidate will have at least two years of {{1}} in digital marketing and social media management. Responsibilities include creating content and {{2}} marketing campaigns across multiple platforms. Applicants must be able to work {{3}} in a fast-paced environment.\n\nTo apply, please send your resume and cover letter to careers@example.com.",
+          "items": [
+            {
+              "id": "p6-003-0",
+              "stem": "(1)",
+              "options": ["market", "marketing", "marketed", "marketer"],
+              "answer": 1,
+              "explanation": "'Marketing team' uses 'marketing' as an adjective (a noun functioning attributively) to describe the type of team."
+            },
+            {
+              "id": "p6-003-1",
+              "stem": "(2)",
+              "options": ["experience", "experiencing", "experienced", "experiences"],
+              "answer": 0,
+              "explanation": "A noun is needed after 'two years of'. 'Experience' is the uncountable noun used for professional background."
+            },
+            {
+              "id": "p6-003-2",
+              "stem": "(3)",
+              "options": ["manage", "managed", "managing", "management"],
+              "answer": 2,
+              "explanation": "Parallel structure with 'creating' requires another gerund. 'Managing' maintains parallel form in the list of responsibilities."
+            },
+            {
+              "id": "p6-003-3",
+              "stem": "(4)",
+              "options": ["effect", "effective", "effectively", "effectiveness"],
+              "answer": 2,
+              "explanation": "An adverb is needed to modify the verb 'work'. 'Effectively' is the adverb form of 'effective'."
+            }
+          ]
+        },
+        {
+          "id": "p6-004",
+          "title": "Meeting Notice: Quarterly Review",
+          "text": "NOTICE: QUARTERLY REVIEW MEETING\n\nDate: August 5, 2026\nTime: 10:00 AM - 12:00 PM\nLocation: Conference Room A\n\nThe quarterly review meeting is {{0}} for all department heads. During the meeting, each department will {{1}} its performance for the last quarter and discuss upcoming targets. The CEO has asked that everyone {{2}} the financial reports before attending. If you are unable to attend, please notify {{3}} department manager by August 3.\n\nThank you.",
+          "items": [
+            {
+              "id": "p6-004-0",
+              "stem": "(1)",
+              "options": ["require", "required", "requiring", "requirement"],
+              "answer": 1,
+              "explanation": "Passive voice is needed: the meeting is the object of 'require'. 'Is required' indicates obligation in a formal notice."
+            },
+            {
+              "id": "p6-004-1",
+              "stem": "(2)",
+              "options": ["present", "presents", "presented", "presentation"],
+              "answer": 0,
+              "explanation": "After the modal 'will', the base form of the verb 'present' is required."
+            },
+            {
+              "id": "p6-004-2",
+              "stem": "(3)",
+              "options": ["reviews", "review", "reviewed", "reviewing"],
+              "answer": 1,
+              "explanation": "The subjunctive mood is used after 'has asked that', requiring the base form 'review' regardless of the subject."
+            },
+            {
+              "id": "p6-004-3",
+              "stem": "(4)",
+              "options": ["his", "her", "their", "its"],
+              "answer": 2,
+              "explanation": "'Their' is the modern standard singular they possessive pronoun, used here for gender-neutral reference to an unspecified employee."
+            }
+          ]
+        },
+        {
+          "id": "p6-005",
+          "title": "Product Announcement: ConnectPro 3000",
+          "text": "FOR IMMEDIATE RELEASE\n\nTechCorp is pleased to announce the launch of its latest {{0}}, the ConnectPro 3000. This innovative device {{1}} businesses to manage their network infrastructure more efficiently than ever before. The ConnectPro 3000 will be available for {{2}} starting September 1. Customers who place orders before August 15 will receive a 15% {{3}} on their first purchase.\n\nFor more information, please visit www.techcorp.com/connectpro.",
+          "items": [
+            {
+              "id": "p6-005-0",
+              "stem": "(1)",
+              "options": ["produce", "product", "production", "productive"],
+              "answer": 1,
+              "explanation": "A noun is needed after 'its latest'. 'Product' refers to the item being launched. 'Production' would refer to the process, not the item."
+            },
+            {
+              "id": "p6-005-1",
+              "stem": "(2)",
+              "options": ["enables", "enable", "enabled", "enabling"],
+              "answer": 0,
+              "explanation": "The subject 'device' is singular, so the verb must be 'enables' (third person singular present tense)."
+            },
+            {
+              "id": "p6-005-2",
+              "stem": "(3)",
+              "options": ["ordering", "order", "purchased", "purchase"],
+              "answer": 3,
+              "explanation": "'Available for purchase' is a standard commercial phrase. 'Purchase' here is a noun following the preposition 'for'."
+            },
+            {
+              "id": "p6-005-3",
+              "stem": "(4)",
+              "options": ["discount", "discounted", "discounting", "discounts"],
+              "answer": 0,
+              "explanation": "A noun is needed after 'a 15%'. 'Discount' is the noun form, referring to the price reduction."
+            }
+          ]
+        }
+      ]
+    },
+    "part7": {
+      "name": "Part 7 · Reading Comprehension",
+      "passages": [
+        {
+          "id": "p7-001",
+          "title": "Memo: Employee Training Day",
+          "text": "TO: All Employees\nFROM: Human Resources\nDATE: June 10, 2026\nSUBJECT: Annual Employee Training Day\n\nThe annual Employee Training Day will be held on Saturday, July 25, 2026, at the Riverside Convention Center, located at 450 Harbor Boulevard. This year's theme is 'Innovation in the Workplace,' and we have arranged a series of workshops covering topics such as time management, digital communication, and leadership development.\n\nAll employees are required to attend. The event will begin at 8:30 AM with registration and refreshments, followed by the opening keynote address at 9:00 AM. Workshop sessions will run from 10:00 AM to 12:00 PM, with a one-hour lunch break provided. Afternoon sessions will continue from 1:00 PM to 4:00 PM.\n\nTransportation will be arranged for employees who do not have personal vehicles. A shuttle bus will depart from the main office parking lot at 7:45 AM sharp. Employees who prefer to drive may park in the convention center's parking garage at no charge.\n\nPlease confirm your attendance by June 25 by replying to this email or contacting your department manager. If you have any special dietary requirements for lunch, please indicate them in your response.",
+          "items": [
+            {
+              "id": "p7-001-0",
+              "stem": "What is the main purpose of this memo?",
+              "options": [
+                "To announce a new company policy on training",
+                "To inform employees about an upcoming training event",
+                "To request feedback on previous training programs",
+                "To introduce new department managers"
+              ],
+              "answer": 1,
+              "explanation": "The memo primarily informs employees about the Training Day event, including the date, location, schedule, and transportation details."
+            },
+            {
+              "id": "p7-001-1",
+              "stem": "What time does the opening keynote address begin?",
+              "options": [
+                "7:45 AM",
+                "8:30 AM",
+                "9:00 AM",
+                "10:00 AM"
+              ],
+              "answer": 2,
+              "explanation": "The memo states: 'registration and refreshments' at 8:30 AM, 'followed by the opening keynote address at 9:00 AM.'"
+            },
+            {
+              "id": "p7-001-2",
+              "stem": "What is mentioned about parking at the convention center?",
+              "options": [
+                "Parking is limited to a first-come, first-served basis",
+                "Employees must pay a reduced parking fee",
+                "Parking in the convention center garage is free",
+                "There is no parking available near the venue"
+              ],
+              "answer": 2,
+              "explanation": "The memo clearly states that employees who drive 'may park in the convention center's parking garage at no charge.'"
+            },
+            {
+              "id": "p7-001-3",
+              "stem": "The word 'indicate' in paragraph 4 is closest in meaning to:",
+              "options": [
+                "ignore",
+                "specify",
+                "deny",
+                "consider"
+              ],
+              "answer": 1,
+              "explanation": "In this context, 'indicate' means to specify or state clearly, as in mentioning dietary requirements in a response."
+            },
+            {
+              "id": "p7-001-4",
+              "stem": "What should employees do if they have special dietary needs?",
+              "options": [
+                "Bring their own lunch to the event",
+                "Contact the convention center's kitchen directly",
+                "Mention them when they confirm their attendance",
+                "Speak to the HR manager on the day of the event"
+              ],
+              "answer": 2,
+              "explanation": "The memo states: 'If you have any special dietary requirements for lunch, please indicate them in your response' when confirming attendance."
+            }
+          ]
+        },
+        {
+          "id": "p7-002",
+          "title": "Email Chain: Client Issue Resolution",
+          "text": "Email 1\n\nFrom: Sarah Chen <schen@example.com>\nTo: Support Team <support@example.com>\nDate: April 3, 2026\nSubject: Client Concern - Apex Solutions\n\nDear Team,\n\nI received a call from Mr. Thompson at Apex Solutions this morning. He expressed frustration that our recent software update caused some of his data to become incorrectly formatted. This issue has significantly delayed their monthly reporting process.\n\nMr. Thompson mentioned that he contacted our technical support hotline twice but was put on hold for over 15 minutes each time and eventually hung up without speaking to anyone.\n\nApex Solutions is a major account for us, and I am very concerned about the impact this could have on our business relationship. Please investigate this matter urgently and let me know what steps we can take to resolve the situation.\n\nBest regards,\nSarah\n\n---\n\nEmail 2\n\nFrom: David Kim <dkim@example.com>\nTo: Sarah Chen <schen@example.com>\nDate: April 3, 2026\nSubject: Re: Client Concern - Apex Solutions\n\nHi Sarah,\n\nI apologize for the delay in responding. I have investigated the technical issue and identified the root cause. The update contained a bug that affected data formatting for a small number of users. Our development team has already prepared a fix, and it will be deployed tomorrow morning.\n\nRegarding the support hotline issue, I have reviewed our call logs and confirmed that Mr. Thompson's calls were dropped due to an unusually high call volume that day. I have personally called Mr. Thompson to apologize and explain the situation. He appreciated the call and agreed to give us another chance.\n\nI have also scheduled a follow-up meeting with the Apex Solutions team for next Tuesday to review the fix and ensure everything is working correctly.\n\nBest,\nDavid",
+          "items": [
+            {
+              "id": "p7-002-0",
+              "stem": "What is the main issue described in Sarah's email?",
+              "options": [
+                "A client is requesting a refund for unused software",
+                "A software update caused data problems for an important client",
+                "A support team member was rude to a client on the phone",
+                "A client wants to cancel their contract with the company"
+              ],
+              "answer": 1,
+              "explanation": "Sarah reports that the software update 'caused some of his data to become incorrectly formatted,' which is the core technical issue affecting Apex Solutions."
+            },
+            {
+              "id": "p7-002-1",
+              "stem": "What complaint did Mr. Thompson make about the technical support hotline?",
+              "options": [
+                "The hotline was closed when he tried to call",
+                "The support staff could not solve his problem",
+                "He was kept on hold for an excessive amount of time",
+                "He could not find the correct hotline number"
+              ],
+              "answer": 2,
+              "explanation": "Sarah states that Mr. Thompson 'was put on hold for over 15 minutes each time' before he hung up without speaking to anyone."
+            },
+            {
+              "id": "p7-002-2",
+              "stem": "How did David Kim address the technical problem?",
+              "options": [
+                "He asked the client to reinstall the previous version",
+                "His team developed a fix that will be released soon",
+                "He suggested that the client switch to a different product",
+                "He arranged for a partial refund for the inconvenience"
+              ],
+              "answer": 1,
+              "explanation": "David says: 'Our development team has already prepared a fix, and it will be deployed tomorrow morning.'"
+            },
+            {
+              "id": "p7-002-3",
+              "stem": "What can be inferred about Mr. Thompson's attitude after David's phone call?",
+              "options": [
+                "He remains dissatisfied with the company",
+                "He has decided to seek a different vendor",
+                "He is willing to continue working with the company",
+                "He is demanding financial compensation for the delay"
+              ],
+              "answer": 2,
+              "explanation": "David reports that Mr. Thompson 'appreciated the call and agreed to give us another chance,' indicating willingness to maintain the business relationship."
+            },
+            {
+              "id": "p7-002-4",
+              "stem": "What is scheduled for next Tuesday?",
+              "options": [
+                "A new software update will be released",
+                "A follow-up meeting with the client will take place",
+                "The support team will receive additional training",
+                "A formal complaint report will be submitted"
+              ],
+              "answer": 1,
+              "explanation": "David states: 'I have also scheduled a follow-up meeting with the Apex Solutions team for next Tuesday to review the fix.'"
+            }
+          ]
+        },
+        {
+          "id": "p7-003",
+          "title": "Advertisement: WorkFlow Pro Software",
+          "text": "Streamline Your Business with WorkFlow Pro\n\nAre you tired of managing your projects with spreadsheets and endless email threads? WorkFlow Pro is the all-in-one project management solution designed specifically for small and medium-sized businesses.\n\nWhy thousands of companies have already switched:\n\n\u2022 Centralized Dashboard \u2013 View all your projects, tasks, and deadlines in one place.\n\u2022 Team Collaboration \u2013 Share files, leave comments, and assign tasks in real time.\n\u2022 Automated Reporting \u2013 Generate professional progress reports with a single click.\n\u2022 Mobile Access \u2013 Manage your projects from anywhere using our mobile app.\n\nSpecial Limited-Time Offer:\nSign up for an annual plan before August 31 and receive two months free! That is a savings of over 15% compared to monthly billing.\n\nOur pricing starts at just $29 per user per month for the Standard plan. The Premium plan, which includes advanced analytics and priority support, is available for $49 per user per month.\n\nTry WorkFlow Pro for 14 days completely free. No credit card required. Visit www.workflowpro.com to start your free trial today.",
+          "items": [
+            {
+              "id": "p7-003-0",
+              "stem": "What is the main purpose of this text?",
+              "options": [
+                "To announce a merger between two software companies",
+                "To advertise a project management software product",
+                "To provide step-by-step instructions for using a new tool",
+                "To compare the features of different software options"
+              ],
+              "answer": 1,
+              "explanation": "The text is an advertisement promoting WorkFlow Pro, describing its features, pricing, and a special promotional offer."
+            },
+            {
+              "id": "p7-003-1",
+              "stem": "Which of the following features is NOT mentioned in the advertisement?",
+              "options": [
+                "Team collaboration tools",
+                "Automated report generation",
+                "Live customer support chat",
+                "Mobile device access"
+              ],
+              "answer": 2,
+              "explanation": "Live customer support chat is not listed. The features mentioned are: centralized dashboard, team collaboration, automated reporting, and mobile access."
+            },
+            {
+              "id": "p7-003-2",
+              "stem": "What special offer is being promoted?",
+              "options": [
+                "A 50% discount on the first three months",
+                "Two months free with an annual subscription",
+                "A free upgrade to the Premium plan for one year",
+                "A reduced rate for the first six months of service"
+              ],
+              "answer": 1,
+              "explanation": "The ad states: 'Sign up for an annual plan before August 31 and receive two months free!'"
+            },
+            {
+              "id": "p7-003-3",
+              "stem": "How much does the Premium plan cost?",
+              "options": [
+                "$29 per user per month",
+                "$49 per user per month",
+                "$29 per month for unlimited users",
+                "$49 per month for the entire team"
+              ],
+              "answer": 1,
+              "explanation": "The ad specifies: 'The Premium plan... is available for $49 per user per month.'"
+            },
+            {
+              "id": "p7-003-4",
+              "stem": "What is NOT required to start the free trial?",
+              "options": [
+                "A credit card number",
+                "An email address",
+                "An internet connection",
+                "Registration on the website"
+              ],
+              "answer": 0,
+              "explanation": "The ad clearly states 'No credit card required' to start the 14-day free trial."
+            }
+          ]
+        },
+        {
+          "id": "p7-004",
+          "title": "Notice: Parking Lot Renovation",
+          "text": "NOTICE OF PARKING LOT CLOSURE\n\nTo: All Building Tenants\nFrom: Building Management\nDate: September 5, 2026\nSubject: Main Parking Lot Resurfacing\n\nPlease be advised that the main parking lot will be closed for resurfacing from Monday, September 14, through Friday, September 25, 2026.\n\nDuring this period, all tenants and visitors are advised to use the temporary parking area located at 1200 Elm Street, approximately two blocks east of the main building. A complimentary shuttle service will operate between the temporary lot and the main entrance every 15 minutes from 6:30 AM to 7:30 PM on weekdays.\n\nPlease note that parking permits for the main lot will not be valid during the closure period. Monthly parking pass holders will receive a pro-rated adjustment on their next billing statement to compensate for the inconvenience.\n\nThe building management apologizes for any inconvenience this may cause and appreciates your understanding as we make these necessary improvements. For questions or special accommodation requests, please contact the building management office at (555) 0123 or visit Room 101 during regular business hours.",
+          "items": [
+            {
+              "id": "p7-004-0",
+              "stem": "What is the main purpose of this notice?",
+              "options": [
+                "To announce an increase in parking fees",
+                "To inform tenants about temporary parking arrangements",
+                "To advertise a new parking facility being built",
+                "To remind tenants about building parking regulations"
+              ],
+              "answer": 1,
+              "explanation": "The notice informs tenants about the temporary closure of the main parking lot and provides details about alternative parking and shuttle service."
+            },
+            {
+              "id": "p7-004-1",
+              "stem": "How long will the main parking lot be closed?",
+              "options": [
+                "One week",
+                "Ten days",
+                "Twelve days",
+                "Three weeks"
+              ],
+              "answer": 2,
+              "explanation": "The closure runs from Monday, September 14 through Friday, September 25, which is a total of 12 calendar days."
+            },
+            {
+              "id": "p7-004-2",
+              "stem": "How frequently does the shuttle service operate?",
+              "options": [
+                "Every 10 minutes",
+                "Every 15 minutes",
+                "Every 20 minutes",
+                "Every 30 minutes"
+              ],
+              "answer": 1,
+              "explanation": "The notice states the shuttle operates 'every 15 minutes from 6:30 AM to 7:30 PM on weekdays.'"
+            },
+            {
+              "id": "p7-004-3",
+              "stem": "The word 'complimentary' in paragraph 2 is closest in meaning to:",
+              "options": [
+                "expensive",
+                "temporary",
+                "free of charge",
+                "limited in availability"
+              ],
+              "answer": 2,
+              "explanation": "In this context, 'complimentary' means provided free of charge, at no cost to the users of the shuttle service."
+            },
+            {
+              "id": "p7-004-4",
+              "stem": "What will happen to monthly parking pass holders?",
+              "options": [
+                "They will receive a full refund for the closure period",
+                "They will be charged an additional fee for alternative parking",
+                "They will get a proportional adjustment on their next bill",
+                "They will need to purchase a temporary parking permit"
+              ],
+              "answer": 2,
+              "explanation": "The notice states: 'Monthly parking pass holders will receive a pro-rated adjustment on their next billing statement,' meaning a proportional credit."
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

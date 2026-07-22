@@ -28,6 +28,15 @@ const APPS = {
     desc: '粉色系打卡日历：点一点记录坚持的每一天，每累计 10 天收获一颗爱心并触发庆祝。一个昵称下可建多个打卡任务，看你的连续打卡与爱心收藏。',
     loader: () => import('../apps/da-ka/src/main.js'),
   },
+  tuoye: {
+    key: 'tuoye',
+    title: '托业模考',
+    subtitle: '英语 · TOEIC 备考',
+    emblem: '托',
+    enterLabel: '开始学习',
+    desc: '托业（TOEIC）全流程备考：背单词、学语法、每日打卡、分项自测、全真模考。内置 50+ 真题格式练习题，覆盖 Part 5/6/7，含 10-990 分换算评分。',
+    loader: () => import('../apps/tuo-ye/src/main.js'),
+  },
   dzf: {
     key: 'dzf',
     title: '鼎足三分',
@@ -70,7 +79,7 @@ const CATEGORIES = [
     subtitle: '成长 · 习惯养成',
     emblem: '学',
     desc: '用轻量小工具把每一天的坚持记录下来，看见时间积累的力量。',
-    appKeys: ['daka'],
+    appKeys: ['daka', 'tuoye'],
   },
   {
     key: 'game',

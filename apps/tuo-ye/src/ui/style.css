@@ -1,0 +1,1436 @@
+/* ============================================================================
+   托业模考 · 蓝/青专业色系样式表
+   设计语言：深蓝导航 + 青色点缀 + 圆角卡片 + 专业教育感。
+   容器自适应：嵌入落地页时填满 .game-mount；独立运行时填满 #game-container。
+   所有选择器都收口在 .tuoye-root 下，避免与其它展品的通用类名互相污染。
+   ========================================================================== */
+
+.tuoye-root {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background:
+    radial-gradient(120% 60% at 50% -10%, rgba(49, 151, 149, 0.12) 0%, transparent 60%),
+    linear-gradient(180deg, #e6f7f7 0%, #ebf8ff 50%, #f0f9ff 100%);
+  color: var(--ink);
+  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+.tuoye-root * { box-sizing: border-box; }
+.tuoye-root::-webkit-scrollbar { width: 0; height: 0; }
+
+/* —— 色板变量 —— */
+.tuoye-root {
+  --blue-900: #1a365d;
+  --blue-800: #2a4a7f;
+  --blue-700: #2c5282;
+  --blue-600: #2b6cb0;
+  --blue-500: #3182ce;
+  --blue-400: #4299e1;
+  --blue-300: #63b3ed;
+  --blue-200: #90cdf4;
+  --blue-100: #bee3f8;
+  --blue-50: #ebf8ff;
+  --teal-700: #285e61;
+  --teal-600: #2c7a7b;
+  --teal-500: #319795;
+  --teal-400: #38b2ac;
+  --teal-300: #4fd1c5;
+  --teal-200: #81e6d9;
+  --teal-100: #b2f5ea;
+  --green-500: #38a169;
+  --green-400: #48bb78;
+  --green-100: #c6f6d5;
+  --red-500: #e53e3e;
+  --red-400: #fc8181;
+  --red-100: #fed7d7;
+  --amber-500: #d69e2e;
+  --amber-400: #ecc94b;
+  --amber-100: #fefcbf;
+  --ink: #1a202c;
+  --ink-soft: #4a5568;
+  --ink-muted: #a0aec0;
+  --white: #ffffff;
+  --bg-card: #ffffff;
+  --bg-page: #ebf8ff;
+  --shadow: 0 4px 12px rgba(26, 54, 93, 0.08);
+  --shadow-md: 0 6px 16px rgba(26, 54, 93, 0.12);
+  --shadow-lg: 0 8px 24px rgba(26, 54, 93, 0.15);
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-lg: 20px;
+}
+
+/* ============================================================ 启动器 === */
+.tuoye-root .launcher {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: clamp(20px, 6vmin, 40px);
+  text-align: center;
+}
+.tuoye-root .launcher-icon {
+  width: 88px;
+  height: 88px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, var(--blue-500), var(--teal-500));
+  color: #fff;
+  font-size: 2.6rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 12px 28px rgba(49, 130, 206, 0.35);
+  animation: tuoye-float 3s ease-in-out infinite;
+}
+.tuoye-root .launcher-title {
+  margin: 0;
+  font-size: clamp(1.8rem, 6vmin, 2.4rem);
+  font-weight: 800;
+  color: var(--blue-800);
+  letter-spacing: 0.04em;
+}
+.tuoye-root .launcher-sub {
+  margin: 0.4rem 0 0;
+  font-size: 0.92rem;
+  line-height: 1.7;
+  color: var(--ink-soft);
+  max-width: 22em;
+}
+.tuoye-root .launcher-form {
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.tuoye-root .launcher-input {
+  width: 100%;
+  padding: 0.9rem 1.1rem;
+  border: 2px solid var(--blue-200);
+  border-radius: 999px;
+  background: var(--white);
+  font-size: 1rem;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  text-align: center;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.tuoye-root .launcher-input::placeholder { color: #a0c4d8; }
+.tuoye-root .launcher-input:focus {
+  border-color: var(--blue-400);
+  box-shadow: 0 0 0 4px rgba(66, 153, 225, 0.18);
+}
+.tuoye-root .launcher-btn {
+  width: 100%;
+  padding: 0.9rem 1.1rem;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--blue-500), var(--blue-600));
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  transition: transform 0.12s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+.tuoye-root .launcher-btn:active { transform: translateY(1px) scale(0.99); }
+.tuoye-root .launcher-btn:hover { filter: brightness(1.04); box-shadow: var(--shadow-lg); }
+.tuoye-root .launcher-hint {
+  font-size: 0.74rem;
+  color: var(--ink-muted);
+}
+
+/* ============================================================ 主视图 === */
+.tuoye-root .main-view {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: clamp(14px, 4vmin, 22px);
+  padding-bottom: max(28px, env(safe-area-inset-bottom));
+  animation: tuoye-fade-in 0.25s ease;
+}
+
+/* —— Header —— */
+.tuoye-root .header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+.tuoye-root .header-left { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.tuoye-root .header-name {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--blue-800);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 10em;
+}
+.tuoye-root .header-streak {
+  flex: none;
+  padding: 0.18rem 0.6rem;
+  border-radius: 999px;
+  background: var(--amber-100);
+  color: var(--amber-500);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.tuoye-root .header-settings {
+  flex: none;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--blue-200);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--blue-600);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.tuoye-root .header-settings:active { background: var(--blue-50); }
+
+/* —— Today check-in card —— */
+.tuoye-root .checkin-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 1rem 1.2rem;
+  border: none;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, var(--teal-500), var(--blue-500));
+  color: #fff;
+  cursor: pointer;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  transition: transform 0.12s ease, filter 0.18s ease;
+  width: 100%;
+  text-align: left;
+}
+.tuoye-root .checkin-card:active { transform: scale(0.99); }
+.tuoye-root .checkin-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(80% 120% at 90% 0%, rgba(255, 255, 255, 0.2), transparent);
+  pointer-events: none;
+}
+.tuoye-root .checkin-card.is-checked {
+  background: linear-gradient(135deg, var(--teal-300), var(--teal-500));
+}
+.tuoye-root .checkin-card__date { font-size: 0.85rem; opacity: 0.92; position: relative; }
+.tuoye-root .checkin-card__btn {
+  font-size: 1.05rem;
+  font-weight: 800;
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--teal-700);
+  position: relative;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+.tuoye-root .checkin-card:not(.is-checked) .checkin-card__btn {
+  animation: tuoye-pulse-btn 1.8s ease-in-out infinite;
+}
+
+/* —— Nav grid (4 large buttons) —— */
+.tuoye-root .nav-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+.tuoye-root .nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 1rem 0.6rem;
+  border: 1.5px solid var(--blue-100);
+  border-radius: var(--radius);
+  background: var(--white);
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: transform 0.12s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  text-align: center;
+}
+.tuoye-root .nav-btn:active { transform: scale(0.97); }
+.tuoye-root .nav-btn:hover { border-color: var(--blue-300); box-shadow: var(--shadow-md); }
+.tuoye-root .nav-btn__icon { font-size: 2rem; line-height: 1; }
+.tuoye-root .nav-btn__label { font-size: 1rem; font-weight: 700; color: var(--blue-800); }
+.tuoye-root .nav-btn__sub { font-size: 0.72rem; color: var(--ink-soft); line-height: 1.3; }
+
+/* —— Stats row —— */
+.tuoye-root .stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+.tuoye-root .stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.6rem 0.3rem;
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  box-shadow: var(--shadow);
+}
+.tuoye-root .stat--accent {
+  background: linear-gradient(135deg, var(--teal-400), var(--teal-600));
+  color: #fff;
+}
+.tuoye-root .stat__num { font-size: 1.4rem; font-weight: 800; line-height: 1.1; }
+.tuoye-root .stat__lbl { font-size: 0.68rem; opacity: 0.8; }
+
+/* —— Bottom info bar —— */
+.tuoye-root .info-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.6);
+  font-size: 0.72rem;
+  color: var(--ink-muted);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.tuoye-root .info-bar:active { background: rgba(255, 255, 255, 0.9); }
+
+/* ============================================================ 通用屏幕 === */
+.tuoye-root .screen {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: clamp(14px, 4vmin, 22px);
+  padding-bottom: max(28px, env(safe-area-inset-bottom));
+  animation: tuoye-fade-in 0.25s ease;
+}
+.tuoye-root .screen-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.tuoye-root .back-btn {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border: 1.5px solid var(--blue-200);
+  border-radius: 50%;
+  background: var(--white);
+  color: var(--blue-600);
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+.tuoye-root .back-btn:active { transform: scale(0.92); background: var(--blue-50); }
+.tuoye-root .screen-title {
+  flex: 1;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--blue-800);
+}
+
+/* ============================================================ 学习屏幕 === */
+.tuoye-root .study-tabs {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.25rem;
+  background: var(--white);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+}
+.tuoye-root .study-tab {
+  flex: 1;
+  padding: 0.55rem 0.4rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+  text-align: center;
+}
+.tuoye-root .study-tab.is-active {
+  background: linear-gradient(135deg, var(--blue-500), var(--teal-500));
+  color: #fff;
+  box-shadow: var(--shadow);
+}
+.tuoye-root .study-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.tuoye-root .study-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+  box-shadow: var(--shadow);
+  border-left: 4px solid var(--blue-400);
+  transition: transform 0.12s ease;
+}
+.tuoye-root .study-card:active { transform: scale(0.99); }
+.tuoye-root .study-card__word {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--blue-700);
+  margin-bottom: 0.1rem;
+}
+.tuoye-root .study-card__phonetic {
+  font-size: 0.82rem;
+  color: var(--teal-500);
+  font-style: italic;
+  margin-bottom: 0.4rem;
+}
+.tuoye-root .study-card__def {
+  font-size: 0.92rem;
+  color: var(--ink);
+  line-height: 1.55;
+  margin-bottom: 0.3rem;
+}
+.tuoye-root .study-card__example {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--blue-200);
+  font-style: italic;
+}
+.tuoye-root .study-card__title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--blue-700);
+  margin-bottom: 0.3rem;
+}
+.tuoye-root .study-card__explanation {
+  font-size: 0.92rem;
+  color: var(--ink);
+  line-height: 1.6;
+  margin-bottom: 0.4rem;
+}
+.tuoye-root .study-card__examples {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.tuoye-root .study-card__example-item {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--blue-200);
+}
+.tuoye-root .study-card__phrase {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--blue-700);
+  margin-bottom: 0.15rem;
+}
+.tuoye-root .study-card__meaning {
+  font-size: 0.88rem;
+  color: var(--teal-600);
+  margin-bottom: 0.3rem;
+  font-weight: 600;
+}
+.tuoye-root .study-empty {
+  text-align: center;
+  color: var(--ink-muted);
+  padding: 2rem 0;
+  font-size: 0.92rem;
+}
+
+/* ============================================================ 打卡屏幕 === */
+.tuoye-root .checkin-screen .stats { margin-bottom: 0.2rem; }
+
+/* —— Milestone progress —— */
+.tuoye-root .milestone {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.tuoye-root .milestone__top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+.tuoye-root .milestone__cnt { color: var(--teal-600); font-weight: 700; }
+.tuoye-root .milestone__bar {
+  height: 9px;
+  border-radius: 999px;
+  background: var(--blue-100);
+  overflow: hidden;
+}
+.tuoye-root .milestone__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--teal-300), var(--blue-500));
+  transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* —— Calendar —— */
+.tuoye-root .calendar {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 0.9rem;
+  box-shadow: var(--shadow);
+}
+.tuoye-root .cal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+.tuoye-root .cal-nav__title { font-size: 1rem; font-weight: 700; color: var(--blue-700); }
+.tuoye-root .cal-nav__btn {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: var(--blue-100);
+  color: var(--blue-600);
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+.tuoye-root .cal-nav__btn:active { transform: scale(0.92); background: var(--blue-200); }
+.tuoye-root .cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 0.3rem;
+}
+.tuoye-root .cal-dow {
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--ink-muted);
+  font-weight: 600;
+  padding: 0.25rem 0;
+}
+.tuoye-root .cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+.tuoye-root .day {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border: none;
+  border-radius: 10px;
+  background: var(--blue-50);
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.tuoye-root .day:active { transform: scale(0.93); }
+.tuoye-root .day--out { color: #c3d5e0; background: transparent; }
+.tuoye-root .day.is-future { color: #d0dce6; background: transparent; cursor: not-allowed; }
+.tuoye-root .day.is-past:not(.is-checked) { box-shadow: inset 0 0 0 1px #b8d4e8; }
+.tuoye-root .day.is-today {
+  box-shadow: inset 0 0 0 2px var(--blue-400);
+  font-weight: 800;
+}
+.tuoye-root .day.is-checked {
+  background: linear-gradient(135deg, var(--teal-400), var(--blue-500));
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(49, 151, 149, 0.3);
+}
+.tuoye-root .day.is-checked.is-today {
+  box-shadow: inset 0 0 0 2px #fff, 0 4px 10px rgba(49, 151, 149, 0.3);
+}
+.tuoye-root .day__check {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  font-size: 0.58rem;
+  color: #fff;
+  line-height: 1;
+}
+
+/* —— Milestone badges —— */
+.tuoye-root .milestones {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 0.9rem;
+  box-shadow: var(--shadow);
+}
+.tuoye-root .milestones__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.5rem;
+}
+.tuoye-root .milestones__title { font-size: 0.92rem; font-weight: 700; color: var(--blue-700); }
+.tuoye-root .milestones__cnt { font-size: 0.76rem; color: var(--ink-soft); }
+.tuoye-root .milestones__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: 0.5rem;
+}
+.tuoye-root .mslot {
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: var(--blue-50);
+  font-size: 1.2rem;
+  color: #c3d5e0;
+  transition: transform 0.2s ease;
+}
+.tuoye-root .mslot.is-on {
+  color: var(--blue-500);
+  background: var(--blue-100);
+  filter: drop-shadow(0 2px 6px rgba(49, 130, 206, 0.2));
+  animation: tuoye-pop 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ============================================================ 自测设置 === */
+.tuoye-root .setup-section {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 1rem;
+  box-shadow: var(--shadow);
+}
+.tuoye-root .setup-label {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--blue-700);
+  margin-bottom: 0.6rem;
+}
+.tuoye-root .part-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.tuoye-root .part-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 0.8rem;
+  border: 1.5px solid var(--blue-100);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+.tuoye-root .part-opt:active { transform: scale(0.99); }
+.tuoye-root .part-opt.is-selected {
+  border-color: var(--blue-500);
+  background: var(--blue-50);
+}
+.tuoye-root .part-opt__dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--blue-300);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+.tuoye-root .part-opt.is-selected .part-opt__dot {
+  border-color: var(--blue-500);
+  background: var(--blue-500);
+}
+.tuoye-root .part-opt.is-selected .part-opt__dot::after {
+  content: "✓";
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+.tuoye-root .part-opt__check {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 2px solid var(--blue-300);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+.tuoye-root .part-opt.is-selected .part-opt__check {
+  border-color: var(--blue-500);
+  background: var(--blue-500);
+}
+.tuoye-root .part-opt.is-selected .part-opt__check::after {
+  content: "✓";
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+.tuoye-root .part-opt__info { display: flex; flex-direction: column; flex: 1; }
+.tuoye-root .part-opt__name { font-weight: 700; color: var(--ink); font-size: 0.92rem; }
+.tuoye-root .part-opt__sub { font-size: 0.74rem; color: var(--ink-soft); }
+.tuoye-root .count-options {
+  display: flex;
+  gap: 0.5rem;
+}
+.tuoye-root .count-opt {
+  flex: 1;
+  padding: 0.6rem;
+  border: 1.5px solid var(--blue-100);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+.tuoye-root .count-opt.is-selected {
+  border-color: var(--blue-500);
+  background: var(--blue-500);
+  color: #fff;
+}
+.tuoye-root .time-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--blue-50);
+  font-size: 0.88rem;
+  color: var(--blue-700);
+}
+.tuoye-root .time-display__val { font-weight: 800; font-family: "SF Mono", "Menlo", monospace; }
+.tuoye-root .start-btn {
+  width: 100%;
+  padding: 0.9rem;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--blue-500), var(--blue-600));
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  transition: transform 0.12s ease, filter 0.18s ease;
+}
+.tuoye-root .start-btn:active { transform: translateY(1px) scale(0.99); }
+.tuoye-root .start-btn:hover { filter: brightness(1.04); }
+.tuoye-root .start-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.tuoye-root .start-btn--exam {
+  background: linear-gradient(135deg, var(--teal-500), var(--blue-500));
+}
+.tuoye-root .warning-text {
+  font-size: 0.78rem;
+  color: var(--amber-500);
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* ============================================================ 自测答题 === */
+.tuoye-root .quiz-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+.tuoye-root .quiz-bar__progress { font-weight: 700; color: var(--blue-700); }
+.tuoye-root .quiz-bar__count { color: var(--teal-600); font-weight: 600; }
+.tuoye-root .quiz-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--blue-100);
+  overflow: hidden;
+}
+.tuoye-root .quiz-progress__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--blue-400), var(--teal-500));
+  transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.tuoye-root .question-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 1.1rem;
+  box-shadow: var(--shadow);
+  min-height: 120px;
+}
+.tuoye-root .question-card__passage {
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+  line-height: 1.65;
+  margin-bottom: 0.8rem;
+  padding: 0.8rem;
+  background: var(--blue-50);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--blue-300);
+  white-space: pre-wrap;
+}
+.tuoye-root .question-card__text {
+  font-size: 1rem;
+  color: var(--ink);
+  line-height: 1.6;
+}
+.tuoye-root .options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.tuoye-root .option-btn {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.75rem 0.9rem;
+  border: 1.5px solid var(--blue-100);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.12s ease;
+  width: 100%;
+  font-size: 0.92rem;
+  color: var(--ink);
+  line-height: 1.5;
+}
+.tuoye-root .option-btn:active { transform: scale(0.99); }
+.tuoye-root .option-btn:hover { border-color: var(--blue-300); }
+.tuoye-root .option-btn.is-selected {
+  border-color: var(--blue-500);
+  background: var(--blue-50);
+}
+.tuoye-root .option-btn.is-correct {
+  border-color: var(--green-500);
+  background: var(--green-100);
+  color: #22543d;
+}
+.tuoye-root .option-btn.is-wrong {
+  border-color: var(--red-500);
+  background: var(--red-100);
+  color: #742a2a;
+}
+.tuoye-root .option-btn.is-disabled { cursor: default; pointer-events: none; }
+.tuoye-root .option-btn__marker {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--blue-200);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--blue-500);
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+  margin-top: 1px;
+}
+.tuoye-root .option-btn.is-selected .option-btn__marker {
+  border-color: var(--blue-500);
+  background: var(--blue-500);
+  color: #fff;
+}
+.tuoye-root .option-btn.is-correct .option-btn__marker {
+  border-color: var(--green-500);
+  background: var(--green-500);
+  color: #fff;
+}
+.tuoye-root .option-btn.is-wrong .option-btn__marker {
+  border-color: var(--red-500);
+  background: var(--red-500);
+  color: #fff;
+}
+.tuoye-root .feedback {
+  padding: 0.8rem 1rem;
+  border-radius: var(--radius-sm);
+  margin-top: 0.5rem;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  animation: tuoye-fade-in 0.2s ease;
+}
+.tuoye-root .feedback--correct {
+  background: var(--green-100);
+  color: #22543d;
+  border-left: 3px solid var(--green-500);
+}
+.tuoye-root .feedback--wrong {
+  background: var(--red-100);
+  color: #742a2a;
+  border-left: 3px solid var(--red-500);
+}
+.tuoye-root .feedback__label { font-weight: 700; margin-bottom: 0.2rem; }
+.tuoye-root .quiz-nav {
+  display: flex;
+  gap: 0.5rem;
+}
+.tuoye-root .quiz-nav-btn {
+  flex: 1;
+  padding: 0.65rem;
+  border: 1.5px solid var(--blue-200);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--blue-600);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+.tuoye-root .quiz-nav-btn:active { transform: scale(0.97); }
+.tuoye-root .quiz-nav-btn--primary {
+  background: linear-gradient(135deg, var(--blue-500), var(--blue-600));
+  color: #fff;
+  border: none;
+}
+.tuoye-root .quiz-nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ============================================================ 自测结果 === */
+.tuoye-root .result-card {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+}
+.tuoye-root .result-score {
+  font-size: 3rem;
+  font-weight: 900;
+  color: var(--blue-700);
+  line-height: 1.1;
+}
+.tuoye-root .result-score span {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.tuoye-root .result-accuracy {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-top: 0.3rem;
+}
+.tuoye-root .result-accuracy.is-high { color: var(--green-500); }
+.tuoye-root .result-accuracy.is-mid { color: var(--amber-500); }
+.tuoye-root .result-accuracy.is-low { color: var(--red-500); }
+.tuoye-root .result-time {
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+  margin-top: 0.3rem;
+}
+.tuoye-root .result-breakdown {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 1rem;
+  box-shadow: var(--shadow);
+}
+.tuoye-root .result-breakdown__title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--blue-700);
+  margin-bottom: 0.5rem;
+}
+.tuoye-root .result-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0;
+  font-size: 0.88rem;
+  border-bottom: 1px solid var(--blue-50);
+}
+.tuoye-root .result-row:last-child { border-bottom: none; }
+.tuoye-root .result-row__label { color: var(--ink-soft); }
+.tuoye-root .result-row__val { font-weight: 700; color: var(--ink); }
+.tuoye-root .wrong-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.tuoye-root .wrong-item {
+  background: var(--white);
+  border-radius: var(--radius-sm);
+  padding: 0.8rem 1rem;
+  box-shadow: var(--shadow);
+  border-left: 3px solid var(--red-400);
+}
+.tuoye-root .wrong-item__q {
+  font-size: 0.88rem;
+  color: var(--ink);
+  line-height: 1.55;
+  margin-bottom: 0.3rem;
+}
+.tuoye-root .wrong-item__ans {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+.tuoye-root .wrong-item__ans strong { color: var(--green-500); }
+.tuoye-root .result-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* ============================================================ 考试计时器 === */
+.tuoye-root .exam-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  box-shadow: var(--shadow);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.tuoye-root .exam-timer {
+  font-family: "SF Mono", "Menlo", "Consolas", monospace;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--blue-700);
+  letter-spacing: 0.04em;
+}
+.tuoye-root .exam-timer.is-warning { color: var(--amber-500); }
+.tuoye-root .exam-timer.is-danger {
+  color: var(--red-500);
+  animation: tuoye-blink 1s step-end infinite;
+}
+.tuoye-root .exam-progress-text {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.tuoye-root .exam-submit-btn {
+  padding: 0.4rem 0.9rem;
+  border: 1.5px solid var(--red-400);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--red-500);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+.tuoye-root .exam-submit-btn:active { transform: scale(0.96); }
+.tuoye-root .exam-submit-btn:hover { background: var(--red-100); }
+
+/* —— Exam question navigation (grid) —— */
+.tuoye-root .exam-qnav {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  margin-bottom: 0.5rem;
+}
+.tuoye-root .exam-qnav__btn {
+  aspect-ratio: 1 / 1;
+  border: 1.5px solid var(--blue-100);
+  border-radius: 6px;
+  background: var(--white);
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.tuoye-root .exam-qnav__btn.is-answered {
+  background: var(--blue-100);
+  border-color: var(--blue-300);
+  color: var(--blue-700);
+}
+.tuoye-root .exam-qnav__btn.is-current {
+  border-color: var(--blue-500);
+  background: var(--blue-500);
+  color: #fff;
+}
+
+/* ============================================================ 考试结果 === */
+.tuoye-root .exam-result-hero {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+}
+.tuoye-root .exam-result-score {
+  font-size: 3.5rem;
+  font-weight: 900;
+  color: var(--blue-800);
+  line-height: 1.1;
+}
+.tuoye-root .exam-result-score span {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.tuoye-root .exam-result-level {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+.tuoye-root .exam-result-reading {
+  margin-top: 0.5rem;
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+}
+.tuoye-root .exam-result-reading strong { color: var(--blue-700); }
+
+/* ============================================================ 题库信息 === */
+.tuoye-root .bank-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 1rem;
+  box-shadow: var(--shadow);
+}
+.tuoye-root .bank-card__title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--blue-700);
+  margin-bottom: 0.5rem;
+}
+.tuoye-root .bank-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0;
+  font-size: 0.88rem;
+  border-bottom: 1px solid var(--blue-50);
+}
+.tuoye-root .bank-row:last-child { border-bottom: none; }
+.tuoye-root .bank-row__label { color: var(--ink-soft); }
+.tuoye-root .bank-row__val { font-weight: 700; color: var(--ink); }
+
+/* ============================================================ Profile sheet === */
+.tuoye-root .sheet { position: absolute; inset: 0; z-index: 50; }
+.tuoye-root .sheet__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(26, 54, 93, 0);
+  transition: background 0.22s ease;
+}
+.tuoye-root .sheet.is-open .sheet__backdrop { background: rgba(26, 54, 93, 0.32); }
+.tuoye-root .sheet__panel {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  background: var(--blue-50);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 0.9rem 1rem max(1rem, env(safe-area-inset-bottom));
+  transform: translateY(100%);
+  transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 -10px 30px rgba(26, 54, 93, 0.15);
+  max-height: 80%;
+  overflow-y: auto;
+}
+.tuoye-root .sheet.is-open .sheet__panel { transform: translateY(0); }
+.tuoye-root .sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+.tuoye-root .sheet__title { font-size: 1rem; font-weight: 800; color: var(--blue-800); }
+.tuoye-root .sheet__close {
+  width: 30px; height: 30px;
+  border: none; border-radius: 50%;
+  background: var(--blue-100); color: var(--blue-600);
+  font-size: 0.9rem; cursor: pointer;
+}
+.tuoye-root .sheet__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.tuoye-root .sheet__body-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.8rem 1rem;
+  background: var(--white);
+  border-radius: var(--radius-sm);
+}
+.tuoye-root .sheet__body-label { font-weight: 600; color: var(--ink); }
+.tuoye-root .sheet__body-val { color: var(--ink-soft); font-size: 0.92rem; }
+.tuoye-root .sheet__rename-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.4rem;
+  background: var(--white);
+  border-radius: var(--radius-sm);
+}
+.tuoye-root .sheet__rename-input {
+  flex: 1;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--blue-200);
+  border-radius: 8px;
+  font-size: 1rem;
+  color: var(--ink);
+  outline: none;
+  background: var(--white);
+  user-select: text;
+  -webkit-user-select: text;
+}
+.tuoye-root .sheet__rename-input:focus { border-color: var(--blue-400); }
+.tuoye-root .sheet__rename-ok {
+  padding: 0.5rem 0.9rem;
+  border: none; border-radius: 8px;
+  background: var(--blue-500); color: #fff;
+  font-weight: 700; cursor: pointer;
+}
+.tuoye-root .sheet__foot {
+  padding-top: 0.7rem;
+}
+.tuoye-root .sheet__danger-btn {
+  width: 100%;
+  padding: 0.7rem;
+  border: 1.5px solid var(--red-400);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  color: var(--red-500);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.tuoye-root .sheet__danger-btn:active { background: var(--red-100); }
+
+/* ============================================================ 二次确认弹窗 === */
+.tuoye-root .confirm {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.2rem;
+  background: rgba(26, 54, 93, 0);
+  pointer-events: none;
+  transition: background 0.2s ease;
+}
+.tuoye-root .confirm.is-open {
+  background: rgba(26, 54, 93, 0.34);
+  pointer-events: auto;
+}
+.tuoye-root .confirm__backdrop { position: absolute; inset: 0; }
+.tuoye-root .confirm__panel {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  padding: 1.2rem 1.3rem 1.1rem;
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+  transform: scale(0.85);
+  opacity: 0;
+  transition: transform 0.24s cubic-bezier(0.22, 1.4, 0.4, 1), opacity 0.2s ease;
+}
+.tuoye-root .confirm.is-open .confirm__panel { transform: scale(1); opacity: 1; }
+.tuoye-root .confirm__title { font-size: 1.08rem; font-weight: 800; color: var(--blue-800); }
+.tuoye-root .confirm__panel.is-danger .confirm__title { color: var(--red-500); }
+.tuoye-root .confirm__msg {
+  margin-top: 0.45rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+.tuoye-root .confirm__actions {
+  margin-top: 1.1rem;
+  display: flex;
+  gap: 0.6rem;
+}
+.tuoye-root .confirm__btn {
+  flex: 1;
+  padding: 0.65rem 0.8rem;
+  border: none;
+  border-radius: 999px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.12s ease, filter 0.18s ease;
+}
+.tuoye-root .confirm__btn:active { transform: scale(0.97); }
+.tuoye-root .confirm__btn--cancel {
+  background: var(--blue-100);
+  color: var(--blue-600);
+}
+.tuoye-root .confirm__btn--ok {
+  background: linear-gradient(135deg, var(--blue-500), var(--blue-600));
+  color: #fff;
+  box-shadow: var(--shadow);
+}
+.tuoye-root .confirm__btn--ok.is-danger {
+  background: linear-gradient(135deg, #fc8181, #e53e3e);
+}
+
+/* ============================================================ Toast === */
+.tuoye-root .toast-host {
+  position: absolute;
+  left: 0; right: 0; bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.tuoye-root .toast {
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
+  background: rgba(26, 54, 93, 0.92);
+  color: #fff;
+  font-size: 0.85rem;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+}
+.tuoye-root .toast.is-show { opacity: 1; transform: translateY(0); }
+
+/* ============================================================ 动效关键帧（tuoye- 前缀防全局撞名）=== */
+@keyframes tuoye-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes tuoye-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes tuoye-pulse-btn {
+  0%, 100% { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 0 0 0 rgba(49, 151, 149, 0.5); }
+  50% { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 0 0 8px rgba(49, 151, 149, 0); }
+}
+@keyframes tuoye-pop {
+  0% { transform: scale(0); }
+  60% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+@keyframes tuoye-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+@keyframes tuoye-confetti-rise {
+  0% { opacity: 0; transform: translateY(0) rotate(0deg); }
+  10% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-110vh) rotate(360deg); }
+}
+
+/* ============================================================ 庆祝动画 === */
+.tuoye-root .celebrate {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(235, 248, 255, 0);
+  pointer-events: none;
+  transition: background 0.3s ease;
+}
+.tuoye-root .celebrate.is-open {
+  background: rgba(235, 248, 255, 0.78);
+  pointer-events: auto;
+}
+.tuoye-root .celebrate__particles {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.tuoye-root .celebrate__particle {
+  position: absolute;
+  bottom: -10%;
+  font-size: 1.4rem;
+  color: var(--blue-400);
+  opacity: 0;
+  animation-name: tuoye-confetti-rise;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-fill-mode: forwards;
+}
+.tuoye-root .celebrate__card {
+  position: relative;
+  text-align: center;
+  padding: 1.6rem 2rem;
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  transform: scale(0.6);
+  opacity: 0;
+  transition: transform 0.35s cubic-bezier(0.22, 1.4, 0.4, 1), opacity 0.3s ease;
+}
+.tuoye-root .celebrate.is-open .celebrate__card { transform: scale(1); opacity: 1; }
+.tuoye-root .celebrate__big {
+  font-size: 3.5rem;
+  color: var(--blue-500);
+  line-height: 1;
+  filter: drop-shadow(0 8px 16px rgba(49, 130, 206, 0.35));
+}
+.tuoye-root .celebrate__title { margin-top: 0.4rem; font-size: 1.5rem; font-weight: 800; color: var(--blue-800); }
+.tuoye-root .celebrate__sub { margin-top: 0.2rem; font-size: 0.95rem; color: var(--ink-soft); }
+.tuoye-root .celebrate__btn {
+  margin-top: 1rem;
+  padding: 0.6rem 1.6rem;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--blue-500), var(--teal-500));
+  color: #fff;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  pointer-events: auto;
+}
+.tuoye-root .celebrate__btn:active { transform: scale(0.96); }
+
+/* —— 窄屏微调 —— */
+@media (max-width: 360px) {
+  .tuoye-root .stat__num { font-size: 1.2rem; }
+  .tuoye-root .day { font-size: 0.78rem; }
+  .tuoye-root .launcher-title { font-size: 1.7rem; }
+  .tuoye-root .nav-btn__label { font-size: 0.9rem; }
+  .tuoye-root .exam-timer { font-size: 1.1rem; }
+}
+
+/* —— 尊重「减少动态效果」偏好 —— */
+@media (prefers-reduced-motion: reduce) {
+  .tuoye-root .launcher-icon,
+  .tuoye-root .checkin-card:not(.is-checked) .checkin-card__btn,
+  .tuoye-root .celebrate__big,
+  .tuoye-root .mslot.is-on,
+  .tuoye-root .day__check,
+  .tuoye-root .celebrate__particle,
+  .tuoye-root .exam-timer.is-danger { animation: none !important; }
+  .tuoye-root .main-view,
+  .tuoye-root .screen { animation: none !important; }
+}

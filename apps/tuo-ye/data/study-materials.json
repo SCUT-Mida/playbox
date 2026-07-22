@@ -1,0 +1,61 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2026-07-22",
+  "categories": {
+    "vocab": {
+      "name": "核心词汇",
+      "items": [
+        { "id": "v-001", "word": "agenda", "phonetic": "/əˈdʒendə/", "definition": "议事日程，议程", "example": "The first item on the agenda is the budget report." },
+        { "id": "v-002", "word": "invoice", "phonetic": "/ˈɪnvɔɪs/", "definition": "发票，收据", "example": "Please submit the invoice to the accounting department." },
+        { "id": "v-003", "word": "negotiate", "phonetic": "/nɪˈɡoʊʃieɪt/", "definition": "谈判，协商", "example": "We need to negotiate the terms of the contract." },
+        { "id": "v-004", "word": "allocate", "phonetic": "/ˈæləkeɪt/", "definition": "分配，配置", "example": "The company allocated additional resources to the project." },
+        { "id": "v-005", "word": "implement", "phonetic": "/ˈɪmplɪment/", "definition": "实施，执行", "example": "The new policy will be implemented next quarter." },
+        { "id": "v-006", "word": "subsequently", "phonetic": "/ˈsʌbsɪkwəntli/", "definition": "随后，后来", "example": "The proposal was approved and subsequently put into effect." },
+        { "id": "v-007", "word": "demonstrate", "phonetic": "/ˈdemənstreɪt/", "definition": "展示，证明", "example": "The results demonstrate a significant improvement." },
+        { "id": "v-008", "word": "comply", "phonetic": "/kəmˈplaɪ/", "definition": "遵守，遵从", "example": "All employees must comply with safety regulations." },
+        { "id": "v-009", "word": "endorse", "phonetic": "/ɪnˈdɔːrs/", "definition": "认可，背书", "example": "The board endorsed the new strategic plan." },
+        { "id": "v-010", "word": "feasible", "phonetic": "/ˈfiːzəbl/", "definition": "可行的，可实现的", "example": "We need to determine if the project is feasible." },
+        { "id": "v-011", "word": "prospective", "phonetic": "/prəˈspektɪv/", "definition": "预期的，潜在的", "example": "We met with several prospective clients last week." },
+        { "id": "v-012", "word": "remittance", "phonetic": "/rɪˈmɪtns/", "definition": "汇款，付款", "example": "Please include your remittance with the order form." },
+        { "id": "v-013", "word": "consolidate", "phonetic": "/kənˈsɑːlɪdeɪt/", "definition": "合并，巩固", "example": "The company plans to consolidate its operations." },
+        { "id": "v-014", "word": "accumulate", "phonetic": "/əˈkjuːmjəleɪt/", "definition": "积累，积聚", "example": "Employees accumulate vacation days throughout the year." },
+        { "id": "v-015", "word": "specify", "phonetic": "/ˈspesɪfaɪ/", "definition": "指定，详细说明", "example": "Please specify your preferred delivery date." }
+      ]
+    },
+    "grammar": {
+      "name": "语法要点",
+      "items": [
+        { "id": "g-001", "title": "现在完成时", "explanation": "have/has + 过去分词，表示过去发生的动作对现在造成的影响，或从过去持续到现在的动作。常与 already, yet, just, since, for 连用。", "examples": ["I have already submitted the report.", "She has worked here for five years.", "Have you finished the proposal yet?"] },
+        { "id": "g-002", "title": "被动语态", "explanation": "be + 过去分词。在商务英语中常用被动语态以显得更正式、客观，也用于强调动作本身而非执行者。", "examples": ["The meeting was postponed to next week.", "All applications must be submitted by Friday.", "The report is being prepared by the marketing team."] },
+        { "id": "g-003", "title": "词性转换", "explanation": "TOEIC Part 5 高频考点。掌握名词、动词、形容词、副词之间的转换规律。如：succeed (v) → success (n) → successful (adj) → successfully (adv)。", "examples": ["The project was completed successfully.", "She is a successful businesswoman.", "His success inspired the team."] },
+        { "id": "g-004", "title": "主谓一致", "explanation": "谓语动词必须与主语在人称和数上保持一致。注意集合名词（staff, team, committee）作整体看时用单数；each, every, one of 后接单数动词。", "examples": ["The committee has reached a decision.", "Each of the employees receives a bonus.", "The number of applicants has increased."] },
+        { "id": "g-005", "title": "介词搭配", "explanation": "TOEIC 高频考点。注意固定的介词搭配：responsible for, capable of, interested in, familiar with, concerned about, dependent on。", "examples": ["She is responsible for the marketing campaign.", "He is capable of managing large teams.", "We are familiar with the latest technology."] },
+        { "id": "g-006", "title": "条件句", "explanation": "Type 1: If + 现在时, will + 动词原形（可能发生）。Type 2: If + 过去时, would + 动词原形（不太可能）。Type 3: If + 过去完成时, would have + 过去分词（不可能发生）。", "examples": ["If we increase the budget, we will finish faster.", "If I were the manager, I would approve the plan.", "If we had known earlier, we would have acted differently."] },
+        { "id": "g-007", "title": "动名词 vs 不定式", "explanation": "某些动词后只能接动名词（enjoy, avoid, consider, finish, suggest），某些只能接不定式（decide, hope, plan, promise, want），有些两者皆可（begin, start, like, continue）。", "examples": ["I enjoy working with international clients.", "We plan to expand into Asian markets.", "They started developing the new software."] },
+        { "id": "g-008", "title": "比较级与最高级", "explanation": "短词加 -er/-est（fast→faster→fastest）；长词前加 more/most（efficient→more efficient→most efficient）。注意不规则变化：good→better→best, bad→worse→worst。", "examples": ["This quarter's sales are higher than last quarter's.", "She is the most qualified candidate for the position.", "The new system is more efficient than the old one."] },
+        { "id": "g-009", "title": "定语从句", "explanation": "关系代词 who（人，主格）, whom（人，宾格）, which（物）, that（人或物）, whose（所属关系）。非限定性定语从句（有逗号）只能用 who/which，不能用 that。", "examples": ["The manager who hired me is retiring.", "The report that I submitted was approved.", "Ms. Lee, whose team won the award, will speak tomorrow."] },
+        { "id": "g-010", "title": "时态：将来时表达", "explanation": "will + 动词原形（即时决定/预测）；be going to + 动词原形（计划/打算）；现在进行时（已安排）；be to + 动词原形（正式安排/命令）。", "examples": ["The conference will take place in March.", "We are going to launch the product next month.", "The CEO is to address the board on Friday."] }
+      ]
+    },
+    "business": {
+      "name": "商务短语",
+      "items": [
+        { "id": "b-001", "phrase": "follow up on", "meaning": "跟进，追踪", "usage": "I'd like to follow up on our previous discussion about the contract." },
+        { "id": "b-002", "phrase": "in charge of", "meaning": "负责，主管", "usage": "She is in charge of the marketing department." },
+        { "id": "b-003", "phrase": "look into", "meaning": "调查，研究", "usage": "We will look into the matter and get back to you." },
+        { "id": "b-004", "phrase": "take into account", "meaning": "考虑到，顾及", "usage": "We must take into account the current market conditions." },
+        { "id": "b-005", "phrase": "on behalf of", "meaning": "代表", "usage": "I am writing on behalf of the entire team." },
+        { "id": "b-006", "phrase": "bring up", "meaning": "提出（话题）", "usage": "I'd like to bring up an important issue at the meeting." },
+        { "id": "b-007", "phrase": "carry out", "meaning": "执行，实施", "usage": "The research team will carry out the survey next week." },
+        { "id": "b-008", "phrase": "come up with", "meaning": "想出，提出（主意）", "usage": "We need to come up with a solution by Friday." },
+        { "id": "b-009", "phrase": "draw up", "meaning": "起草，拟定", "usage": "The legal team will draw up the contract." },
+        { "id": "b-010", "phrase": "get back to", "meaning": "回复，再联系", "usage": "I'll get back to you with the details by end of day." },
+        { "id": "b-011", "phrase": "keep track of", "meaning": "记录，追踪", "usage": "Please keep track of all expenses during the trip." },
+        { "id": "b-012", "phrase": "point out", "meaning": "指出，提醒", "usage": "I'd like to point out that the deadline is approaching." },
+        { "id": "b-013", "phrase": "put off", "meaning": "推迟，延期", "usage": "The meeting has been put off until next Monday." },
+        { "id": "b-014", "phrase": "run out of", "meaning": "用完，耗尽", "usage": "We are running out of time to complete the project." },
+        { "id": "b-015", "phrase": "set up", "meaning": "建立，设立", "usage": "The company set up a new branch in Singapore." }
+      ]
+    }
+  }
+}

@@ -236,3 +236,34 @@ export function setActiveKey(key) {
     return true;
   } catch (_) { return false; }
 }
+
+// ============================================================================
+// 自定义题包（用户导入的额外题目）
+// 存放于主数据 JSON 的 customQuestions 字段，用于获取最新真题 / 补充题库。
+// ============================================================================
+
+/** 获取用户导入的自定义题包（无则 null）。 */
+export function getCustomQuestions() {
+  try {
+    const data = loadData();
+    return data.customQuestions || null;
+  } catch (_) { return null; }
+}
+
+/** 保存用户导入的自定义题包。 */
+export function saveCustomQuestions(pack) {
+  try {
+    const data = loadData();
+    data.customQuestions = pack;
+    return saveData(data);
+  } catch (_) { return false; }
+}
+
+/** 清除自定义题包。 */
+export function clearCustomQuestions() {
+  try {
+    const data = loadData();
+    delete data.customQuestions;
+    return saveData(data);
+  } catch (_) { return false; }
+}

@@ -45,19 +45,49 @@ function _flattenPassages(passages, partKey) {
 }
 
 // ============================================================================
-// 私有：从 questionData 提取各部分的扁平题目列表（缓存复用）
+// 自定义题包支持
+// 用户可导入额外的 TOEIC 格式题目（JSON），与内置题库合并使用。
+// 用于获取最新真题 / 补充练习题。
 // ============================================================================
 
+let _customPack = null; // 内存缓存，避免每次查询都读 localStorage
+
+/** 加载自定义题包（合并到内置题目中）。传入 null 清除。 */
+export function loadCustomPack(pack) {
+  _customPack = (pack && typeof pack === 'object') ? pack : null;
+}
+
+/** 获取当前自定义题包信息（用于 UI 显示）。 */
+export function getCustomPackInfo() {
+  if (!_customPack) return null;
+  const p5 = _flatPart5(_customPack?.parts?.part5?.questions);
+  const p6 = _flattenPassages(_customPack?.parts?.part6?.passages, 'part6');
+  const p7 = _flattenPassages(_customPack?.parts?.part7?.passages, 'part7');
+  return {
+    version: _customPack?.version || '',
+    lastUpdated: _customPack?.lastUpdated || '',
+    total: p5.length + p6.length + p7.length,
+    partCounts: { part5: p5.length, part6: p6.length, part7: p7.length },
+  };
+}
+
+// 合并内置 + 自定义题目的查询函数
 function _getPart5Q() {
-  return _flatPart5(questionData?.parts?.part5?.questions);
+  const builtin = _flatPart5(questionData?.parts?.part5?.questions);
+  const custom = _customPack ? _flatPart5(_customPack?.parts?.part5?.questions) : [];
+  return custom.length ? [...builtin, ...custom] : builtin;
 }
 
 function _getPart6Items() {
-  return _flattenPassages(questionData?.parts?.part6?.passages, 'part6');
+  const builtin = _flattenPassages(questionData?.parts?.part6?.passages, 'part6');
+  const custom = _customPack ? _flattenPassages(_customPack?.parts?.part6?.passages, 'part6') : [];
+  return custom.length ? [...builtin, ...custom] : builtin;
 }
 
 function _getPart7Items() {
-  return _flattenPassages(questionData?.parts?.part7?.passages, 'part7');
+  const builtin = _flattenPassages(questionData?.parts?.part7?.passages, 'part7');
+  const custom = _customPack ? _flattenPassages(_customPack?.parts?.part7?.passages, 'part7') : [];
+  return custom.length ? [...builtin, ...custom] : builtin;
 }
 
 // ============================================================================
@@ -68,6 +98,7 @@ export function getBankInfo() {
   const p5 = _getPart5Q();
   const p6 = _getPart6Items();
   const p7 = _getPart7Items();
+  const custom = getCustomPackInfo();
   return {
     version: questionData?.version || '',
     lastUpdated: questionData?.lastUpdated || '',
@@ -77,6 +108,7 @@ export function getBankInfo() {
       part6: p6.length,
       part7: p7.length,
     },
+    customPack: custom,
   };
 }
 

@@ -43,7 +43,8 @@ import {
   getCategoryNames, getMaterials, getFormattedCards,
   getTotalMaterialCount, getStudyVersion,
 } from '../core/studyEngine.js';
-import { getBankInfo } from '../core/questionBank.js';
+import { getBankInfo, loadCustomPack, getCustomPackInfo } from '../core/questionBank.js';
+import { getCustomQuestions, saveCustomQuestions, clearCustomQuestions } from '../core/store.js';
 import {
   todayDate, toISODate, parseISO, monthMatrix, isToday, isFuture, diffDays,
   monthDayLabel,
@@ -95,6 +96,9 @@ export class AppUI {
     this._detachKeyboard = attachKeyboardShell(this.root);
     this._bindGlobal();
     this._restoreProfile();
+    // 恢复自定义题包（从 localStorage 加载用户之前导入的题目）
+    const savedPack = getCustomQuestions();
+    if (savedPack) loadCustomPack(savedPack);
     this.render();
   }
 
@@ -794,6 +798,7 @@ export class AppUI {
   _renderBank() {
     const bank = getBankInfo();
     const study = getStudyVersion();
+    const custom = bank.customPack;
     this.root.insertAdjacentHTML('beforeend', `
       <section class="screen">
         <div class="screen-header">
@@ -833,6 +838,37 @@ export class AppUI {
           </div>
         </div>
 
+        ${custom ? `
+        <div class="bank-card bank-card--custom">
+          <div class="bank-card__title">已导入题包</div>
+          <div class="bank-row">
+            <span class="bank-row__label">题包版本</span>
+            <span class="bank-row__val">${esc(custom.version || '未标注')}</span>
+          </div>
+          <div class="bank-row">
+            <span class="bank-row__label">更新日期</span>
+            <span class="bank-row__val">${esc(custom.lastUpdated || '未标注')}</span>
+          </div>
+          <div class="bank-row">
+            <span class="bank-row__label">新增题目</span>
+            <span class="bank-row__val">${custom.total} 题</span>
+          </div>
+          <button class="bank-import-btn bank-import-btn--danger" data-act="remove-custom-pack" type="button">移除导入题包</button>
+        </div>
+        ` : ''}
+
+        <div class="bank-card">
+          <div class="bank-card__title">导入最新真题</div>
+          <p class="bank-import-hint">
+            选择 TOEIC 格式的 JSON 题包文件，导入后题目将合并到题库中，可在自测和考试中使用。
+          </p>
+          <label class="bank-import-btn" for="bank-file-input">选择题包文件…</label>
+          <input type="file" id="bank-file-input" accept=".json,application/json" data-id="bank-file-input" hidden />
+          <p class="bank-import-format">
+            格式：与题库相同的 JSON 结构（含 parts.part5/part6/part7）
+          </p>
+        </div>
+
         <div class="bank-card">
           <div class="bank-card__title">学习资料</div>
           <div class="bank-row">
@@ -850,6 +886,11 @@ export class AppUI {
         </div>
       </section>
     `);
+    // 绑定文件输入事件
+    const fileInput = this.root.querySelector('[data-id="bank-file-input"]');
+    if (fileInput) {
+      fileInput.addEventListener('change', (e) => this._onImportPack(e));
+    }
   }
 
   // ===================== 事件分发 =====================
@@ -899,6 +940,7 @@ export class AppUI {
       case 'confirm-ok': this._onConfirmOk(); break;
       case 'confirm-cancel': this._closeConfirm(); break;
       case 'celebrate-ok': this._endCelebrate(); break;
+      case 'remove-custom-pack': this._onRemoveCustomPack(); break;
       default: break;
     }
   }
@@ -1442,6 +1484,53 @@ export class AppUI {
       if (el.parentNode) el.parentNode.removeChild(el);
     }, 300);
     if (!skipToast) this._toast('继续加油，下一个里程碑在前方 ⭐');
+  }
+
+  // ===================== 导入题包 =====================
+  _onImportPack(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const text = ev.target.result;
+        const pack = JSON.parse(text);
+        if (!pack || !pack.parts) {
+          this._toast('文件格式不正确：缺少 parts 字段');
+          return;
+        }
+        // 基本结构校验
+        const hasQuestions = pack.parts.part5?.questions || pack.parts.part6?.passages || pack.parts.part7?.passages;
+        if (!hasQuestions) {
+          this._toast('文件格式不正确：未找到题目数据');
+          return;
+        }
+        loadCustomPack(pack);
+        saveCustomQuestions(pack);
+        const info = getCustomPackInfo();
+        this.render();
+        this._toast(`导入成功！新增 ${info ? info.total : 0} 道题目`);
+      } catch (err) {
+        this._toast('文件解析失败：' + (err.message || 'JSON 格式错误'));
+      }
+    };
+    reader.onerror = () => { this._toast('文件读取失败'); };
+    reader.readAsText(file);
+  }
+
+  _onRemoveCustomPack() {
+    this._confirm({
+      title: '移除导入题包？',
+      message: '导入的题目将从题库中移除，不影响内置题目。',
+      confirmText: '确认移除',
+      danger: true,
+      onConfirm: () => {
+        loadCustomPack(null);
+        clearCustomQuestions();
+        this.render();
+        this._toast('已移除导入的题包');
+      },
+    });
   }
 
   // ===================== Toast =====================

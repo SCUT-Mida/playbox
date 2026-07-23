@@ -321,6 +321,11 @@ export class AppUI {
     const canSpeak = isSpeechSupported();
     return this._studyCards.map((c) => {
       if (c.type === 'vocab') {
+        const exampleHtml = c.example ? `
+          <div class="study-card__example ${canSpeak ? 'is-clickable' : ''}" ${canSpeak ? `data-act="speak" data-text="${esc(c.example)}"` : ''}>
+            <span class="study-card__example-text">"${esc(c.example)}"</span>
+            ${canSpeak ? '<span class="study-card__speak-icon">🔊</span>' : ''}
+          </div>` : '';
         return `
           <div class="study-card">
             <div class="study-card__head">
@@ -329,12 +334,15 @@ export class AppUI {
             </div>
             ${c.subtitle ? `<div class="study-card__phonetic">${esc(c.subtitle)}</div>` : ''}
             <div class="study-card__def">${esc(c.body)}</div>
-            ${c.example ? `<div class="study-card__example"><span>"${esc(c.example)}"</span>${canSpeak ? `<button class="speak-btn speak-btn--sm" data-act="speak" data-text="${esc(c.example)}" type="button" aria-label="例句发音">🔊</button>` : ''}</div>` : ''}
+            ${exampleHtml}
           </div>`;
       }
       if (c.type === 'grammar') {
         const examplesHtml = (c.examples || []).map((ex) =>
-          `<div class="study-card__example-item"><span>${esc(ex)}</span>${canSpeak ? `<button class="speak-btn speak-btn--sm" data-act="speak" data-text="${esc(ex)}" type="button" aria-label="发音">🔊</button>` : ''}</div>`
+          `<div class="study-card__example-item ${canSpeak ? 'is-clickable' : ''}" ${canSpeak ? `data-act="speak" data-text="${esc(ex)}"` : ''}>
+            <span class="study-card__example-text">${esc(ex)}</span>
+            ${canSpeak ? '<span class="study-card__speak-icon">🔊</span>' : ''}
+          </div>`
         ).join('');
         return `
           <div class="study-card">

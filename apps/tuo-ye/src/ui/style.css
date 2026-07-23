@@ -1510,10 +1510,47 @@
   align-items: center;
   gap: 0.4rem;
 }
+.tuoye-root .study-card__example.is-clickable {
+  padding: 0.5rem 0.7rem;
+  margin-top: 0.4rem;
+  border-radius: 8px;
+  background: rgba(49, 130, 206, 0.06);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.tuoye-root .study-card__example.is-clickable:active {
+  background: rgba(49, 130, 206, 0.15);
+}
 .tuoye-root .study-card__example-item {
   display: flex;
   align-items: center;
   gap: 0.4rem;
+}
+.tuoye-root .study-card__example-item.is-clickable {
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  background: rgba(49, 130, 206, 0.06);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.tuoye-root .study-card__example-item.is-clickable:active {
+  background: rgba(49, 130, 206, 0.15);
+}
+.tuoye-root .study-card__example-text {
+  flex: 1;
+  font-style: italic;
+  color: var(--ink-soft, #4a5568);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.tuoye-root .study-card__speak-icon {
+  flex: none;
+  font-size: 1rem;
+  opacity: 0.6;
+}
+.tuoye-root .study-card__example.is-clickable:active .study-card__speak-icon,
+.tuoye-root .study-card__example-item.is-clickable:active .study-card__speak-icon {
+  opacity: 1;
 }
 .tuoye-root .question-card__passage-head {
   display: flex;

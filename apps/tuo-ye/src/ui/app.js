@@ -333,10 +333,10 @@ export class AppUI {
       const studiedBtn = `<button class="learned-toggle ${studied ? 'is-on' : ''}" data-act="toggle-learned" data-cat="${esc(cat)}" data-id="${esc(c.id)}" type="button">${studied ? '✓ 已学习' : '标记已学习'}</button>`;
       if (c.type === 'vocab') {
         const exampleHtml = c.example ? `
-          <div class="study-card__example ${canSpeak ? 'is-clickable' : ''}" ${canSpeak ? `data-act="speak" data-text="${esc(c.example)}"` : ''}>
-            <span class="study-card__example-text">"${esc(c.example)}"</span>
-            ${canSpeak ? '<span class="study-card__speak-icon">🔊</span>' : ''}
-          </div>` : '';
+          <button class="study-example-btn" data-act="speak" data-text="${esc(c.example)}" type="button">
+            <span class="study-example-btn__text">"${esc(c.example)}"</span>
+            <span class="study-example-btn__icon">🔊</span>
+          </button>` : '';
         return `
           <div class="study-card ${studiedCls}">
             <div class="study-card__head">
@@ -351,10 +351,10 @@ export class AppUI {
       }
       if (c.type === 'grammar') {
         const examplesHtml = (c.examples || []).map((ex) =>
-          `<div class="study-card__example-item ${canSpeak ? 'is-clickable' : ''}" ${canSpeak ? `data-act="speak" data-text="${esc(ex)}"` : ''}>
-            <span class="study-card__example-text">${esc(ex)}</span>
-            ${canSpeak ? '<span class="study-card__speak-icon">🔊</span>' : ''}
-          </div>`
+          `<button class="study-example-btn" data-act="speak" data-text="${esc(ex)}" type="button">
+            <span class="study-example-btn__text">${esc(ex)}</span>
+            <span class="study-example-btn__icon">🔊</span>
+          </button>`
         ).join('');
         return `
           <div class="study-card ${studiedCls}">
@@ -871,9 +871,17 @@ export class AppUI {
           </div>
         </div>
 
+        <div class="bank-card">
+          <div class="bank-card__title">检查更新</div>
+          <p class="bank-update-hint">点击下方按钮，从服务器获取最新题库。有新版本时会自动更新。</p>
+          <button class="bank-update-btn" data-act="check-update" type="button">
+            🔄 检查更新
+          </button>
+        </div>
+
         ${custom ? `
         <div class="bank-card bank-card--custom">
-          <div class="bank-card__title">已导入题包</div>
+          <div class="bank-card__title">已加载额外题包</div>
           <div class="bank-row">
             <span class="bank-row__label">题包版本</span>
             <span class="bank-row__val">${esc(custom.version || '未标注')}</span>
@@ -886,21 +894,9 @@ export class AppUI {
             <span class="bank-row__label">新增题目</span>
             <span class="bank-row__val">${custom.total} 题</span>
           </div>
-          <button class="bank-import-btn bank-import-btn--danger" data-act="remove-custom-pack" type="button">移除导入题包</button>
+          <button class="bank-update-btn bank-update-btn--danger" data-act="remove-custom-pack" type="button">移除额外题包</button>
         </div>
         ` : ''}
-
-        <div class="bank-card">
-          <div class="bank-card__title">导入最新真题</div>
-          <p class="bank-import-hint">
-            选择 TOEIC 格式的 JSON 题包文件，导入后题目将合并到题库中，可在自测和考试中使用。
-          </p>
-          <label class="bank-import-btn" for="bank-file-input">选择题包文件…</label>
-          <input type="file" id="bank-file-input" accept=".json,application/json" data-id="bank-file-input" hidden />
-          <p class="bank-import-format">
-            格式：与题库相同的 JSON 结构（含 parts.part5/part6/part7）
-          </p>
-        </div>
 
         <div class="bank-card">
           <div class="bank-card__title">学习资料</div>
@@ -919,11 +915,6 @@ export class AppUI {
         </div>
       </section>
     `);
-    // 绑定文件输入事件
-    const fileInput = this.root.querySelector('[data-id="bank-file-input"]');
-    if (fileInput) {
-      fileInput.addEventListener('change', (e) => this._onImportPack(e));
-    }
   }
 
   // ===================== 事件分发 =====================
@@ -974,6 +965,7 @@ export class AppUI {
       case 'confirm-cancel': this._closeConfirm(); break;
       case 'celebrate-ok': this._endCelebrate(); break;
       case 'remove-custom-pack': this._onRemoveCustomPack(); break;
+      case 'check-update': this._onCheckUpdate(btn); break;
       case 'speak': this._onSpeak(btn.dataset.text, btn.dataset.slow === '1'); break;
       case 'stop-speak': stopSpeaking(); break;
       case 'toggle-learned': this._onToggleLearned(btn.dataset.cat, btn.dataset.id); break;
@@ -1522,7 +1514,55 @@ export class AppUI {
     if (!skipToast) this._toast('继续加油，下一个里程碑在前方 ⭐');
   }
 
-  // ===================== 导入题包 =====================
+  // ===================== 题库更新 =====================
+  async _onCheckUpdate(btn) {
+    const UPDATE_URL = 'https://raw.githubusercontent.com/SCUT-Mida/playbox/main/apps/tuo-ye/data/questions.json';
+    const oldText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '正在检查…';
+    try {
+      const resp = await fetch(UPDATE_URL + '?t=' + Date.now());
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const pack = await resp.json();
+      if (!pack || !pack.parts) throw new Error('数据格式错误');
+      const oldBank = getBankInfo();
+      const newTotal = (pack.parts.part5?.questions?.length || 0)
+        + (pack.parts.part6?.passages?.reduce((s, p) => s + (p.items?.length || 0), 0) || 0)
+        + (pack.parts.part7?.passages?.reduce((s, p) => s + (p.items?.length || 0), 0) || 0);
+      // 比较版本
+      if (pack.version === oldBank.version && !oldBank.customPack) {
+        btn.textContent = '已是最新版本';
+        this._toast('当前已是最新题库（v' + pack.version + '）');
+      } else {
+        loadCustomPack(pack);
+        saveCustomQuestions(pack);
+        btn.textContent = '更新成功！';
+        this._toast(`题库已更新！共 ${newTotal} 道题目`);
+        setTimeout(() => this.render(), 1500);
+      }
+    } catch (err) {
+      btn.textContent = oldText;
+      btn.disabled = false;
+      this._toast('更新失败：' + (err.message || '网络错误'));
+    }
+  }
+
+  _onRemoveCustomPack() {
+    this._confirm({
+      title: '移除额外题包？',
+      message: '额外题目将从题库中移除，不影响内置题目。',
+      confirmText: '确认移除',
+      danger: true,
+      onConfirm: () => {
+        loadCustomPack(null);
+        clearCustomQuestions();
+        this.render();
+        this._toast('已移除额外题包');
+      },
+    });
+  }
+
+  // ===================== 学习标记 =====================
   _onToggleLearned(cat, id) {
     if (!cat || !id) return;
     if (isStudied(cat, id)) {
@@ -1531,12 +1571,10 @@ export class AppUI {
       markStudied(cat, id);
       this._toast('已标记为已学习 ✓');
     }
-    // 局部刷新 tab 计数 + 卡片状态
     this._refreshStudyProgress();
   }
 
   _refreshStudyProgress() {
-    // 刷新 tab 上的计数
     const tabs = this.root.querySelectorAll('.study-tab');
     const cats = getCategoryNames();
     tabs.forEach((tab, i) => {
@@ -1545,7 +1583,6 @@ export class AppUI {
       const countEl = tab.querySelector('.study-tab__count');
       if (countEl) countEl.textContent = `${studiedCount(c.key)}/${getMaterials(c.key).length}`;
     });
-    // 刷新卡片上的按钮状态（不整页重渲染，避免滚动位置丢失）
     const cards = this.root.querySelectorAll('.study-card');
     cards.forEach((card) => {
       const btn = card.querySelector('.learned-toggle');
@@ -1559,56 +1596,10 @@ export class AppUI {
     });
   }
 
+  // ===================== 发音 =====================
   _onSpeak(text, slow) {
     if (!text) return;
-    const ok = speak(text, { slow: !!slow });
-    if (!ok) this._toast('当前浏览器不支持语音朗读');
-  }
-
-  _onImportPack(e) {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const text = ev.target.result;
-        const pack = JSON.parse(text);
-        if (!pack || !pack.parts) {
-          this._toast('文件格式不正确：缺少 parts 字段');
-          return;
-        }
-        // 基本结构校验
-        const hasQuestions = pack.parts.part5?.questions || pack.parts.part6?.passages || pack.parts.part7?.passages;
-        if (!hasQuestions) {
-          this._toast('文件格式不正确：未找到题目数据');
-          return;
-        }
-        loadCustomPack(pack);
-        saveCustomQuestions(pack);
-        const info = getCustomPackInfo();
-        this.render();
-        this._toast(`导入成功！新增 ${info ? info.total : 0} 道题目`);
-      } catch (err) {
-        this._toast('文件解析失败：' + (err.message || 'JSON 格式错误'));
-      }
-    };
-    reader.onerror = () => { this._toast('文件读取失败'); };
-    reader.readAsText(file);
-  }
-
-  _onRemoveCustomPack() {
-    this._confirm({
-      title: '移除导入题包？',
-      message: '导入的题目将从题库中移除，不影响内置题目。',
-      confirmText: '确认移除',
-      danger: true,
-      onConfirm: () => {
-        loadCustomPack(null);
-        clearCustomQuestions();
-        this.render();
-        this._toast('已移除导入的题包');
-      },
-    });
+    speak(text, { slow: !!slow });
   }
 
   // ===================== Toast =====================

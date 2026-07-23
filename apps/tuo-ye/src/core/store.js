@@ -110,6 +110,9 @@ function _migrate(raw) {
     checkin: _migrateCheckin(raw.checkin),
     examResults: _migrateExamResults(raw.examResults),
     quizStats: _migrateQuizStats(raw.quizStats),
+    // 保留扩展字段（不 migrate 内部结构，直接透传）
+    studyProgress: (raw.studyProgress && typeof raw.studyProgress === 'object') ? raw.studyProgress : {},
+    customQuestions: raw.customQuestions || null,
   };
 }
 

@@ -1440,37 +1440,31 @@
   border: 2px solid var(--blue-300, #63b3ed);
   background: linear-gradient(135deg, #ebf8ff 0%, #ffffff 100%);
 }
-.tuoye-root .bank-import-hint {
+.tuoye-root .bank-update-hint {
   margin: 0.5rem 0 0.75rem;
   font-size: 0.82rem;
   line-height: 1.6;
   color: var(--ink-soft, #4a5568);
 }
-.tuoye-root .bank-import-btn {
-  display: inline-block;
-  padding: 0.6rem 1.2rem;
-  border: 2px solid var(--blue-500, #3182ce);
+.tuoye-root .bank-update-btn {
+  display: block;
+  width: 100%;
+  padding: 0.7rem;
+  border: none;
   border-radius: 10px;
   background: var(--blue-500, #3182ce);
   color: var(--white, #fff);
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  text-align: center;
-  transition: filter 0.18s ease, transform 0.12s ease;
+  transition: filter 0.15s ease, transform 0.1s ease;
 }
-.tuoye-root .bank-import-btn:hover { filter: brightness(1.08); }
-.tuoye-root .bank-import-btn:active { transform: translateY(1px); }
-.tuoye-root .bank-import-btn--danger {
+.tuoye-root .bank-update-btn:hover:not(:disabled) { filter: brightness(1.08); }
+.tuoye-root .bank-update-btn:active:not(:disabled) { transform: scale(0.98); }
+.tuoye-root .bank-update-btn:disabled { opacity: 0.6; cursor: default; }
+.tuoye-root .bank-update-btn--danger {
   margin-top: 0.75rem;
-  border-color: var(--red-500, #e53e3e);
   background: var(--red-500, #e53e3e);
-}
-.tuoye-root .bank-import-format {
-  margin: 0.6rem 0 0;
-  font-size: 0.75rem;
-  color: var(--ink-soft, #4a5568);
-  opacity: 0.7;
 }
 
 /* ============================================================ 发音按钮 === */
@@ -1510,47 +1504,37 @@
   align-items: center;
   gap: 0.4rem;
 }
-.tuoye-root .study-card__example.is-clickable {
-  padding: 0.5rem 0.7rem;
-  margin-top: 0.4rem;
-  border-radius: 8px;
-  background: rgba(49, 130, 206, 0.06);
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-.tuoye-root .study-card__example.is-clickable:active {
-  background: rgba(49, 130, 206, 0.15);
-}
-.tuoye-root .study-card__example-item {
+/* 例句发音按钮 — 整行可点击 */
+.tuoye-root .study-example-btn {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-}
-.tuoye-root .study-card__example-item.is-clickable {
-  padding: 0.5rem 0.7rem;
-  border-radius: 8px;
-  background: rgba(49, 130, 206, 0.06);
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  border: 1.5px solid var(--blue-200, #bee3f8);
+  border-radius: 10px;
+  background: var(--blue-50, #ebf8ff);
+  text-align: left;
   cursor: pointer;
-  transition: background 0.15s ease;
+  font-family: inherit;
+  transition: background 0.15s ease, transform 0.1s ease;
+  -webkit-tap-highlight-color: rgba(49, 130, 206, 0.15);
 }
-.tuoye-root .study-card__example-item.is-clickable:active {
-  background: rgba(49, 130, 206, 0.15);
+.tuoye-root .study-example-btn:active {
+  background: var(--blue-100, #bee3f8);
+  transform: scale(0.98);
 }
-.tuoye-root .study-card__example-text {
+.tuoye-root .study-example-btn__text {
   flex: 1;
   font-style: italic;
   color: var(--ink-soft, #4a5568);
   font-size: 0.85rem;
   line-height: 1.5;
 }
-.tuoye-root .study-card__speak-icon {
+.tuoye-root .study-example-btn__icon {
   flex: none;
-  font-size: 1rem;
-  opacity: 0.6;
-}
-.tuoye-root .study-card__example.is-clickable:active .study-card__speak-icon,
-.tuoye-root .study-card__example-item.is-clickable:active .study-card__speak-icon {
-  opacity: 1;
+  font-size: 1.05rem;
 }
 /* 已学习标记 */
 .tuoye-root .study-tab__count {

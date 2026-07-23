@@ -267,3 +267,57 @@ export function clearCustomQuestions() {
     return saveData(data);
   } catch (_) { return false; }
 }
+
+// ============================================================================
+// 学习进度（已学习标记）
+// 记录用户已查看/学习的材料 ID，按 category 分组。
+// ============================================================================
+
+/** 获取全部学习进度。返回 { vocab: Set-like, grammar: ..., business: ... } */
+export function getStudyProgress() {
+  try {
+    const data = loadData();
+    return data.studyProgress || {};
+  } catch (_) { return {}; }
+}
+
+/** 标记某个材料为已学习。 */
+export function markStudied(category, itemId) {
+  try {
+    const data = loadData();
+    if (!data.studyProgress) data.studyProgress = {};
+    if (!data.studyProgress[category]) data.studyProgress[category] = [];
+    if (!data.studyProgress[category].includes(itemId)) {
+      data.studyProgress[category].push(itemId);
+      saveData(data);
+    }
+    return true;
+  } catch (_) { return false; }
+}
+
+/** 取消已学习标记。 */
+export function unmarkStudied(category, itemId) {
+  try {
+    const data = loadData();
+    if (!data.studyProgress || !data.studyProgress[category]) return false;
+    data.studyProgress[category] = data.studyProgress[category].filter((id) => id !== itemId);
+    saveData(data);
+    return true;
+  } catch (_) { return false; }
+}
+
+/** 某个材料是否已学习。 */
+export function isStudied(category, itemId) {
+  try {
+    const data = loadData();
+    return !!(data.studyProgress?.[category]?.includes(itemId));
+  } catch (_) { return false; }
+}
+
+/** 获取某分类已学习数量。 */
+export function studiedCount(category) {
+  try {
+    const data = loadData();
+    return data.studyProgress?.[category]?.length || 0;
+  } catch (_) { return 0; }
+}

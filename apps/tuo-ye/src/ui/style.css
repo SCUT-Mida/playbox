@@ -1552,6 +1552,34 @@
 .tuoye-root .study-card__example-item.is-clickable:active .study-card__speak-icon {
   opacity: 1;
 }
+/* 已学习标记 */
+.tuoye-root .study-tab__count {
+  font-size: 0.7rem;
+  opacity: 0.6;
+  margin-left: 0.3rem;
+}
+.tuoye-root .study-card.is-studied {
+  border-left: 3px solid var(--teal-500, #319795);
+}
+.tuoye-root .learned-toggle {
+  display: block;
+  width: 100%;
+  margin-top: 0.6rem;
+  padding: 0.5rem;
+  border: 1.5px solid var(--line, #e2e8f0);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-soft, #4a5568);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.tuoye-root .learned-toggle.is-on {
+  border-color: var(--teal-500, #319795);
+  background: rgba(49, 151, 149, 0.08);
+  color: var(--teal-500, #319795);
+}
 .tuoye-root .question-card__passage-head {
   display: flex;
   align-items: center;

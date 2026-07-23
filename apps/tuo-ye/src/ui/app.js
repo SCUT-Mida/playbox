@@ -44,7 +44,9 @@ import {
   getTotalMaterialCount, getStudyVersion,
 } from '../core/studyEngine.js';
 import { getBankInfo, loadCustomPack, getCustomPackInfo } from '../core/questionBank.js';
-import { getCustomQuestions, saveCustomQuestions, clearCustomQuestions } from '../core/store.js';
+import { getCustomQuestions, saveCustomQuestions, clearCustomQuestions,
+  getStudyProgress, markStudied, unmarkStudied, isStudied, studiedCount,
+} from '../core/store.js';
 import {
   todayDate, toISODate, parseISO, monthMatrix, isToday, isFuture, diffDays,
   monthDayLabel,
@@ -292,12 +294,17 @@ export class AppUI {
   _renderStudy() {
     this._loadStudyCards();
     const cats = getCategoryNames();
-    const tabsHtml = cats.map((c) => `
-      <button class="study-tab ${c.key === this._studyCat ? 'is-active' : ''}"
-              data-act="study-tab" data-cat="${esc(c.key)}" type="button">
-        ${esc(c.icon)} ${esc(c.name)}
-      </button>
-    `).join('');
+    const tabsHtml = cats.map((c) => {
+      const total = getMaterials(c.key).length;
+      const done = studiedCount(c.key);
+      return `
+        <button class="study-tab ${c.key === this._studyCat ? 'is-active' : ''}"
+                data-act="study-tab" data-cat="${esc(c.key)}" type="button">
+          ${esc(c.icon)} ${esc(c.name)}
+          <span class="study-tab__count">${done}/${total}</span>
+        </button>
+      `;
+    }).join('');
     const cardsHtml = this._renderStudyCards();
 
     this.root.insertAdjacentHTML('beforeend', `
@@ -319,7 +326,11 @@ export class AppUI {
   _renderStudyCards() {
     if (!this._studyCards.length) return '<p class="study-empty">暂无学习资料</p>';
     const canSpeak = isSpeechSupported();
+    const cat = this._studyCat;
     return this._studyCards.map((c) => {
+      const studied = isStudied(cat, c.id);
+      const studiedCls = studied ? 'is-studied' : '';
+      const studiedBtn = `<button class="learned-toggle ${studied ? 'is-on' : ''}" data-act="toggle-learned" data-cat="${esc(cat)}" data-id="${esc(c.id)}" type="button">${studied ? '✓ 已学习' : '标记已学习'}</button>`;
       if (c.type === 'vocab') {
         const exampleHtml = c.example ? `
           <div class="study-card__example ${canSpeak ? 'is-clickable' : ''}" ${canSpeak ? `data-act="speak" data-text="${esc(c.example)}"` : ''}>
@@ -327,7 +338,7 @@ export class AppUI {
             ${canSpeak ? '<span class="study-card__speak-icon">🔊</span>' : ''}
           </div>` : '';
         return `
-          <div class="study-card">
+          <div class="study-card ${studiedCls}">
             <div class="study-card__head">
               <div class="study-card__word">${esc(c.title)}</div>
               ${canSpeak ? `<button class="speak-btn" data-act="speak" data-text="${esc(c.title)}" type="button" aria-label="发音">🔊</button>` : ''}
@@ -335,6 +346,7 @@ export class AppUI {
             ${c.subtitle ? `<div class="study-card__phonetic">${esc(c.subtitle)}</div>` : ''}
             <div class="study-card__def">${esc(c.body)}</div>
             ${exampleHtml}
+            ${studiedBtn}
           </div>`;
       }
       if (c.type === 'grammar') {
@@ -345,21 +357,23 @@ export class AppUI {
           </div>`
         ).join('');
         return `
-          <div class="study-card">
+          <div class="study-card ${studiedCls}">
             <div class="study-card__title">${esc(c.title)}</div>
             <div class="study-card__explanation">${esc(c.body)}</div>
             ${examplesHtml ? `<div class="study-card__examples">${examplesHtml}</div>` : ''}
+            ${studiedBtn}
           </div>`;
       }
       // business
       return `
-        <div class="study-card">
+        <div class="study-card ${studiedCls}">
           <div class="study-card__head">
             <div class="study-card__phrase">${esc(c.title)}</div>
             ${canSpeak ? `<button class="speak-btn" data-act="speak" data-text="${esc(c.title)}" type="button" aria-label="发音">🔊</button>` : ''}
           </div>
           <div class="study-card__meaning">${esc(c.subtitle)}</div>
           <div class="study-card__def">${esc(c.body)}</div>
+          ${studiedBtn}
         </div>`;
     }).join('');
   }
@@ -577,7 +591,7 @@ export class AppUI {
 
         <div class="question-card">
           ${passageHtml}
-          <div class="question-card__text">${esc(q.question || q.text || '')}</div>
+          <div class="question-card__text">${esc(q.stem || '')}</div>
         </div>
 
         <div class="options">${optionsHtml}</div>
@@ -610,7 +624,7 @@ export class AppUI {
         const labels = ['A', 'B', 'C', 'D'];
         return `
           <div class="wrong-item">
-            <div class="wrong-item__q">${esc(q.question || q.text || '')}</div>
+            <div class="wrong-item__q">${esc(q.stem || '')}</div>
             <div class="wrong-item__ans">
               你的答案：${esc(labels[this._quizSession.answers[q.id]] || '-')}
               · 正确答案：<strong>${esc(labels[q.answer])}</strong>
@@ -741,7 +755,7 @@ export class AppUI {
 
         <div class="question-card">
           ${passageHtml}
-          <div class="question-card__text">${esc(q.question || q.text || '')}</div>
+          <div class="question-card__text">${esc(q.stem || '')}</div>
         </div>
 
         <div class="options">${optionsHtml}</div>
@@ -962,6 +976,7 @@ export class AppUI {
       case 'remove-custom-pack': this._onRemoveCustomPack(); break;
       case 'speak': this._onSpeak(btn.dataset.text, btn.dataset.slow === '1'); break;
       case 'stop-speak': stopSpeaking(); break;
+      case 'toggle-learned': this._onToggleLearned(btn.dataset.cat, btn.dataset.id); break;
       default: break;
     }
   }
@@ -1508,6 +1523,42 @@ export class AppUI {
   }
 
   // ===================== 导入题包 =====================
+  _onToggleLearned(cat, id) {
+    if (!cat || !id) return;
+    if (isStudied(cat, id)) {
+      unmarkStudied(cat, id);
+    } else {
+      markStudied(cat, id);
+      this._toast('已标记为已学习 ✓');
+    }
+    // 局部刷新 tab 计数 + 卡片状态
+    this._refreshStudyProgress();
+  }
+
+  _refreshStudyProgress() {
+    // 刷新 tab 上的计数
+    const tabs = this.root.querySelectorAll('.study-tab');
+    const cats = getCategoryNames();
+    tabs.forEach((tab, i) => {
+      const c = cats[i];
+      if (!c) return;
+      const countEl = tab.querySelector('.study-tab__count');
+      if (countEl) countEl.textContent = `${studiedCount(c.key)}/${getMaterials(c.key).length}`;
+    });
+    // 刷新卡片上的按钮状态（不整页重渲染，避免滚动位置丢失）
+    const cards = this.root.querySelectorAll('.study-card');
+    cards.forEach((card) => {
+      const btn = card.querySelector('.learned-toggle');
+      if (!btn) return;
+      const id = btn.dataset.id;
+      const cat = btn.dataset.cat;
+      const studied = isStudied(cat, id);
+      btn.classList.toggle('is-on', studied);
+      btn.textContent = studied ? '✓ 已学习' : '标记已学习';
+      card.classList.toggle('is-studied', studied);
+    });
+  }
+
   _onSpeak(text, slow) {
     if (!text) return;
     const ok = speak(text, { slow: !!slow });

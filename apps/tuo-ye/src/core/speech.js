@@ -115,34 +115,48 @@ export function speak(text, opts = {}) {
   if (!text) return false;
 
   // 策略 1：原生 speechSynthesis（有英文语音时优先）
-  if (hasNativeAPI() && hasEnglishVoice()) {
-    try {
-      window.speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.voice = _cachedVoice;
-      utter.lang = _cachedVoice?.lang || 'en-US';
-      utter.rate = opts.slow ? 0.6 : (opts.rate || 0.9);
-      utter.pitch = 1;
-      utter.volume = 1;
-
-      utter.onstart = () => { _speaking = true; };
-      utter.onend = () => { _speaking = false; };
-      utter.onerror = () => {
-        _speaking = false;
-        // 原生失败时回退到音频
-        speakWithAudio(text, opts);
-      };
-
-      _speaking = true;
-      window.speechSynthesis.speak(utter);
-      return true;
-    } catch (_) {
-      // 原生 API 抛异常时回退
+  if (hasNativeAPI()) {
+    // 有英文语音 → 用英文语音（质量最好）
+    if (hasEnglishVoice()) {
+      try {
+        return speakNative(text, opts, _cachedVoice);
+      } catch (_) { /* 回退 */ }
     }
+    // 无英文语音（国产 ROM 常见）→ 仍尝试用默认语音读英文
+    // 很多中文 TTS 引擎能读英文（带口音），比完全没有好
+    try {
+      return speakNative(text, opts, null); // null = 用系统默认语音
+    } catch (_) { /* 回退到音频 */ }
   }
 
-  // 策略 2：有道 TTS 音频兜底（国产 ROM 无英文语音时）
+  // 策略 2：有道 TTS 音频兜底
+  // 有道 API 对单词/短句效果好，长文本可能不可靠
   return speakWithAudio(text, opts);
+}
+
+// 用原生 speechSynthesis 朗读
+function speakNative(text, opts, voice) {
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  if (voice) {
+    utter.voice = voice;
+    utter.lang = voice.lang || 'en-US';
+  } else {
+    utter.lang = 'en-US'; // 提示引擎用英文模式
+  }
+  utter.rate = opts.slow ? 0.6 : (opts.rate || 0.9);
+  utter.pitch = 1;
+  utter.volume = 1;
+  utter.onstart = () => { _speaking = true; };
+  utter.onend = () => { _speaking = false; };
+  utter.onerror = () => {
+    _speaking = false;
+    // 原生失败时回退到音频（仅短文本）
+    if (text.length <= 100) speakWithAudio(text, opts);
+  };
+  _speaking = true;
+  window.speechSynthesis.speak(utter);
+  return true;
 }
 
 /** 停止当前发音。 */

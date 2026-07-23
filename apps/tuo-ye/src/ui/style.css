@@ -1472,3 +1472,55 @@
   color: var(--ink-soft, #4a5568);
   opacity: 0.7;
 }
+
+/* ============================================================ 发音按钮 === */
+.tuoye-root .speak-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 0.5rem;
+  border: 1.5px solid var(--blue-300, #63b3ed);
+  border-radius: 8px;
+  background: var(--blue-50, #ebf8ff);
+  color: var(--blue-500, #3182ce);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.12s ease, background 0.15s ease;
+}
+.tuoye-root .speak-btn:hover { filter: brightness(1.05); background: var(--blue-100, #bee3f8); }
+.tuoye-root .speak-btn:active { transform: scale(0.92); }
+.tuoye-root .speak-btn--sm {
+  min-width: 26px;
+  height: 26px;
+  font-size: 0.78rem;
+  padding: 0 0.4rem;
+}
+.tuoye-root .study-card__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.tuoye-root .study-card__head > :first-child { flex: 1; }
+.tuoye-root .study-card__example {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.tuoye-root .study-card__example-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.tuoye-root .question-card__passage-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--ink-soft, #4a5568);
+  font-weight: 600;
+}

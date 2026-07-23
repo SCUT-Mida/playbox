@@ -49,6 +49,7 @@ import {
   todayDate, toISODate, parseISO, monthMatrix, isToday, isFuture, diffDays,
   monthDayLabel,
 } from '../core/calendar.js';
+import { isSpeechSupported, speak, stopSpeaking, warmupVoices } from '../core/speech.js';
 
 export class AppUI {
   constructor(parent) {
@@ -99,6 +100,8 @@ export class AppUI {
     // 恢复自定义题包（从 localStorage 加载用户之前导入的题目）
     const savedPack = getCustomQuestions();
     if (savedPack) loadCustomPack(savedPack);
+    // 预热语音合成（Chrome 异步加载语音列表）
+    warmupVoices();
     this.render();
   }
 
@@ -315,19 +318,23 @@ export class AppUI {
 
   _renderStudyCards() {
     if (!this._studyCards.length) return '<p class="study-empty">暂无学习资料</p>';
+    const canSpeak = isSpeechSupported();
     return this._studyCards.map((c) => {
       if (c.type === 'vocab') {
         return `
           <div class="study-card">
-            <div class="study-card__word">${esc(c.title)}</div>
+            <div class="study-card__head">
+              <div class="study-card__word">${esc(c.title)}</div>
+              ${canSpeak ? `<button class="speak-btn" data-act="speak" data-text="${esc(c.title)}" type="button" aria-label="发音">🔊</button>` : ''}
+            </div>
             ${c.subtitle ? `<div class="study-card__phonetic">${esc(c.subtitle)}</div>` : ''}
             <div class="study-card__def">${esc(c.body)}</div>
-            ${c.example ? `<div class="study-card__example">"${esc(c.example)}"</div>` : ''}
+            ${c.example ? `<div class="study-card__example"><span>"${esc(c.example)}"</span>${canSpeak ? `<button class="speak-btn speak-btn--sm" data-act="speak" data-text="${esc(c.example)}" type="button" aria-label="例句发音">🔊</button>` : ''}</div>` : ''}
           </div>`;
       }
       if (c.type === 'grammar') {
         const examplesHtml = (c.examples || []).map((ex) =>
-          `<div class="study-card__example-item">${esc(ex)}</div>`
+          `<div class="study-card__example-item"><span>${esc(ex)}</span>${canSpeak ? `<button class="speak-btn speak-btn--sm" data-act="speak" data-text="${esc(ex)}" type="button" aria-label="发音">🔊</button>` : ''}</div>`
         ).join('');
         return `
           <div class="study-card">
@@ -339,7 +346,10 @@ export class AppUI {
       // business
       return `
         <div class="study-card">
-          <div class="study-card__phrase">${esc(c.title)}</div>
+          <div class="study-card__head">
+            <div class="study-card__phrase">${esc(c.title)}</div>
+            ${canSpeak ? `<button class="speak-btn" data-act="speak" data-text="${esc(c.title)}" type="button" aria-label="发音">🔊</button>` : ''}
+          </div>
           <div class="study-card__meaning">${esc(c.subtitle)}</div>
           <div class="study-card__def">${esc(c.body)}</div>
         </div>`;
@@ -512,7 +522,8 @@ export class AppUI {
 
     let passageHtml = '';
     if (q.passageText) {
-      passageHtml = `<div class="question-card__passage">${esc(q.passageText)}</div>`;
+      const canSpeak = isSpeechSupported();
+      passageHtml = `<div class="question-card__passage"><div class="question-card__passage-head"><span>阅读材料</span>${canSpeak ? `<button class="speak-btn speak-btn--sm" data-act="speak" data-text="${esc(q.passageText)}" type="button" aria-label="朗读">🔊 朗读</button>` : ''}</div>${esc(q.passageText)}</div>`;
     }
 
     let optionsHtml = '';
@@ -941,6 +952,8 @@ export class AppUI {
       case 'confirm-cancel': this._closeConfirm(); break;
       case 'celebrate-ok': this._endCelebrate(); break;
       case 'remove-custom-pack': this._onRemoveCustomPack(); break;
+      case 'speak': this._onSpeak(btn.dataset.text, btn.dataset.slow === '1'); break;
+      case 'stop-speak': stopSpeaking(); break;
       default: break;
     }
   }
@@ -1487,6 +1500,12 @@ export class AppUI {
   }
 
   // ===================== 导入题包 =====================
+  _onSpeak(text, slow) {
+    if (!text) return;
+    const ok = speak(text, { slow: !!slow });
+    if (!ok) this._toast('当前浏览器不支持语音朗读');
+  }
+
   _onImportPack(e) {
     const file = e.target.files && e.target.files[0];
     if (!file) return;

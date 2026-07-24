@@ -51,12 +51,13 @@ export function warmupVoices() {
 let _audioEl = null;
 let _speaking = false;
 
-// 有道 TTS 音频（单词和句子均支持）
+// 百度翻译 TTS 音频（单词和句子均支持，国内可访问）
+// spd: 语速 1-5，3=正常，2=偏慢（适合语言学习）
 function speakWithAudio(text, opts = {}) {
   if (_audioEl) { _audioEl.pause(); _audioEl = null; }
   const truncated = text.length > 500 ? text.slice(0, 500) : text;
-  const type = opts.slow ? 1 : 2;
-  const url = 'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(truncated) + '&type=' + type;
+  const spd = opts.slow ? 2 : 3;
+  const url = 'https://fanyi.baidu.com/gettts?lan=en&text=' + encodeURIComponent(truncated) + '&spd=' + spd + '&source=web';
   _audioEl = new Audio(url);
   _speaking = true;
   _audioEl.onended = () => { _speaking = false; };

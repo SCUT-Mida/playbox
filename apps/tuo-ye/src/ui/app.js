@@ -338,7 +338,14 @@ export class AppUI {
   }
 
   _loadStudyCards() {
-    this._studyCards = getFormattedCards(this._studyCat);
+    const cards = getFormattedCards(this._studyCat);
+    // 已学习的排到后面，未学习的排在前面
+    this._studyCards = cards.sort((a, b) => {
+      const aStudied = isStudied(this._studyCat, a.id);
+      const bStudied = isStudied(this._studyCat, b.id);
+      if (aStudied === bStudied) return 0;
+      return aStudied ? 1 : -1;
+    });
   }
 
   _renderStudyCards() {
@@ -1583,7 +1590,14 @@ export class AppUI {
       unmarkStudied(cat, id);
     } else {
       markStudied(cat, id);
-      this._toast('已标记为已学习 ✓');
+      this._toast('已学习 ✓ 卡片已移到后面');
+    }
+    // 重新排序 + 刷新（已学习的排到后面）
+    this._loadStudyCards();
+    const cardsContainer = this.root.querySelector('.study-cards');
+    if (cardsContainer) {
+      cardsContainer.innerHTML = this._renderStudyCards();
+      this._bindSpeakButtons();
     }
     this._refreshStudyProgress();
   }

@@ -325,8 +325,6 @@ export class AppUI {
     if (!this.root) return;
     const btns = this.root.querySelectorAll('.speak-btn');
     btns.forEach((btn) => {
-      // 替换内容为 双状态图标
-      btn.innerHTML = '<span class="speak-icon-static">🔊</span><span class="speak-icon-wave"><i></i><i></i><i></i></span>';
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -362,17 +360,17 @@ export class AppUI {
           <div class="study-card ${studiedCls}">
             <div class="study-card__head">
               <div class="study-card__word">${esc(c.title)}</div>
-              ${canSpeak ? `<button class="speak-btn" data-act="speak" data-text="${esc(c.title)}" type="button" aria-label="发音">🔊</button>` : ''}
+              ${canSpeak ? `<button class="speak-btn" data-act="speak" data-text="${esc(c.title)}" type="button" aria-label="发音"><span class="si-on">🔊</span><span class="si-wave"><i></i><i></i><i></i></span></button>` : ''}
             </div>
             ${c.subtitle ? `<div class="study-card__phonetic">${esc(c.subtitle)}</div>` : ''}
             <div class="study-card__def">${esc(c.body)}</div>
-            ${c.example ? `<div class="study-card__head study-card__example-row"><span class="study-card__example-text">"${esc(c.example)}"</span>${canSpeak ? `<button class="speak-btn" data-act="speak" data-text="${esc(c.example)}" type="button" aria-label="例句发音">🔊</button>` : ''}</div>` : ''}
+            ${c.example ? `<div class="study-card__head study-card__example-row"><span class="study-card__example-text">"${esc(c.example)}"</span>${canSpeak ? `<button class="speak-btn" data-act="speak" data-text="${esc(c.example)}" type="button" aria-label="例句发音"><span class="si-on">🔊</span><span class="si-wave"><i></i><i></i><i></i></span></button>` : ''}</div>` : ''}
             ${studiedBtn}
           </div>`;
       }
       if (c.type === 'grammar') {
         const examplesHtml = (c.examples || []).map((ex) =>
-          `<div class="study-card__head study-card__example-row"><span class="study-card__example-text">${esc(ex)}</span>${canSpeak ? `<button class="speak-btn" data-act="speak" data-text="${esc(ex)}" type="button" aria-label="发音">🔊</button>` : ''}</div>`
+          `<div class="study-card__head study-card__example-row"><span class="study-card__example-text">${esc(ex)}</span>${canSpeak ? `<button class="speak-btn" data-act="speak" data-text="${esc(ex)}" type="button" aria-label="发音"><span class="si-on">🔊</span><span class="si-wave"><i></i><i></i><i></i></span></button>` : ''}</div>`
         ).join('');
         return `
           <div class="study-card ${studiedCls}">
@@ -384,12 +382,12 @@ export class AppUI {
       }
       // business
       const bizExampleHtml = c.example ? `
-        <div class="study-card__head study-card__example-row"><span class="study-card__example-text">"${esc(c.example)}"</span>${canSpeak ? `<button class="speak-btn" data-act="speak" data-text="${esc(c.example)}" type="button" aria-label="例句发音">🔊</button>` : ''}</div>` : '';
+        <div class="study-card__head study-card__example-row"><span class="study-card__example-text">"${esc(c.example)}"</span>${canSpeak ? `<button class="speak-btn" data-act="speak" data-text="${esc(c.example)}" type="button" aria-label="例句发音"><span class="si-on">🔊</span><span class="si-wave"><i></i><i></i><i></i></span></button>` : ''}</div>` : '';
       return `
         <div class="study-card ${studiedCls}">
           <div class="study-card__head">
             <div class="study-card__phrase">${esc(c.title)}</div>
-            ${canSpeak ? `<button class="speak-btn" data-act="speak" data-text="${esc(c.title)}" type="button" aria-label="发音">🔊</button>` : ''}
+            ${canSpeak ? `<button class="speak-btn" data-act="speak" data-text="${esc(c.title)}" type="button" aria-label="发音"><span class="si-on">🔊</span><span class="si-wave"><i></i><i></i><i></i></span></button>` : ''}
           </div>
           <div class="study-card__meaning">${esc(c.subtitle)}</div>
           <div class="study-card__def">${esc(c.body)}</div>

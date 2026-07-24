@@ -325,6 +325,8 @@ export class AppUI {
     if (!this.root) return;
     const btns = this.root.querySelectorAll('.speak-btn');
     btns.forEach((btn) => {
+      // 替换内容为 双状态图标
+      btn.innerHTML = '<span class="speak-icon-static">🔊</span><span class="speak-icon-wave"><i></i><i></i><i></i></span>';
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();

@@ -114,29 +114,11 @@ function speakWithBaidu(text) {
 /** 绑定按钮动画 */
 export function setSpeakingBtn(btn) {
   _speakingBtn = btn;
-  if (!btn) return;
-  btn.classList.add('is-speaking');
-  // 纯 JS 动画：切换波纹符号
-  const frames = ['▁', '▃', '▅', '▇', '▅', '▃'];
-  let i = 0;
-  if (_waveTimer) clearInterval(_waveTimer);
-  _waveTimer = setInterval(() => {
-    if (!_speakingBtn || _speakingBtn !== btn) { clearInterval(_waveTimer); _waveTimer = null; return; }
-    btn.textContent = frames[i % frames.length];
-    i++;
-  }, 120);
+  if (btn) btn.classList.add('is-speaking');
 }
 
-let _waveTimer = null;
-
 function _clearBtnAnim() {
-  if (_waveTimer) { clearInterval(_waveTimer); _waveTimer = null; }
-  if (_speakingBtn) {
-    _speakingBtn.classList.remove('is-speaking');
-    // 恢复原始按钮内容
-    _speakingBtn.innerHTML = '<span class="si-on">🔊</span><span class="si-wave"><i></i><i></i><i></i></span>';
-    _speakingBtn = null;
-  }
+  if (_speakingBtn) { _speakingBtn.classList.remove('is-speaking'); _speakingBtn = null; }
 }
 
 export function stopSpeaking() {

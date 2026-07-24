@@ -27,6 +27,7 @@ for (const item of (studyData.categories.grammar.items || [])) {
 }
 for (const item of (studyData.categories.business.items || [])) {
   if (item.phrase) _textToId[item.phrase.toLowerCase().trim()] = item.id;
+  if (item.usage) _textToId[item.usage.toLowerCase().trim()] = item.id + '-ex';
 }
 
 /**

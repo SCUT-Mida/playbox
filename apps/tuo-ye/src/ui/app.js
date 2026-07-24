@@ -51,7 +51,7 @@ import {
   todayDate, toISODate, parseISO, monthMatrix, isToday, isFuture, diffDays,
   monthDayLabel,
 } from '../core/calendar.js';
-import { isSpeechSupported, speak, stopSpeaking, warmupVoices } from '../core/speech.js';
+import { isSpeechSupported, speak, stopSpeaking, warmupVoices, setSpeakingBtn } from '../core/speech.js';
 
 export class AppUI {
   constructor(parent) {
@@ -330,8 +330,7 @@ export class AppUI {
         e.stopPropagation();
         const text = btn.dataset.text;
         if (!text) return;
-        btn.classList.add('is-speaking');
-        setTimeout(() => btn.classList.remove('is-speaking'), 300);
+        setSpeakingBtn(btn);
         speak(text, {});
       });
     });
@@ -382,6 +381,8 @@ export class AppUI {
           </div>`;
       }
       // business
+      const bizExampleHtml = c.example ? `
+        <div class="study-card__head study-card__example-row"><span class="study-card__example-text">"${esc(c.example)}"</span>${canSpeak ? `<button class="speak-btn" data-act="speak" data-text="${esc(c.example)}" type="button" aria-label="例句发音">🔊</button>` : ''}</div>` : '';
       return `
         <div class="study-card ${studiedCls}">
           <div class="study-card__head">
@@ -390,6 +391,7 @@ export class AppUI {
           </div>
           <div class="study-card__meaning">${esc(c.subtitle)}</div>
           <div class="study-card__def">${esc(c.body)}</div>
+          ${bizExampleHtml}
           ${studiedBtn}
         </div>`;
     }).join('');

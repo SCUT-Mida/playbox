@@ -77,7 +77,8 @@ export function formatBusinessCard(item) {
     type: 'business',
     title: item.phrase || '',
     subtitle: item.meaning || '',
-    body: item.usage || '',
+    body: '',
+    example: item.usage || '',
   };
 }
 

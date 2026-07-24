@@ -436,21 +436,15 @@ export class GameUI {
     const fac = playerFaction(s);
     const tSel = h('select', null, targets.map((n) => h('option', { value: n.id }, n.name)));
     const sIn = h('input', { type: 'number', value: Math.min(500, c.soldiers), min: 0, style: { width: '5rem' } });
-    const gIn = h('input', { type: 'number', value: 0, min: 0, style: { width: '5rem' } });
-    const grIn = h('input', { type: 'number', value: 0, min: 0, style: { width: '5rem' } });
     const body = h('div', null,
-      h('p', { class: 'hint' }, `金 ${Math.round(fac.money)} · 粮 ${Math.round(fac.grain)} · 本城兵 ${Math.round(c.soldiers)}`),
+      h('p', { class: 'hint' }, `金 ${Math.round(fac.money)} · 粮 ${Math.round(fac.grain)}（势力共享，无需输送）· 本城兵 ${Math.round(c.soldiers)}`),
       h('div', { class: 'create__field' }, h('label', null, '目标城市'), tSel),
       h('div', { class: 'stat-grid' },
         h('div', { class: 'stat' }, h('div', { class: 'stat__k' }, '兵'), h('div', { class: 'stat__v', style: { fontSize: '0.9rem' } }, sIn)),
-        h('div', { class: 'stat' }, h('div', { class: 'stat__k' }, '金'), h('div', { class: 'stat__v', style: { fontSize: '0.9rem' } }, gIn)),
-        h('div', { class: 'stat' }, h('div', { class: 'stat__k' }, '粮'), h('div', { class: 'stat__v', style: { fontSize: '0.9rem' } }, grIn)),
       ),
     );
-    this.openForm('输送资源', body, () => {
-      const r = A.transport(s, c.id, tSel.value, {
-        soldiers: parseInt(sIn.value, 10) || 0, gold: parseInt(gIn.value, 10) || 0, grain: parseInt(grIn.value, 10) || 0,
-      });
+    this.openForm('输送士兵', body, () => {
+      const r = A.transport(s, c.id, tSel.value, { soldiers: parseInt(sIn.value, 10) || 0 });
       this.toast(r.msg); this.closeModal(); this.afterAction();
     }, '输送');
   }

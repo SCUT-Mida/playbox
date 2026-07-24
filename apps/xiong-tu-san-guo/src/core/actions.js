@@ -5,6 +5,7 @@
 import {
   cityById, heroById, factionById, playerFaction, neighbors, heroesInCity,
   wildHeroesInCity, heroesOfFaction, bestDefender, troopCap, cmdRemaining, maxDefense, lordOf,
+  checkGameOver,
 } from './state.js';
 import { citiesOf, recruitCost } from './economy.js';
 import { skillBonus, techMult, techLevel } from './tech.js';
@@ -225,6 +226,8 @@ export function campaign(state, fromCityId, toCityId, generalId, troops, formati
 
   let won = battle.result === 'attacker';
   applyCampaignResult(state, battle, from, to, g, fid, r);
+  // 占领后立即判定胜负（不必等到回合结束），让 UI 的 afterAction 即时弹出结算
+  if (won) checkGameOver(state);
 
   const msgs = battle.log.slice(-3);
   return { ok: true, won, battle, msg: won ? `攻克 ${to.name}！` : `攻打 ${to.name} 失利。`, log: msgs };
@@ -251,11 +254,11 @@ function applyCampaignResult(state, battle, from, to, attackerGen, fid, rng) {
     to.gold = 0; to.grain = 0;
     state.turnLog.push(`🏰 攻陷 ${to.name}！缴获 ${lootGold} 金、${lootGrain} 粮，余兵 ${survivors} 驻守。`);
   } else {
-    // 失利：出征兵力覆灭（已从 from 扣除），主将若未被俘则退回
-    if (attackerGen.id !== '__militia__' && attackerGen.status !== 'prisoner') {
-      // 仍在 from 城
-    }
-    state.turnLog.push(`💔 攻打 ${to.name} 失利，出征军覆灭。`);
+    // 失利：出征兵力覆灭（已从 from 扣除）；守军实际伤亡如实回写到真实城市
+    // （createBattle 做了浅拷贝，runBattle 只削减 battle.defender，需手动落账）
+    to.soldiers = Math.round(battle.defender.soldiers);
+    to.defense = Math.max(0, Math.round(battle.defender.defense));
+    state.turnLog.push(`💔 攻打 ${to.name} 失利，出征军覆灭；守军余 ${to.soldiers}、城防余 ${to.defense}。`);
   }
 
   // 俘虏处理
@@ -285,19 +288,14 @@ export function transport(state, fromCityId, toCityId, payload, fid = PLAYER(sta
   if (from.ownerFactionId !== fid || to.ownerFactionId !== fid) return { ok: false, msg: '须为己方城市' };
   if (!from.adjacent.includes(toCityId)) return { ok: false, msg: '两城不相邻' };
   if (!spendCmd(state, fid)) return { ok: false, msg: '指令点不足' };
-  const fac = factionById(state, fid);
+  // 金 / 粮为势力级共享池（见 economy.js），无需在城市间输送；
+  // 唯一需要调运的城市级资源是士兵。
   const s = Math.max(0, Math.floor(payload.soldiers || 0));
-  const gm = Math.max(0, Math.floor(payload.gold || 0));
-  const gr = Math.max(0, Math.floor(payload.grain || 0));
+  if (s <= 0) { refundCmd(state, fid); return { ok: false, msg: '输送数量无效' }; }
   if (s > from.soldiers) { refundCmd(state, fid); return { ok: false, msg: '兵力不足' }; }
-  if (gm > fac.money) { refundCmd(state, fid); return { ok: false, msg: '金钱不足' }; }
-  if (gr > fac.grain) { refundCmd(state, fid); return { ok: false, msg: '军粮不足' }; }
   from.soldiers -= s;
   to.soldiers += s;
-  fac.money -= gm;
-  fac.grain -= gr;
-  // 同步迁移随军武将（可选）：把 from 城中指定的空闲武将调往 to（此处只调资源）
-  return { ok: true, msg: `自 ${from.name} 向 ${to.name} 输送：兵 ${s}、金 ${gm}、粮 ${gr}` };
+  return { ok: true, msg: `自 ${from.name} 向 ${to.name} 输送士兵 ${s}` };
 }
 
 // —— 外交 / 计略 ——
@@ -316,7 +314,11 @@ export function stratagem(state, fromCityId, toCityId, type, fid = PLAYER(state)
   if (facMoney(state, fid) < cost) { refundCmd(state, fid); return { ok: false, msg: '金钱不足' }; }
   factionById(state, fid).money -= cost;
 
-  const caster = bestDefender(state, fromCityId) || { stats: { i: 50 } };
+  // 施计者取智力最高者（计略成功率取决于智力，而非统率）
+  const casterRoster = heroesInCity(state, fromCityId, fid);
+  const caster = casterRoster.length
+    ? casterRoster.reduce((a, b) => ((a.stats.i || 0) >= (b.stats.i || 0) ? a : b))
+    : { stats: { i: 50 } };
   const intel = caster.stats ? caster.stats.i : 50;
   const targetGen = bestDefender(state, toCityId);
   const tIntel = targetGen && targetGen.stats ? targetGen.stats.i : 45;

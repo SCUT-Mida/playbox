@@ -73,38 +73,31 @@ export function getSpeechEngine() {
 }
 
 /**
- * 发音策略（按文本长度分流）：
- * - 短文本（≤40字符，单词/短语）：用原生 TTS（国产 ROM 的中文引擎能读单词）
- * - 长文本（>40字符，句子）：直接用有道音频（原生引擎对英文长句静默失败）
- *
- * 这是关键：原生 TTS 对单词会触发 onstart 并真正发声，
- * 但对英文长句也会触发 onstart 却不出声（静默失败），
- * 导致超时检测无效。按长度分流可绕过这个问题。
+ * 发音策略：统一用有道音频。
+ * 有道 dictvoice API 对单词和句子都能读，国产手机兼容性好。
+ * 如果有英文语音则优先原生（质量更好），否则全走有道。
  */
 export function speak(text, opts = {}) {
   if (!text) return false;
   stopSpeaking();
-  const isShort = text.length <= 40;
 
-  if (isShort && hasNativeAPI()) {
-    // 短文本：先试原生
-    let nativeStarted = false;
+  // 有英文语音 → 原生 TTS（桌面浏览器，质量好）
+  if (hasNativeAPI() && hasEnglishVoice()) {
     try {
       const utter = new SpeechSynthesisUtterance(text);
-      if (_cachedVoice) { utter.voice = _cachedVoice; utter.lang = _cachedVoice.lang || 'en-US'; }
-      else { utter.lang = 'en-US'; }
+      utter.voice = _cachedVoice;
+      utter.lang = _cachedVoice.lang || 'en-US';
       utter.rate = opts.slow ? 0.6 : (opts.rate || 0.9);
-      utter.onstart = () => { nativeStarted = true; _speaking = true; };
+      utter.onstart = () => { _speaking = true; };
       utter.onend = () => { _speaking = false; };
-      utter.onerror = () => { _speaking = false; if (!nativeStarted) speakWithAudio(text, opts); };
+      utter.onerror = () => { _speaking = false; speakWithAudio(text, opts); };
       _speaking = true;
       window.speechSynthesis.speak(utter);
-      setTimeout(() => { if (!nativeStarted) { try{window.speechSynthesis.cancel()}catch(_){}; _speaking=false; speakWithAudio(text, opts); } }, 1500);
       return true;
     } catch (_) { _speaking = false; }
   }
 
-  // 长文本或原生不可用：直接有道音频
+  // 无英文语音（国产 ROM）→ 全部用有道
   return speakWithAudio(text, opts);
 }
 

@@ -1512,49 +1512,17 @@
   align-items: center;
   gap: 0.4rem;
 }
-/* 例句发音按钮 — 整行可点击 */
-.tuoye-root .study-example-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: 100%;
+/* 例句行 — 文字 + 独立 🔊 按钮，和单词行结构一致 */
+.tuoye-root .study-card__example-row {
   margin-top: 0.5rem;
-  padding: 0.6rem 0.8rem;
-  border: 1.5px solid var(--blue-200, #bee3f8);
-  border-radius: 10px;
-  background: var(--blue-50, #ebf8ff);
-  text-align: left;
-  cursor: pointer;
-  font-family: inherit;
-  transition: background 0.15s ease, transform 0.1s ease;
-  -webkit-tap-highlight-color: rgba(49, 130, 206, 0.15);
 }
-.tuoye-root .study-example-btn:active {
-  background: var(--blue-100, #bee3f8);
-  transform: scale(0.98);
-}
-.tuoye-root .study-example-btn__text {
+.tuoye-root .study-card__example-text {
   flex: 1;
   font-style: italic;
   color: var(--ink-soft, #4a5568);
   font-size: 0.85rem;
   line-height: 1.5;
-}
-.tuoye-root .study-example-btn__icon {
-  flex: none;
-  font-size: 1.05rem;
-}
-.tuoye-root .speak-btn.is-speaking,
-.tuoye-root .study-example-btn.is-speaking {
-  background: var(--blue-300, #63b3ed) !important;
-  transform: scale(0.96);
-}
-.tuoye-root .study-example-btn.is-speaking .study-example-btn__icon {
-  animation: tuoye-pulse 0.3s ease;
-}
-@keyframes tuoye-pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.3); }
+  -webkit-tap-highlight-color: transparent;
 }
 /* 已学习标记 */
 .tuoye-root .study-tab__count {

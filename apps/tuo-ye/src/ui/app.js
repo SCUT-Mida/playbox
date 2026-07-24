@@ -323,14 +323,13 @@ export class AppUI {
 
   _bindSpeakButtons() {
     if (!this.root) return;
-    const btns = this.root.querySelectorAll('.speak-btn, .study-example-btn');
+    const btns = this.root.querySelectorAll('.speak-btn');
     btns.forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
         const text = btn.dataset.text;
         if (!text) return;
-        // 视觉反馈：按钮闪一下
         btn.classList.add('is-speaking');
         setTimeout(() => btn.classList.remove('is-speaking'), 300);
         speak(text, {});
@@ -351,11 +350,6 @@ export class AppUI {
       const studiedCls = studied ? 'is-studied' : '';
       const studiedBtn = `<button class="learned-toggle ${studied ? 'is-on' : ''}" data-act="toggle-learned" data-cat="${esc(cat)}" data-id="${esc(c.id)}" type="button">${studied ? '✓ 已学习' : '标记已学习'}</button>`;
       if (c.type === 'vocab') {
-        const exampleHtml = c.example ? `
-          <button class="study-example-btn" data-act="speak" data-text="${esc(c.example)}" type="button">
-            <span class="study-example-btn__text">"${esc(c.example)}"</span>
-            <span class="study-example-btn__icon">🔊</span>
-          </button>` : '';
         return `
           <div class="study-card ${studiedCls}">
             <div class="study-card__head">
@@ -364,16 +358,13 @@ export class AppUI {
             </div>
             ${c.subtitle ? `<div class="study-card__phonetic">${esc(c.subtitle)}</div>` : ''}
             <div class="study-card__def">${esc(c.body)}</div>
-            ${exampleHtml}
+            ${c.example ? `<div class="study-card__head study-card__example-row"><span class="study-card__example-text">"${esc(c.example)}"</span>${canSpeak ? `<button class="speak-btn" data-act="speak" data-text="${esc(c.example)}" type="button" aria-label="例句发音">🔊</button>` : ''}</div>` : ''}
             ${studiedBtn}
           </div>`;
       }
       if (c.type === 'grammar') {
         const examplesHtml = (c.examples || []).map((ex) =>
-          `<button class="study-example-btn" data-act="speak" data-text="${esc(ex)}" type="button">
-            <span class="study-example-btn__text">${esc(ex)}</span>
-            <span class="study-example-btn__icon">🔊</span>
-          </button>`
+          `<div class="study-card__head study-card__example-row"><span class="study-card__example-text">${esc(ex)}</span>${canSpeak ? `<button class="speak-btn" data-act="speak" data-text="${esc(ex)}" type="button" aria-label="发音">🔊</button>` : ''}</div>`
         ).join('');
         return `
           <div class="study-card ${studiedCls}">

@@ -9,6 +9,8 @@
 //   2. 无英文语音 → 直接用有道音频，跳过原生（避免国产 ROM 静默失败）
 // ============================================================================
 
+import { getLocalAudio } from './audioManifest.js';
+
 function hasNativeAPI() {
   return typeof window !== 'undefined' && 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
 }
@@ -95,7 +97,18 @@ export function speak(text, opts = {}) {
   if (!text) return false;
   stopSpeaking();
 
-  // 有英文语音 → 原生 TTS（桌面浏览器，质量好）
+  // 优先：预生成本地音频（单词和句子都有，100% 可靠）
+  const localUrl = getLocalAudio(text);
+  if (localUrl) {
+    _audioEl = new Audio(localUrl);
+    _speaking = true;
+    _audioEl.onended = () => { _speaking = false; };
+    _audioEl.onerror = () => { _speaking = false; };
+    _audioEl.play().catch(() => { _speaking = false; });
+    return true;
+  }
+
+  // 有英文语音 → 原生 TTS（桌面浏览器）
   if (hasNativeAPI() && hasEnglishVoice()) {
     try {
       const utter = new SpeechSynthesisUtterance(text);
@@ -111,7 +124,7 @@ export function speak(text, opts = {}) {
     } catch (_) { _speaking = false; }
   }
 
-  // 无英文语音（国产 ROM）→ 全部用有道
+  // 兜底：在线 TTS API（有道→百度）
   return speakWithAudio(text, opts);
 }
 

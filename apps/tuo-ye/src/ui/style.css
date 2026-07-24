@@ -1536,6 +1536,18 @@
   flex: none;
   font-size: 1.05rem;
 }
+.tuoye-root .speak-btn.is-speaking,
+.tuoye-root .study-example-btn.is-speaking {
+  background: var(--blue-300, #63b3ed) !important;
+  transform: scale(0.96);
+}
+.tuoye-root .study-example-btn.is-speaking .study-example-btn__icon {
+  animation: tuoye-pulse 0.3s ease;
+}
+@keyframes tuoye-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+}
 /* 已学习标记 */
 .tuoye-root .study-tab__count {
   font-size: 0.7rem;

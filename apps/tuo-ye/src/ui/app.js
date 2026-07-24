@@ -317,6 +317,25 @@ export class AppUI {
         <div class="study-cards">${cardsHtml}</div>
       </section>
     `);
+    // 直接绑定发音按钮（不走事件委托，确保移动端可靠触发）
+    this._bindSpeakButtons();
+  }
+
+  _bindSpeakButtons() {
+    if (!this.root) return;
+    const btns = this.root.querySelectorAll('.speak-btn, .study-example-btn');
+    btns.forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const text = btn.dataset.text;
+        if (!text) return;
+        // 视觉反馈：按钮闪一下
+        btn.classList.add('is-speaking');
+        setTimeout(() => btn.classList.remove('is-speaking'), 300);
+        speak(text, {});
+      });
+    });
   }
 
   _loadStudyCards() {
@@ -1121,7 +1140,11 @@ export class AppUI {
     const tabs = this.root.querySelectorAll('.study-tab');
     tabs.forEach((t) => t.classList.toggle('is-active', t.dataset.cat === cat));
     const cardsContainer = this.root.querySelector('.study-cards');
-    if (cardsContainer) cardsContainer.innerHTML = this._renderStudyCards();
+    if (cardsContainer) {
+      cardsContainer.innerHTML = this._renderStudyCards();
+      // 重新绑定发音按钮
+      this._bindSpeakButtons();
+    }
   }
 
   // ===================== 自测逻辑 =====================

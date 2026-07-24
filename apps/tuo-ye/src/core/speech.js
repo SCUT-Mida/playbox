@@ -51,18 +51,31 @@ export function warmupVoices() {
 let _audioEl = null;
 let _speaking = false;
 
-// 百度翻译 TTS 音频（单词和句子均支持，国内可访问）
-// spd: 语速 1-5，3=正常，2=偏慢（适合语言学习）
+// 音频发音：有道(单词) → 百度(句子) 双保险
 function speakWithAudio(text, opts = {}) {
   if (_audioEl) { _audioEl.pause(); _audioEl = null; }
   const truncated = text.length > 500 ? text.slice(0, 500) : text;
-  const spd = opts.slow ? 2 : 3;
-  const url = 'https://fanyi.baidu.com/gettts?lan=en&text=' + encodeURIComponent(truncated) + '&spd=' + spd + '&source=web';
-  _audioEl = new Audio(url);
+  const encoded = encodeURIComponent(truncated);
+  const youdaoUrl = 'https://dict.youdao.com/dictvoice?audio=' + encoded + '&type=2';
+  const baiduUrl = 'https://fanyi.baidu.com/gettts?lan=en&text=' + encoded + '&spd=3&source=web';
+
+  let triedBaidu = false;
   _speaking = true;
+
+  function tryBaidu() {
+    if (triedBaidu) { _speaking = false; return; } // 两个都失败了
+    triedBaidu = true;
+    _audioEl = new Audio(baiduUrl);
+    _audioEl.onended = () => { _speaking = false; };
+    _audioEl.onerror = () => { _speaking = false; };
+    _audioEl.play().catch(() => { _speaking = false; });
+  }
+
+  // 先试有道（单词/短语能成功，句子会 500 → onerror）
+  _audioEl = new Audio(youdaoUrl);
   _audioEl.onended = () => { _speaking = false; };
-  _audioEl.onerror = () => { _speaking = false; };
-  _audioEl.play().catch(() => { _speaking = false; });
+  _audioEl.onerror = () => { tryBaidu(); }; // 有道失败 → 试百度
+  _audioEl.play().catch(() => { tryBaidu(); }); // play() 被拒 → 试百度
   return true;
 }
 

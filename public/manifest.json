@@ -1,0 +1,20 @@
+{
+  "name": "Playbox · 玩盒子",
+  "short_name": "Playbox",
+  "description": "托业模考 · TOEIC 备考 + 创意沙盒",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f8f4e6",
+  "theme_color": "#f8f4e6",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%23f8f4e6'/%3E%3Ctext x='256' y='360' font-size='280' text-anchor='middle' fill='%23ffb400' font-family='serif' font-weight='bold'%3E%E7%8E%A9%3C/text%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

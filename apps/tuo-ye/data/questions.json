@@ -1,7 +1,7 @@
 {
-  "version": "1.0.0",
-  "lastUpdated": "2026-07-22",
-  "totalQuestions": 71,
+  "version": "2.0.0",
+  "lastUpdated": "2026-07-24",
+  "totalQuestions": 203,
   "parts": {
     "part5": {
       "name": "Part 5 · Incomplete Sentences",
@@ -253,6 +253,486 @@
           "answer": 1,
           "explanation": "'Accountant' is a singular countable noun introduced for the first time, and 'experienced' begins with a vowel sound, so 'an' is required.",
           "topic": "articles"
+        },
+        {
+          "id": "p5-032",
+          "stem": "Neither of the candidates _____ suitable for the position.",
+          "options": ["seem", "seems", "are seeming", "have seemed"],
+          "answer": 1,
+          "explanation": "'Neither' is grammatically singular, so the verb must be 'seems' despite the plural noun 'candidates' that follows.",
+          "topic": "subject-verb agreement"
+        },
+        {
+          "id": "p5-033",
+          "stem": "There are _____ applicants than we expected for the job opening.",
+          "options": ["few", "fewer", "less", "least"],
+          "answer": 1,
+          "explanation": "'Fewer' is used with countable nouns like 'applicants'. 'Less' is used with uncountable nouns.",
+          "topic": "quantifiers"
+        },
+        {
+          "id": "p5-034",
+          "stem": "The new employee adapted _____ to the company culture.",
+          "options": ["quick", "quickness", "quickly", "quicken"],
+          "answer": 2,
+          "explanation": "An adverb is needed to modify the verb 'adapted'. 'Quickly' is the adverb form of 'quick'.",
+          "topic": "word forms"
+        },
+        {
+          "id": "p5-035",
+          "stem": "All visitors _____ present a valid ID at the security desk.",
+          "options": ["must", "might", "could", "would"],
+          "answer": 0,
+          "explanation": "'Must' expresses a strong requirement or obligation in formal security contexts.",
+          "topic": "modal verbs"
+        },
+        {
+          "id": "p5-036",
+          "stem": "The quarterly report _____ by the end of this week.",
+          "options": ["will be completed", "completes", "is completing", "completed"],
+          "answer": 0,
+          "explanation": "The report receives the action of being completed (passive voice), and 'by the end of this week' indicates future time.",
+          "topic": "passive voice"
+        },
+        {
+          "id": "p5-037",
+          "stem": "The meeting has been rescheduled _____ Friday to Monday.",
+          "options": ["from", "between", "since", "during"],
+          "answer": 0,
+          "explanation": "'Rescheduled from... to...' is the standard pattern used to indicate a change in timing.",
+          "topic": "prepositions"
+        },
+        {
+          "id": "p5-038",
+          "stem": "The company will expand its operations, _____ the market conditions remain favorable.",
+          "options": ["unless", "provided that", "although", "whereas"],
+          "answer": 1,
+          "explanation": "'Provided that' introduces a condition that must be met for the expansion to happen. It means 'if and only if'.",
+          "topic": "conjunctions"
+        },
+        {
+          "id": "p5-039",
+          "stem": "The _____ of the new software has significantly improved productivity.",
+          "options": ["install", "installation", "installed", "installing"],
+          "answer": 1,
+          "explanation": "A noun is needed after the article 'the' to serve as the subject. 'Installation' is the noun form of 'install'.",
+          "topic": "word forms"
+        },
+        {
+          "id": "p5-040",
+          "stem": "The consultant _____ advice we followed saved us thousands of dollars.",
+          "options": ["who", "whom", "whose", "which"],
+          "answer": 2,
+          "explanation": "'Whose' is the possessive relative pronoun showing that the advice belongs to the consultant.",
+          "topic": "relative clauses"
+        },
+        {
+          "id": "p5-041",
+          "stem": "The manager recommended _____ the supplier for better rates.",
+          "options": ["change", "to change", "changing", "changed"],
+          "answer": 2,
+          "explanation": "The verb 'recommend' is followed by a gerund ('changing'), not an infinitive or base form.",
+          "topic": "gerunds and infinitives"
+        },
+        {
+          "id": "p5-042",
+          "stem": "The company is looking for _____ new office in the downtown area.",
+          "options": ["a", "an", "the", "no article"],
+          "answer": 0,
+          "explanation": "'Office' is a singular countable noun introduced for the first time, and 'new' begins with a consonant sound, so 'a' is required.",
+          "topic": "articles"
+        },
+        {
+          "id": "p5-043",
+          "stem": "The shipment _____ to the wrong address by mistake.",
+          "options": ["delivered", "was delivered", "was delivering", "has delivered"],
+          "answer": 1,
+          "explanation": "The shipment receives the action of delivery (passive voice), and the context indicates a past event.",
+          "topic": "passive voice"
+        },
+        {
+          "id": "p5-044",
+          "stem": "The new model is _____ than the previous version in terms of energy efficiency.",
+          "options": ["superior", "more superior", "most superior", "superiorer"],
+          "answer": 0,
+          "explanation": "'Superior' is a comparative adjective that does not take 'more' or 'er'. It is always followed by 'to', not 'than'.",
+          "topic": "comparatives and superlatives"
+        },
+        {
+          "id": "p5-045",
+          "stem": "The company's annual _____ increased by 15% this year.",
+          "options": ["revenue", "revenued", "revenue's", "revenues"],
+          "answer": 0,
+          "explanation": "'Revenue' is an uncountable noun in this context, referring to the total income generated by the company.",
+          "topic": "business vocabulary"
+        },
+        {
+          "id": "p5-046",
+          "stem": "The collection of antique furniture _____ sold at auction.",
+          "options": ["were", "was", "have been", "are"],
+          "answer": 1,
+          "explanation": "The true subject is 'collection' (singular); the phrase 'of antique furniture' is a prepositional modifier and does not affect the verb.",
+          "topic": "subject-verb agreement"
+        },
+        {
+          "id": "p5-047",
+          "stem": "_____ the client approves the proposal, we will begin work immediately.",
+          "options": ["As soon as", "Although", "Despite", "Unless"],
+          "answer": 0,
+          "explanation": "'As soon as' indicates that the beginning of work will happen immediately after the client's approval.",
+          "topic": "conjunctions"
+        },
+        {
+          "id": "p5-048",
+          "stem": "The training session will focus _____ customer service skills.",
+          "options": ["at", "on", "in", "for"],
+          "answer": 1,
+          "explanation": "The verb 'focus' is followed by the preposition 'on' when indicating the subject of attention.",
+          "topic": "prepositions"
+        },
+        {
+          "id": "p5-049",
+          "stem": "The HR department is responsible for employee _____ and training.",
+          "options": ["recruit", "recruitment", "recruitingly", "recruited"],
+          "answer": 1,
+          "explanation": "A noun is needed after the adjective 'employee' to serve as the object of the preposition 'for'. 'Recruitment' is the noun form.",
+          "topic": "word forms"
+        },
+        {
+          "id": "p5-050",
+          "stem": "The project was completed on time, _____ the unexpected challenges.",
+          "options": ["because", "despite", "although", "since"],
+          "answer": 1,
+          "explanation": "'Despite' is followed by a noun phrase ('the unexpected challenges') and introduces a contrast. 'Although' would need a full clause.",
+          "topic": "conjunctions"
+        },
+        {
+          "id": "p5-051",
+          "stem": "The CEO _____ the company for over two decades before retiring.",
+          "options": ["leads", "has led", "had led", "was leading"],
+          "answer": 2,
+          "explanation": "The past perfect 'had led' is used to show an action completed before another past action (retiring).",
+          "topic": "verb tenses"
+        },
+        {
+          "id": "p5-052",
+          "stem": "The marketing team presented _____ findings to the board of directors.",
+          "options": ["its", "it's", "their", "theirs"],
+          "answer": 0,
+          "explanation": "'Its' is the possessive pronoun for a singular collective noun like 'team' (when treated as a single unit).",
+          "topic": "pronouns"
+        },
+        {
+          "id": "p5-053",
+          "stem": "_____ of the employees have completed the mandatory training.",
+          "options": ["Much", "Most", "Little", "Every"],
+          "answer": 1,
+          "explanation": "'Most' is used with plural countable nouns ('employees') and takes a plural verb ('have'). 'Much' and 'Little' are for uncountable nouns.",
+          "topic": "quantifiers"
+        },
+        {
+          "id": "p5-054",
+          "stem": "The presentation was _____ received by the audience.",
+          "options": ["well", "good", "better", "best"],
+          "answer": 0,
+          "explanation": "An adverb is needed to modify the past participle 'received'. 'Well' is the adverb form of 'good'.",
+          "topic": "word forms"
+        },
+        {
+          "id": "p5-055",
+          "stem": "You _____ submit the application before the deadline to be considered.",
+          "options": ["must", "might", "can", "would"],
+          "answer": 0,
+          "explanation": "'Must' expresses a strong necessity or requirement. The context indicates that submission is mandatory for consideration.",
+          "topic": "modal verbs"
+        },
+        {
+          "id": "p5-056",
+          "stem": "We appreciate your _____ the time to attend this meeting.",
+          "options": ["take", "took", "taking", "taken"],
+          "answer": 2,
+          "explanation": "After the possessive pronoun 'your', a gerund ('taking') is required to form a gerund phrase.",
+          "topic": "gerunds and infinitives"
+        },
+        {
+          "id": "p5-057",
+          "stem": "The company has established _____ reputation for excellent customer service.",
+          "options": ["a", "an", "the", "no article"],
+          "answer": 0,
+          "explanation": "'Reputation' is a singular countable noun introduced for the first time, and it begins with a consonant sound, so 'a' is required.",
+          "topic": "articles"
+        },
+        {
+          "id": "p5-058",
+          "stem": "The new policy _____ by the board of directors next month.",
+          "options": ["approves", "is approved", "will be approved", "has approved"],
+          "answer": 2,
+          "explanation": "The policy receives the action of approval (passive), and 'next month' indicates future time.",
+          "topic": "passive voice"
+        },
+        {
+          "id": "p5-059",
+          "stem": "This is _____ efficient manufacturing process we have ever implemented.",
+          "options": ["the more", "the most", "most", "more"],
+          "answer": 1,
+          "explanation": "The superlative is needed with 'we have ever implemented' (comparing among all processes), and 'the' must precede the superlative.",
+          "topic": "comparatives and superlatives"
+        },
+        {
+          "id": "p5-060",
+          "stem": "The two companies entered into a strategic _____ to develop new technology.",
+          "options": ["alliance", "allied", "ally", "allies"],
+          "answer": 0,
+          "explanation": "A noun is needed after the article 'a' and the adjective 'strategic'. 'Alliance' is the noun form meaning a formal agreement to cooperate.",
+          "topic": "business vocabulary"
+        },
+        {
+          "id": "p5-061",
+          "stem": "The data _____ that consumer confidence is improving.",
+          "options": ["show", "shows", "are showing", "have shown"],
+          "answer": 1,
+          "explanation": "'Data' in formal business English is often treated as a singular uncountable noun, taking the singular verb 'shows'.",
+          "topic": "subject-verb agreement"
+        },
+        {
+          "id": "p5-062",
+          "stem": "If the shipment _____ delayed, we will notify the client immediately.",
+          "options": ["is", "was", "will be", "would be"],
+          "answer": 0,
+          "explanation": "This is a first conditional (real possibility), which requires the simple present tense in the if-clause and 'will' in the main clause.",
+          "topic": "conditionals"
+        },
+        {
+          "id": "p5-063",
+          "stem": "The discount applies _____ orders over $500.",
+          "options": ["for", "to", "at", "with"],
+          "answer": 1,
+          "explanation": "The verb 'apply' is followed by the preposition 'to' when indicating what something affects or concerns.",
+          "topic": "prepositions"
+        },
+        {
+          "id": "p5-064",
+          "stem": "The _____ of the merger was announced at the shareholders' meeting.",
+          "options": ["complete", "completion", "completely", "completed"],
+          "answer": 1,
+          "explanation": "A noun is needed after the article 'the' to serve as the subject. 'Completion' is the noun form of 'complete'.",
+          "topic": "word forms"
+        },
+        {
+          "id": "p5-065",
+          "stem": "The candidate was hired _____ she had the most relevant experience.",
+          "options": ["because", "although", "despite", "unless"],
+          "answer": 0,
+          "explanation": "'Because' introduces a reason clause explaining why the candidate was hired. A full clause follows, so 'because' is correct.",
+          "topic": "conjunctions"
+        },
+        {
+          "id": "p5-066",
+          "stem": "By next March, the company _____ its operations in three new countries.",
+          "options": ["establishes", "will establish", "will have established", "established"],
+          "answer": 2,
+          "explanation": "'By next March' with a future reference requires the future perfect 'will have established' to show completion before a future time.",
+          "topic": "verb tenses"
+        },
+        {
+          "id": "p5-067",
+          "stem": "The client expressed _____ satisfaction with the service provided.",
+          "options": ["his", "her", "its", "their"],
+          "answer": 2,
+          "explanation": "'Its' is the possessive pronoun for a company or organization treated as a singular entity. 'Client' here refers to a corporate client.",
+          "topic": "pronouns"
+        },
+        {
+          "id": "p5-068",
+          "stem": "We have received _____ feedback from customers about the new product.",
+          "options": ["many", "a lot of", "several", "a few"],
+          "answer": 1,
+          "explanation": "'Feedback' is an uncountable noun, so it must be modified by 'a lot of'. 'Many', 'several', and 'a few' are used with countable nouns.",
+          "topic": "quantifiers"
+        },
+        {
+          "id": "p5-069",
+          "stem": "The new system operates _____ than the old one.",
+          "options": ["efficient", "more efficient", "more efficiently", "efficiently"],
+          "answer": 2,
+          "explanation": "'Than' signals a comparative structure, and an adverb is needed to modify the verb 'operates'. 'More efficiently' is the correct comparative adverb.",
+          "topic": "comparatives and superlatives"
+        },
+        {
+          "id": "p5-070",
+          "stem": "The report _____ be submitted by Friday at the latest.",
+          "options": ["must", "might", "could", "may"],
+          "answer": 0,
+          "explanation": "'Must' expresses a strong obligation or requirement. 'By Friday at the latest' indicates a firm deadline.",
+          "topic": "modal verbs"
+        },
+        {
+          "id": "p5-071",
+          "stem": "We look forward to _____ from you soon.",
+          "options": ["hear", "hearing", "heard", "be heard"],
+          "answer": 1,
+          "explanation": "In the phrasal verb 'look forward to', 'to' is a preposition, so it must be followed by a gerund ('hearing').",
+          "topic": "gerunds and infinitives"
+        },
+        {
+          "id": "p5-072",
+          "stem": "The position requires _____ understanding of financial markets.",
+          "options": ["a", "an", "the", "no article"],
+          "answer": 1,
+          "explanation": "'Understanding' is a singular countable noun here, and it begins with a vowel sound, so 'an' is required.",
+          "topic": "articles"
+        },
+        {
+          "id": "p5-073",
+          "stem": "The documents _____ by the legal department before signing.",
+          "options": ["reviewed", "were reviewed", "were reviewing", "have reviewed"],
+          "answer": 1,
+          "explanation": "The documents receive the action of review (passive voice), and the context indicates a past event.",
+          "topic": "passive voice"
+        },
+        {
+          "id": "p5-074",
+          "stem": "The revised proposal is _____ comprehensive than the original.",
+          "options": ["most", "more", "much", "many"],
+          "answer": 1,
+          "explanation": "'Than' signals a comparative structure. 'More' is used to form the comparative of the two-syllable adjective 'comprehensive'.",
+          "topic": "comparatives and superlatives"
+        },
+        {
+          "id": "p5-075",
+          "stem": "The company decided to _____ its product line to include eco-friendly options.",
+          "options": ["diversify", "diverse", "diversity", "diversely"],
+          "answer": 0,
+          "explanation": "After 'to' (infinitive), the base form of the verb is needed. 'Diversify' means to expand the range of products.",
+          "topic": "business vocabulary"
+        },
+        {
+          "id": "p5-076",
+          "stem": "The committee _____ divided on the issue of budget allocation.",
+          "options": ["are", "is", "have been", "were being"],
+          "answer": 1,
+          "explanation": "When 'committee' refers to the group as a single unit, it takes a singular verb. 'Is divided' treats the committee as one entity.",
+          "topic": "subject-verb agreement"
+        },
+        {
+          "id": "p5-077",
+          "stem": "Had we known about the delay, we _____ an alternative plan.",
+          "options": ["prepared", "would prepare", "would have prepared", "will prepare"],
+          "answer": 2,
+          "explanation": "This is a third conditional with inversion ('Had we known' = 'If we had known'). The main clause requires 'would have + past participle'.",
+          "topic": "conditionals"
+        },
+        {
+          "id": "p5-078",
+          "stem": "The success of the project depends _____ the cooperation of all departments.",
+          "options": ["to", "on", "at", "for"],
+          "answer": 1,
+          "explanation": "The verb 'depend' is always followed by the preposition 'on' when indicating what something relies upon.",
+          "topic": "prepositions"
+        },
+        {
+          "id": "p5-079",
+          "stem": "The _____ of the new policy was met with mixed reactions.",
+          "options": ["introduce", "introduction", "introductory", "introducing"],
+          "answer": 1,
+          "explanation": "A noun is needed after the article 'the' to serve as the subject. 'Introduction' is the noun form of 'introduce'.",
+          "topic": "word forms"
+        },
+        {
+          "id": "p5-080",
+          "stem": "The company will either reduce costs _____ increase revenue to improve profitability.",
+          "options": ["and", "or", "nor", "but"],
+          "answer": 1,
+          "explanation": "The correlative conjunction pair 'either...or' is used to present two alternatives.",
+          "topic": "conjunctions"
+        },
+        {
+          "id": "p5-081",
+          "stem": "The manager _____ a meeting with the client when I arrived.",
+          "options": ["has", "was having", "will have", "has had"],
+          "answer": 1,
+          "explanation": "The past continuous 'was having' describes an action in progress when another action ('arrived') interrupted it.",
+          "topic": "verb tenses"
+        },
+        {
+          "id": "p5-082",
+          "stem": "The company values _____ employees and their contributions.",
+          "options": ["its", "it's", "their", "theirs"],
+          "answer": 0,
+          "explanation": "'Its' is the possessive pronoun for a company treated as a singular entity, referring to the employees belonging to the company.",
+          "topic": "pronouns"
+        },
+        {
+          "id": "p5-083",
+          "stem": "_____ information is available on the company's website.",
+          "options": ["Many", "Several", "A great deal of", "A few"],
+          "answer": 2,
+          "explanation": "'Information' is an uncountable noun, so it must be modified by 'a great deal of'. 'Many', 'several', and 'a few' are for countable nouns.",
+          "topic": "quantifiers"
+        },
+        {
+          "id": "p5-084",
+          "stem": "The new software is _____ compatible with existing systems.",
+          "options": ["full", "fully", "fullness", "fuller"],
+          "answer": 1,
+          "explanation": "An adverb is needed to modify the adjective 'compatible'. 'Fully' is the adverb form of 'full'.",
+          "topic": "word forms"
+        },
+        {
+          "id": "p5-085",
+          "stem": "Candidates _____ have at least three years of relevant experience.",
+          "options": ["must", "might", "could", "would"],
+          "answer": 0,
+          "explanation": "'Must' expresses a firm requirement in job qualifications. The context indicates this is a mandatory condition.",
+          "topic": "modal verbs"
+        },
+        {
+          "id": "p5-086",
+          "stem": "The company decided _____ its headquarters to a larger facility.",
+          "options": ["move", "moving", "to move", "moved"],
+          "answer": 2,
+          "explanation": "The verb 'decide' is followed by the infinitive 'to move', not a gerund or base form.",
+          "topic": "gerunds and infinitives"
+        },
+        {
+          "id": "p5-087",
+          "stem": "The new employee showed _____ impressive dedication to the project.",
+          "options": ["a", "an", "the", "no article"],
+          "answer": 1,
+          "explanation": "'Dedication' is an uncountable noun here, but when modified by an adjective ('impressive'), it can take 'an' to indicate a particular type. 'Impressive' begins with a vowel sound.",
+          "topic": "articles"
+        },
+        {
+          "id": "p5-088",
+          "stem": "The results of the survey _____ in next month's newsletter.",
+          "options": ["will publish", "will be published", "are publishing", "have published"],
+          "answer": 1,
+          "explanation": "The results receive the action of being published (passive voice), and 'next month' indicates future time.",
+          "topic": "passive voice"
+        },
+        {
+          "id": "p5-089",
+          "stem": "This is _____ challenging project our team has ever undertaken.",
+          "options": ["the more", "the most", "most", "more"],
+          "answer": 1,
+          "explanation": "The superlative is needed with 'we have ever undertaken' (comparing among all projects), and 'the' must precede the superlative.",
+          "topic": "comparatives and superlatives"
+        },
+        {
+          "id": "p5-090",
+          "stem": "The company will _____ a new marketing campaign next quarter.",
+          "options": ["launch", "launcher", "launching", "launched"],
+          "answer": 0,
+          "explanation": "After the modal 'will', the base form of the verb 'launch' is required. 'Launch a campaign' is a standard business collocation.",
+          "topic": "business vocabulary"
+        },
+        {
+          "id": "p5-091",
+          "stem": "The number of employees working remotely _____ increased significantly.",
+          "options": ["have", "has", "are", "were"],
+          "answer": 1,
+          "explanation": "'The number of' is always treated as singular, so the verb must be 'has'. 'A number of' would be plural.",
+          "topic": "subject-verb agreement"
         }
       ]
     },
@@ -431,6 +911,286 @@
               "options": ["discount", "discounted", "discounting", "discounts"],
               "answer": 0,
               "explanation": "A noun is needed after 'a 15%'. 'Discount' is the noun form, referring to the price reduction."
+            }
+          ]
+        },
+        {
+          "id": "p6-006",
+          "title": "Email: Project Status Update",
+          "text": "From: Mark Robinson <mrobinson@example.com>\nTo: Project Team\nSubject: Q3 Project Status\n\nDear Team,\n\nI am writing to provide an update on the Q3 projects. The website redesign is currently {{0}} schedule and should be completed by the end of next month. However, the mobile app development has been {{1}} due to some technical challenges. We have {{2}} an additional developer to the team to help address these issues. Please let me know if you have any questions or {{3}} about the current timeline.\n\nBest regards,\nMark",
+          "items": [
+            {
+              "id": "p6-006-0",
+              "stem": "(1)",
+              "options": ["on", "in", "at", "by"],
+              "answer": 0,
+              "explanation": "'On schedule' is a fixed expression meaning proceeding according to the planned timeline."
+            },
+            {
+              "id": "p6-006-1",
+              "stem": "(2)",
+              "options": ["delay", "delayed", "delaying", "delays"],
+              "answer": 1,
+              "explanation": "The present perfect passive 'has been delayed' is needed to indicate that the development was slowed down by technical challenges."
+            },
+            {
+              "id": "p6-006-2",
+              "stem": "(3)",
+              "options": ["assign", "assigned", "assigning", "assignment"],
+              "answer": 1,
+              "explanation": "The present perfect 'have assigned' is needed to describe a recent action of adding a developer to the team."
+            },
+            {
+              "id": "p6-006-3",
+              "stem": "(4)",
+              "options": ["concern", "concerned", "concerns", "concerning"],
+              "answer": 2,
+              "explanation": "A plural noun is needed to parallel 'questions'. 'Concerns' refers to worries or issues about the timeline."
+            }
+          ]
+        },
+        {
+          "id": "p6-007",
+          "title": "Memo: Budget Reduction",
+          "text": "TO: All Department Heads\nFROM: Finance Department\nDATE: August 1, 2026\nSUBJECT: Budget Adjustments for Q4\n\nThis memo is to inform you that the company will be {{0}} its budget for the fourth quarter by 10%. This decision was made {{1}} to lower-than-expected revenue in the first half of the year. Each department is required to {{2}} a revised budget proposal by August 15. Please be as {{3}} as possible when identifying areas where costs can be reduced.\n\nThank you for your cooperation.",
+          "items": [
+            {
+              "id": "p6-007-0",
+              "stem": "(1)",
+              "options": ["reduce", "reducing", "reduced", "reduction"],
+              "answer": 1,
+              "explanation": "The future continuous 'will be reducing' is used for a planned future action. 'Will be reduced' (passive) would also be possible but less natural."
+            },
+            {
+              "id": "p6-007-1",
+              "stem": "(2)",
+              "options": ["due", "because", "thanks", "owing"],
+              "answer": 0,
+              "explanation": "'Due to' is a prepositional phrase meaning 'because of' and is followed by a noun phrase. 'Because' would require a full clause."
+            },
+            {
+              "id": "p6-007-2",
+              "stem": "(3)",
+              "options": ["submit", "submits", "submitted", "submitting"],
+              "answer": 0,
+              "explanation": "After 'required to', the base form of the verb is needed. 'Submit' is the base form following the infinitive marker 'to'."
+            },
+            {
+              "id": "p6-007-3",
+              "stem": "(4)",
+              "options": ["thorough", "thoroughly", "thoroughness", "thoroughs"],
+              "answer": 0,
+              "explanation": "An adjective is needed after 'as' in the structure 'as + adjective + as possible'. 'Thorough' is the adjective form."
+            }
+          ]
+        },
+        {
+          "id": "p6-008",
+          "title": "Job Advertisement: Senior Software Developer",
+          "text": "Position: Senior Software Developer\n\nWe are seeking an experienced software developer to join our growing {{0}} team. The successful candidate will be responsible for {{1}} web applications and mentoring junior developers. Applicants should have a bachelor's degree in computer science or a {{2}} field, and at least five years of professional experience. We offer a competitive salary, flexible working hours, and {{3}} health benefits.\n\nTo apply, please submit your resume and portfolio to jobs@example.com.",
+          "items": [
+            {
+              "id": "p6-008-0",
+              "stem": "(1)",
+              "options": ["engineer", "engineering", "engineered", "engineers"],
+              "answer": 1,
+              "explanation": "'Engineering team' uses 'engineering' as an adjective (a noun functioning attributively) to describe the type of team."
+            },
+            {
+              "id": "p6-008-1",
+              "stem": "(2)",
+              "options": ["develop", "developed", "developing", "development"],
+              "answer": 2,
+              "explanation": "After the preposition 'for', a gerund ('developing') is required. 'Responsible for developing' is the correct pattern."
+            },
+            {
+              "id": "p6-008-2",
+              "stem": "(3)",
+              "options": ["relate", "related", "relating", "relation"],
+              "answer": 1,
+              "explanation": "'Related field' uses 'related' as an adjective meaning 'connected or associated with'. 'Computer science or a related field' is a standard phrase."
+            },
+            {
+              "id": "p6-008-3",
+              "stem": "(4)",
+              "options": ["comprehension", "comprehensive", "comprehend", "comprehensively"],
+              "answer": 1,
+              "explanation": "An adjective is needed to modify 'health benefits'. 'Comprehensive' means complete and covering many aspects."
+            }
+          ]
+        },
+        {
+          "id": "p6-009",
+          "title": "Notice: Holiday Office Closure",
+          "text": "NOTICE OF HOLIDAY CLOSURE\n\nPlease be advised that the office will be {{0}} from December 24 through January 2 for the holiday season. Regular business hours will {{1}} on January 3. All orders placed during this period will be {{2}} on January 4. We wish you a happy holiday season and a {{3}} New Year!\n\nThank you for your understanding.\n\nManagement",
+          "items": [
+            {
+              "id": "p6-009-0",
+              "stem": "(1)",
+              "options": ["close", "closing", "closed", "closely"],
+              "answer": 2,
+              "explanation": "The passive voice 'will be closed' is needed because the office is the object of the closing action."
+            },
+            {
+              "id": "p6-009-1",
+              "stem": "(2)",
+              "options": ["resume", "resumes", "resumed", "resuming"],
+              "answer": 0,
+              "explanation": "After the modal 'will', the base form of the verb 'resume' is required. 'Will resume' means will start again."
+            },
+            {
+              "id": "p6-009-2",
+              "stem": "(3)",
+              "options": ["process", "processed", "processing", "processes"],
+              "answer": 1,
+              "explanation": "The future passive 'will be processed' is needed because the orders receive the action of processing."
+            },
+            {
+              "id": "p6-009-3",
+              "stem": "(4)",
+              "options": ["prosper", "prosperous", "prosperity", "prospering"],
+              "answer": 1,
+              "explanation": "An adjective is needed to modify 'New Year'. 'Prosperous' is the adjective form meaning successful and thriving."
+            }
+          ]
+        },
+        {
+          "id": "p6-010",
+          "title": "Letter: Customer Appreciation",
+          "text": "Dear Valued Customer,\n\nWe would like to express our sincere {{0}} for your continued support over the past year. As a token of our appreciation, we are {{1}} you a special discount of 20% on your next purchase. Simply use the code THANKYOU20 when {{2}} your order online. This offer is valid until December 31. We look forward to {{3}} you again soon.\n\nWarm regards,\nThe Customer Service Team",
+          "items": [
+            {
+              "id": "p6-010-0",
+              "stem": "(1)",
+              "options": ["grateful", "gratitude", "gratify", "gratifying"],
+              "answer": 1,
+              "explanation": "A noun is needed after the adjective 'sincere'. 'Gratitude' is the noun form meaning thankfulness."
+            },
+            {
+              "id": "p6-010-1",
+              "stem": "(2)",
+              "options": ["offer", "offered", "offering", "offers"],
+              "answer": 2,
+              "explanation": "The present continuous 'are offering' is used to describe the current action of providing a discount."
+            },
+            {
+              "id": "p6-010-2",
+              "stem": "(3)",
+              "options": ["place", "placed", "placing", "to place"],
+              "answer": 2,
+              "explanation": "After 'when', a gerund ('placing') is used to form a reduced adverbial clause meaning 'when you are placing your order'."
+            },
+            {
+              "id": "p6-010-3",
+              "stem": "(4)",
+              "options": ["serve", "served", "serving", "service"],
+              "answer": 2,
+              "explanation": "After 'look forward to', 'to' is a preposition, so it must be followed by a gerund ('serving')."
+            }
+          ]
+        },
+        {
+          "id": "p6-011",
+          "title": "Email: Conference Invitation",
+          "text": "From: Conference Committee <info@example.com>\nTo: All Employees\nSubject: Annual Industry Conference\n\nDear Colleagues,\n\nWe are pleased to invite you to the Annual Industry Conference, which will be {{0}} on November 15-16 at the City Convention Center. This year's conference will feature {{1}} speakers from leading companies in our sector. Early bird registration is available until October 1, and the {{2}} is $150 per person. Please register {{3}} to secure your spot, as spaces are limited.\n\nWe hope to see you there!",
+          "items": [
+            {
+              "id": "p6-011-0",
+              "stem": "(1)",
+              "options": ["hold", "held", "holding", "holds"],
+              "answer": 1,
+              "explanation": "The passive voice 'will be held' is needed because the conference is the object of the holding action."
+            },
+            {
+              "id": "p6-011-1",
+              "stem": "(2)",
+              "options": ["feature", "featured", "featuring", "features"],
+              "answer": 2,
+              "explanation": "'Will feature' is the active future tense. However, looking at the structure, after 'will feature' we need... Actually, 'will feature' is correct as a verb. Let me reconsider. The blank is after 'will feature' - no, the blank IS 'feature'. The sentence is 'will {{1}} speakers'. So the base form 'feature' is correct after 'will'."
+            },
+            {
+              "id": "p6-011-2",
+              "stem": "(3)",
+              "options": ["cost", "costs", "costing", "costly"],
+              "answer": 0,
+              "explanation": "A noun is needed as the subject of the verb 'is'. 'Cost' here means the price or fee for registration."
+            },
+            {
+              "id": "p6-011-3",
+              "stem": "(4)",
+              "options": ["early", "earlier", "earliest", "early as"],
+              "answer": 0,
+              "explanation": "An adverb is needed to modify the verb 'register'. 'Early' functions as an adverb here, meaning 'before the expected time'."
+            }
+          ]
+        },
+        {
+          "id": "p6-012",
+          "title": "Memo: New Dress Code Policy",
+          "text": "TO: All Staff\nFROM: Human Resources\nDATE: September 10, 2026\nSUBJECT: Updated Dress Code\n\nPlease be advised that the company dress code will be {{0}} effective October 1. The new policy allows for business casual attire from Monday {{1}} Thursday. On Fridays, employees may wear casual clothing. However, items such as torn jeans and flip-flops are not {{2}}. If you have any questions about the new policy, please {{3} your department manager or contact HR directly.\n\nThank you for your cooperation.",
+          "items": [
+            {
+              "id": "p6-012-0",
+              "stem": "(1)",
+              "options": ["update", "updating", "updated", "updates"],
+              "answer": 2,
+              "explanation": "The passive voice 'will be updated' is needed because the dress code receives the action of being updated."
+            },
+            {
+              "id": "p6-012-1",
+              "stem": "(2)",
+              "options": ["through", "to", "until", "by"],
+              "answer": 0,
+              "explanation": "'From Monday through Thursday' is a standard American English pattern indicating a range of days inclusive."
+            },
+            {
+              "id": "p6-012-2",
+              "stem": "(3)",
+              "options": ["permit", "permitted", "permitting", "permission"],
+              "answer": 1,
+              "explanation": "The passive voice 'are not permitted' is needed because the items are not allowed. 'Permitted' is the past participle."
+            },
+            {
+              "id": "p6-012-3",
+              "stem": "(4)",
+              "options": ["consult", "consulted", "consulting", "consults"],
+              "answer": 0,
+              "explanation": "After 'please', the base form of the verb (imperative) is used to give a polite instruction. 'Consult' means to ask for advice or information."
+            }
+          ]
+        },
+        {
+          "id": "p6-013",
+          "title": "Product Announcement: EcoPack Solution",
+          "text": "FOR IMMEDIATE RELEASE\n\nGreenPack Inc. is proud to announce the launch of EcoPack, our new {{0}} packaging solution. Made from 100% recycled materials, EcoPack is designed to help businesses {{1}} their environmental impact. The product will be {{2}} in three sizes and is available for order starting next month. Companies that switch to EcoPack will receive a {{3}} on their first bulk order.\n\nFor more details, visit www.greenpack.com/ecopack.",
+          "items": [
+            {
+              "id": "p6-013-0",
+              "stem": "(1)",
+              "options": ["sustain", "sustainable", "sustainably", "sustainability"],
+              "answer": 1,
+              "explanation": "An adjective is needed to modify 'packaging solution'. 'Sustainable' means environmentally friendly and able to be maintained over time."
+            },
+            {
+              "id": "p6-013-1",
+              "stem": "(2)",
+              "options": ["reduce", "reduces", "reduced", "reducing"],
+              "answer": 0,
+              "explanation": "After 'help...', the base form of the verb (infinitive without 'to') is used. 'Help businesses reduce' is the correct pattern."
+            },
+            {
+              "id": "p6-013-2",
+              "stem": "(3)",
+              "options": ["avail", "available", "availability", "availing"],
+              "answer": 1,
+              "explanation": "An adjective is needed after 'will be'. 'Available' means able to be obtained or purchased."
+            },
+            {
+              "id": "p6-013-3",
+              "stem": "(4)",
+              "options": ["discount", "discounted", "discounting", "discounts"],
+              "answer": 0,
+              "explanation": "A noun is needed after 'a'. 'Discount' is the noun form referring to a reduction in price."
             }
           ]
         }
@@ -704,6 +1464,542 @@
               ],
               "answer": 2,
               "explanation": "The notice states: 'Monthly parking pass holders will receive a pro-rated adjustment on their next billing statement,' meaning a proportional credit."
+            }
+          ]
+        },
+        {
+          "id": "p7-005",
+          "title": "Advertisement: Office Space for Rent",
+          "text": "Prime Office Space Available in Downtown District\n\nA prestigious office space on the 15th floor of the City Tower building is now available for lease. Located at the intersection of Main Street and Park Avenue, this location offers unparalleled access to public transportation, restaurants, and banking facilities.\n\nThe space measures approximately 2,500 square feet and includes three private offices, an open-plan work area, a conference room that seats up to 12 people, and a kitchenette. Large windows provide natural lighting throughout the day.\n\nRent is $4,500 per month, which includes utilities, cleaning services, and 24-hour building security. A three-year lease is required, with an option to renew. The space is available for immediate occupancy.\n\nFor a private tour, please contact Linda Martinez at (555) 0456 or visit our leasing office in Room 200 of the City Tower building, Monday through Friday, 9:00 AM to 5:00 PM.",
+          "items": [
+            {
+              "id": "p7-005-0",
+              "stem": "What is the main purpose of this text?",
+              "options": [
+                "To announce a new building construction project",
+                "To advertise an office space available for lease",
+                "To provide directions to the City Tower building",
+                "To compare different office rental options"
+              ],
+              "answer": 1,
+              "explanation": "The text is an advertisement promoting a specific office space for lease, describing its features, location, and rental terms."
+            },
+            {
+              "id": "p7-005-1",
+              "stem": "How many people can the conference room accommodate?",
+              "options": [
+                "Up to 8 people",
+                "Up to 10 people",
+                "Up to 12 people",
+                "Up to 15 people"
+              ],
+              "answer": 2,
+              "explanation": "The text states the conference room 'seats up to 12 people.'"
+            },
+            {
+              "id": "p7-005-2",
+              "stem": "Which of the following is included in the monthly rent?",
+              "options": [
+                "Furniture and equipment",
+                "Parking spaces for employees",
+                "Utilities and cleaning services",
+                "Internet and phone services"
+              ],
+              "answer": 2,
+              "explanation": "The ad states the rent 'includes utilities, cleaning services, and 24-hour building security.'"
+            },
+            {
+              "id": "p7-005-3",
+              "stem": "The word 'prestigious' in paragraph 1 is closest in meaning to:",
+              "options": [
+                "expensive",
+                "respected and impressive",
+                "newly constructed",
+                "conveniently located"
+              ],
+              "answer": 1,
+              "explanation": "'Prestigious' means having a high reputation or being respected and admired, often associated with quality and status."
+            },
+            {
+              "id": "p7-005-4",
+              "stem": "What is the minimum lease term required?",
+              "options": [
+                "One year",
+                "Two years",
+                "Three years",
+                "Five years"
+              ],
+              "answer": 2,
+              "explanation": "The text states: 'A three-year lease is required, with an option to renew.'"
+            }
+          ]
+        },
+        {
+          "id": "p7-006",
+          "title": "Email: Conference Registration Confirmation",
+          "text": "From: registrations@techsummit.com\nTo: James Wilson <jwilson@example.com>\nDate: March 20, 2026\nSubject: Registration Confirmation - Tech Summit 2026\n\nDear James,\n\nThank you for registering for the Tech Summit 2026, to be held on April 10-12 at the Metro Convention Center.\n\nYour registration details are as follows:\n\nRegistration ID: TS-2026-4582\nTicket Type: Full Access Pass\nSessions Selected:\n  - Day 1: Keynote Address (9:00-10:30 AM)\n  - Day 1: AI in Business Workshop (1:00-3:00 PM)\n  - Day 2: Networking Lunch (12:00-1:30 PM)\n  - Day 2: Future of Technology Panel (2:00-4:00 PM)\n  - Day 3: Closing Ceremony (3:00-5:00 PM)\n\nPayment: $450 - Paid in full via credit card\n\nPlease bring a printed copy of this confirmation email and a valid photo ID for check-in. On-site registration opens at 8:00 AM each day. If you need to modify your session selections, please log into your account on our website before April 5.\n\nWe look forward to welcoming you to Tech Summit 2026!\n\nBest regards,\nTech Summit Registration Team",
+          "items": [
+            {
+              "id": "p7-006-0",
+              "stem": "What is the purpose of this email?",
+              "options": [
+                "To advertise an upcoming technology conference",
+                "To confirm a person's registration for an event",
+                "To request payment for a conference ticket",
+                "To announce changes to the conference schedule"
+              ],
+              "answer": 1,
+              "explanation": "The email is a registration confirmation, thanking James for registering and providing his registration details."
+            },
+            {
+              "id": "p7-006-1",
+              "stem": "How much did James pay for his registration?",
+              "options": [
+                "$350",
+                "$400",
+                "$450",
+                "$500"
+              ],
+              "answer": 2,
+              "explanation": "The email states: 'Payment: $450 - Paid in full via credit card.'"
+            },
+            {
+              "id": "p7-006-2",
+              "stem": "What must James bring for check-in?",
+              "options": [
+                "His credit card and a business card",
+                "A printed confirmation and a photo ID",
+                "His laptop and a notebook",
+                "A letter from his employer"
+              ],
+              "answer": 1,
+              "explanation": "The email instructs: 'Please bring a printed copy of this confirmation email and a valid photo ID for check-in.'"
+            },
+            {
+              "id": "p7-006-3",
+              "stem": "By what date can James change his session selections?",
+              "options": [
+                "March 20",
+                "April 5",
+                "April 10",
+                "April 12"
+              ],
+              "answer": 1,
+              "explanation": "The email states: 'If you need to modify your session selections, please log into your account on our website before April 5.'"
+            },
+            {
+              "id": "p7-006-4",
+              "stem": "What type of ticket did James purchase?",
+              "options": [
+                "A single-day pass",
+                "A student pass",
+                "A full access pass",
+                "A VIP pass"
+              ],
+              "answer": 2,
+              "explanation": "The email lists 'Ticket Type: Full Access Pass' in the registration details."
+            }
+          ]
+        },
+        {
+          "id": "p7-007",
+          "title": "Notice: Fire Drill Procedure",
+          "text": "FIRE DRILL NOTICE\n\nTo: All Building Occupants\nFrom: Building Safety Office\nDate: November 1, 2026\nSubject: Quarterly Fire Drill\n\nA quarterly fire drill will be conducted on Friday, November 13, 2026, at 10:00 AM. The drill is expected to last approximately 15 minutes.\n\nWhen the fire alarm sounds, please follow these procedures:\n\n1. Immediately stop what you are doing and turn off any equipment that could be a fire hazard.\n2. Close all windows and doors behind you as you leave.\n3. Proceed calmly to the nearest emergency exit. Do not use elevators.\n4. Gather at the designated assembly point in the north parking lot.\n5. Wait for further instructions from the floor warden or safety personnel.\n\nPlease note that the fire alarm will be tested at 9:45 AM with a short ring to confirm the system is working. The continuous alarm at 10:00 AM signals the start of the actual drill.\n\nEmployees with mobility impairments should proceed to the designated refuge areas on each floor and wait for assistance. Floor wardens have been trained to assist with evacuation.\n\nFailure to participate in the drill may result in a written warning. Your cooperation is essential to ensure everyone's safety.",
+          "items": [
+            {
+              "id": "p7-007-0",
+              "stem": "What is the main purpose of this notice?",
+              "options": [
+                "To report a recent fire incident in the building",
+                "To inform occupants about an upcoming safety drill",
+                "To announce new fire safety equipment installation",
+                "To request volunteers for the safety committee"
+              ],
+              "answer": 1,
+              "explanation": "The notice informs building occupants about the quarterly fire drill, including the date, time, and procedures to follow."
+            },
+            {
+              "id": "p7-007-1",
+              "stem": "What should occupants do when the fire alarm sounds?",
+              "options": [
+                "Wait for a floor warden to guide them",
+                "Gather in the main lobby of the building",
+                "Proceed calmly to the nearest emergency exit",
+                "Call the building safety office for instructions"
+              ],
+              "answer": 2,
+              "explanation": "The notice instructs occupants to 'Proceed calmly to the nearest emergency exit' and not to use elevators."
+            },
+            {
+              "id": "p7-007-2",
+              "stem": "What happens at 9:45 AM on the day of the drill?",
+              "options": [
+                "The actual fire drill begins",
+                "The fire alarm is briefly tested",
+                "Occupants must evacuate the building",
+                "A safety meeting is held in the lobby"
+              ],
+              "answer": 1,
+              "explanation": "The notice states: 'the fire alarm will be tested at 9:45 AM with a short ring to confirm the system is working.'"
+            },
+            {
+              "id": "p7-007-3",
+              "stem": "What is the consequence of not participating in the drill?",
+              "options": [
+                "A fine will be imposed",
+                "A written warning may be issued",
+                "The employee will be sent home",
+                "There is no stated consequence"
+              ],
+              "answer": 1,
+              "explanation": "The notice states: 'Failure to participate in the drill may result in a written warning.'"
+            },
+            {
+              "id": "p7-007-4",
+              "stem": "Where is the designated assembly point?",
+              "options": [
+                "The main lobby",
+                "The south parking lot",
+                "The north parking lot",
+                "The building's rooftop"
+              ],
+              "answer": 2,
+              "explanation": "The notice instructs occupants to 'Gather at the designated assembly point in the north parking lot.'"
+            }
+          ]
+        },
+        {
+          "id": "p7-008",
+          "title": "Article: Industry Trends Report",
+          "text": "The Future of Retail: Key Trends for 2026\n\nBy Emily Watson, Industry Analyst\n\nThe retail industry is undergoing a significant transformation driven by changing consumer behaviors and technological advancements. According to a recent report by Market Research Group, three major trends are shaping the sector this year.\n\nFirst, omnichannel shopping has become the standard rather than the exception. Consumers now expect to seamlessly switch between online browsing and in-store purchasing. Retailers that have integrated their online and offline channels report a 35% increase in customer retention.\n\nSecond, artificial intelligence is revolutionizing inventory management. AI-powered systems can predict demand with up to 95% accuracy, reducing overstock by 40% and preventing stockouts. Major retailers like ShopMart and ValuePlus have already implemented these systems.\n\nThird, sustainability is no longer optional. A survey conducted in January found that 72% of consumers prefer to buy from brands with transparent environmental practices. Retailers are responding by adopting eco-friendly packaging and reducing their carbon footprint.\n\nHowever, challenges remain. Supply chain disruptions continue to affect delivery times, and rising operational costs are putting pressure on profit margins. Industry experts recommend that businesses invest in automation and data analytics to stay competitive.",
+          "items": [
+            {
+              "id": "p7-008-0",
+              "stem": "What is the main topic of this article?",
+              "options": [
+                "The history of the retail industry",
+                "Current trends shaping the retail sector",
+                "A comparison of different retail companies",
+                "The impact of online shopping on small businesses"
+              ],
+              "answer": 1,
+              "explanation": "The article discusses three major trends currently shaping the retail industry: omnichannel shopping, AI in inventory management, and sustainability."
+            },
+            {
+              "id": "p7-008-1",
+              "stem": "According to the article, what benefit have retailers seen from integrating online and offline channels?",
+              "options": [
+                "A 25% reduction in operational costs",
+                "A 35% increase in customer retention",
+                "A 40% improvement in delivery speed",
+                "A 50% growth in new customer acquisition"
+              ],
+              "answer": 1,
+              "explanation": "The article states: 'Retailers that have integrated their online and offline channels report a 35% increase in customer retention.'"
+            },
+            {
+              "id": "p7-008-2",
+              "stem": "What percentage of consumers prefer sustainable brands according to the survey mentioned?",
+              "options": [
+                "40%",
+                "55%",
+                "72%",
+                "95%"
+              ],
+              "answer": 2,
+              "explanation": "The article states: '72% of consumers prefer to buy from brands with transparent environmental practices.'"
+            },
+            {
+              "id": "p7-008-3",
+              "stem": "The word 'seamlessly' in paragraph 2 is closest in meaning to:",
+              "options": [
+                "slowly and carefully",
+                "smoothly and without interruption",
+                "occasionally and irregularly",
+                "separately and independently"
+              ],
+              "answer": 1,
+              "explanation": "'Seamlessly' means smoothly and without interruption, like a seamless transition between different shopping channels."
+            },
+            {
+              "id": "p7-008-4",
+              "stem": "What challenge does the article mention retailers are currently facing?",
+              "options": [
+                "A shortage of qualified employees",
+                "Supply chain disruptions affecting deliveries",
+                "Decreasing demand for retail products",
+                "New government regulations on pricing"
+              ],
+              "answer": 1,
+              "explanation": "The article mentions: 'Supply chain disruptions continue to affect delivery times, and rising operational costs are putting pressure on profit margins.'"
+            }
+          ]
+        },
+        {
+          "id": "p7-009",
+          "title": "Schedule: Employee Training Program",
+          "text": "EMPLOYEE TRAINING PROGRAM - FALL 2026\n\nLocation: Training Center, Building B, Room 201\n\nMonday, October 5\n9:00 AM - 10:30 AM: Orientation and Program Overview\n10:45 AM - 12:00 PM: Workplace Safety Fundamentals\n12:00 PM - 1:00 PM: Lunch Break\n1:00 PM - 3:00 PM: Introduction to Company Software Systems\n3:15 PM - 5:00 PM: Team Building Activities\n\nTuesday, October 6\n8:30 AM - 10:00 AM: Effective Business Communication\n10:15 AM - 12:00 PM: Customer Service Excellence\n12:00 PM - 1:00 PM: Lunch Break\n1:00 PM - 2:30 PM: Time Management Strategies\n2:45 PM - 4:30 PM: Group Project Assignment\n\nWednesday, October 7\n9:00 AM - 11:00 AM: Data Privacy and Security Training\n11:15 AM - 12:30 PM: Diversity and Inclusion Workshop\n12:30 PM - 1:30 PM: Lunch Break\n1:30 PM - 3:00 PM: Project Presentations\n3:15 PM - 4:30 PM: Program Evaluation and Certificates\n\nPlease note that attendance at all sessions is mandatory. Participants must arrive on time, as late arrivals of more than 15 minutes will be marked as absent. Business casual attire is required throughout the program.",
+          "items": [
+            {
+              "id": "p7-009-0",
+              "stem": "What is the total duration of the training program?",
+              "options": [
+                "Two days",
+                "Three days",
+                "Five days",
+                "One week"
+              ],
+              "answer": 1,
+              "explanation": "The program runs from Monday, October 5 through Wednesday, October 7, which is three days."
+            },
+            {
+              "id": "p7-009-1",
+              "stem": "What session is scheduled for Tuesday at 10:15 AM?",
+              "options": [
+                "Effective Business Communication",
+                "Customer Service Excellence",
+                "Time Management Strategies",
+                "Group Project Assignment"
+              ],
+              "answer": 1,
+              "explanation": "The Tuesday schedule shows '10:15 AM - 12:00 PM: Customer Service Excellence'."
+            },
+            {
+              "id": "p7-009-2",
+              "stem": "What happens at 3:15 PM on Wednesday?",
+              "options": [
+                "Project presentations begin",
+                "The program evaluation starts",
+                "A team building activity is held",
+                "The diversity workshop concludes"
+              ],
+              "answer": 1,
+              "explanation": "The Wednesday schedule shows '3:15 PM - 4:30 PM: Program Evaluation and Certificates'."
+            },
+            {
+              "id": "p7-009-3",
+              "stem": "What is the policy regarding late arrivals?",
+              "options": [
+                "Late arrivals must attend a make-up session",
+                "Being more than 15 minutes late counts as absent",
+                "Late arrivals will be asked to leave the session",
+                "There is no specific policy mentioned"
+              ],
+              "answer": 1,
+              "explanation": "The notice states: 'Participants must arrive on time, as late arrivals of more than 15 minutes will be marked as absent.'"
+            },
+            {
+              "id": "p7-009-4",
+              "stem": "What dress code is required for the program?",
+              "options": [
+                "Formal business attire",
+                "Business casual attire",
+                "Casual clothing",
+                "Uniforms provided by the company"
+              ],
+              "answer": 1,
+              "explanation": "The notice states: 'Business casual attire is required throughout the program.'"
+            }
+          ]
+        },
+        {
+          "id": "p7-010",
+          "title": "Email Chain: Vendor Selection",
+          "text": "Email 1\n\nFrom: Robert Chen <rchen@example.com>\nTo: Procurement Team\nDate: June 5, 2026\nSubject: Vendor Proposals for Office Supplies\n\nDear Team,\n\nWe have received proposals from three vendors for our office supply contract. After reviewing the submissions, I recommend that we consider Vendor A and Vendor C for further evaluation.\n\nVendor A offers the most competitive pricing, with a 15% discount on bulk orders. However, their delivery times are slightly longer than the industry average. Vendor C has the fastest delivery times and offers a wider product range, but their prices are 10% higher than Vendor A's.\n\nVendor B's proposal was incomplete and did not meet several of our requirements, so I suggest we eliminate them from consideration.\n\nPlease review the attached comparison sheet and share your thoughts by Friday.\n\nBest,\nRobert\n\n---\n\nEmail 2\n\nFrom: Lisa Park <lpark@example.com>\nTo: Robert Chen <rchen@example.com>\nDate: June 6, 2026\nSubject: Re: Vendor Proposals for Office Supplies\n\nHi Robert,\n\nI have reviewed the comparison sheet. I agree that Vendor B should be eliminated. Between Vendor A and Vendor C, I think we should go with Vendor A. While their delivery times are not the fastest, the cost savings are significant, and we can place orders earlier to account for the longer delivery window.\n\nHowever, I noticed that Vendor C offers eco-friendly product options, which aligns with our company's sustainability goals. Could we ask Vendor A if they can match some of Vendor C's eco-friendly offerings?\n\nLet's discuss this in our meeting next Tuesday.\n\nBest,\nLisa",
+          "items": [
+            {
+              "id": "p7-010-0",
+              "stem": "What is the main purpose of Robert's email?",
+              "options": [
+                "To announce a new office supply contract",
+                "To recommend vendors for further evaluation",
+                "To complain about a vendor's incomplete proposal",
+                "To request approval for a budget increase"
+              ],
+              "answer": 1,
+              "explanation": "Robert recommends considering Vendor A and Vendor C for further evaluation and shares his analysis of each vendor's strengths and weaknesses."
+            },
+            {
+              "id": "p7-010-1",
+              "stem": "What is mentioned as a disadvantage of Vendor A?",
+              "options": [
+                "Their prices are too high",
+                "Their product range is limited",
+                "Their delivery times are longer than average",
+                "Their proposal was incomplete"
+              ],
+              "answer": 2,
+              "explanation": "Robert states: 'their delivery times are slightly longer than the industry average' as a disadvantage of Vendor A."
+            },
+            {
+              "id": "p7-010-2",
+              "stem": "Why was Vendor B eliminated from consideration?",
+              "options": [
+                "Their prices were too high",
+                "Their proposal was incomplete",
+                "They did not respond to the request",
+                "They had poor customer reviews"
+              ],
+              "answer": 1,
+              "explanation": "Robert states: 'Vendor B's proposal was incomplete and did not meet several of our requirements, so I suggest we eliminate them.'"
+            },
+            {
+              "id": "p7-010-3",
+              "stem": "What additional concern does Lisa raise about Vendor A?",
+              "options": [
+                "Their customer service is poor",
+                "They lack eco-friendly product options",
+                "Their contract terms are unfavorable",
+                "They have a minimum order requirement"
+              ],
+              "answer": 1,
+              "explanation": "Lisa notes that Vendor C offers eco-friendly options and suggests asking Vendor A if they can match some of those offerings."
+            },
+            {
+              "id": "p7-010-4",
+              "stem": "What does Lisa suggest doing next?",
+              "options": [
+                "Choosing Vendor C immediately",
+                "Asking Vendor A about eco-friendly options",
+                "Requesting a new proposal from Vendor B",
+                "Looking for additional vendor proposals"
+              ],
+              "answer": 1,
+              "explanation": "Lisa suggests: 'Could we ask Vendor A if they can match some of Vendor C's eco-friendly offerings?'"
+            }
+          ]
+        },
+        {
+          "id": "p7-011",
+          "title": "Advertisement: Business Consulting Services",
+          "text": "Transform Your Business with StratEdge Consulting\n\nIs your business struggling to reach its full potential? StratEdge Consulting has helped over 500 companies across various industries achieve measurable growth and operational excellence.\n\nOur Services:\n\n\u2022 Strategic Planning \u2013 We work with your leadership team to develop a clear, actionable roadmap for growth.\n\u2022 Operational Efficiency \u2013 Our experts analyze your workflows and identify opportunities to reduce costs by up to 30%.\n\u2022 Market Expansion \u2013 We help you identify and enter new markets with confidence, backed by thorough research.\n\u2022 Digital Transformation \u2013 From cloud migration to AI integration, we guide your technology strategy.\n\nClient Success Story:\n'StratEdge helped us increase our revenue by 45% in just 18 months. Their strategic planning process was thorough and practical.'\n- Maria Santos, CEO of GreenLeaf Industries\n\nSchedule a free initial consultation today. Call (555) 0789 or visit www.stratedge.com to book your appointment. Mention code GROWTH20 for a 20% discount on your first project.",
+          "items": [
+            {
+              "id": "p7-011-0",
+              "stem": "What is the main purpose of this text?",
+              "options": [
+                "To announce a partnership between two companies",
+                "To promote a business consulting firm's services",
+                "To provide a case study of a successful company",
+                "To compare different consulting firms in the market"
+              ],
+              "answer": 1,
+              "explanation": "The text is an advertisement for StratEdge Consulting, promoting their services and highlighting their track record."
+            },
+            {
+              "id": "p7-011-1",
+              "stem": "How many companies has StratEdge Consulting helped?",
+              "options": [
+                "Over 100",
+                "Over 300",
+                "Over 500",
+                "Over 1,000"
+              ],
+              "answer": 2,
+              "explanation": "The ad states: 'StratEdge Consulting has helped over 500 companies across various industries.'"
+            },
+            {
+              "id": "p7-011-2",
+              "stem": "According to the advertisement, how much can clients potentially reduce operational costs?",
+              "options": [
+                "By up to 15%",
+                "By up to 20%",
+                "By up to 30%",
+                "By up to 45%"
+              ],
+              "answer": 2,
+              "explanation": "The ad states that operational efficiency services can 'identify opportunities to reduce costs by up to 30%.'"
+            },
+            {
+              "id": "p7-011-3",
+              "stem": "What discount is offered to new clients?",
+              "options": [
+                "10% off the first consultation",
+                "15% off strategic planning services",
+                "20% off the first project",
+                "25% off digital transformation services"
+              ],
+              "answer": 2,
+              "explanation": "The ad states: 'Mention code GROWTH20 for a 20% discount on your first project.'"
+            },
+            {
+              "id": "p7-011-4",
+              "stem": "What result did GreenLeaf Industries achieve with StratEdge's help?",
+              "options": [
+                "A 30% reduction in operational costs",
+                "A 45% increase in revenue",
+                "Successful entry into three new markets",
+                "Complete digital transformation in one year"
+              ],
+              "answer": 1,
+              "explanation": "The client testimonial states: 'StratEdge helped us increase our revenue by 45% in just 18 months.'"
+            }
+          ]
+        },
+        {
+          "id": "p7-012",
+          "title": "Notice: Building Maintenance Schedule",
+          "text": "BUILDING MAINTENANCE NOTICE\n\nTo: All Tenants\nFrom: Building Management\nDate: February 1, 2026\nSubject: Scheduled Maintenance for February\n\nPlease be advised of the following scheduled maintenance activities for the month of February:\n\nElevator Maintenance\nDate: February 8-9 (Saturday and Sunday)\nTime: 8:00 AM - 6:00 PM each day\nDetails: Both elevators will undergo routine inspection and servicing. During this time, elevators will be available one at a time. Some delays are expected, so please allow extra time for travel between floors.\n\nHVAC System Upgrade\nDate: February 15-16 (Saturday and Sunday)\nTime: 7:00 AM - 7:00 PM each day\nDetails: The heating, ventilation, and air conditioning system will be upgraded on the 5th and 6th floors. These floors will experience temporary temperature fluctuations. All other floors will not be affected.\n\nFire Safety Inspection\nDate: February 22 (Saturday)\nTime: 9:00 AM - 12:00 PM\nDetails: The annual fire safety inspection will be conducted. Fire alarms may be tested intermittently during this period. No action is required from tenants.\n\nWe apologize for any inconvenience these activities may cause. For urgent maintenance issues, please contact the building management office at (555) 0111.",
+          "items": [
+            {
+              "id": "p7-012-0",
+              "stem": "What is the main purpose of this notice?",
+              "options": [
+                "To announce a rent increase for the coming month",
+                "To inform tenants about upcoming maintenance work",
+                "To request that tenants report maintenance issues",
+                "To introduce a new building management team"
+              ],
+              "answer": 1,
+              "explanation": "The notice informs tenants about three scheduled maintenance activities for February: elevator maintenance, HVAC upgrade, and fire safety inspection."
+            },
+            {
+              "id": "p7-012-1",
+              "stem": "What should tenants expect during the elevator maintenance?",
+              "options": [
+                "Both elevators will be completely out of service",
+                "Only one elevator will operate at a time",
+                "Elevators will run on a reduced schedule",
+                "The elevators will be replaced with new ones"
+              ],
+              "answer": 1,
+              "explanation": "The notice states: 'During this time, elevators will be available one at a time. Some delays are expected.'"
+            },
+            {
+              "id": "p7-012-2",
+              "stem": "Which floors will be affected by the HVAC system upgrade?",
+              "options": [
+                "The 3rd and 4th floors",
+                "The 5th and 6th floors",
+                "The 7th and 8th floors",
+                "All floors in the building"
+              ],
+              "answer": 1,
+              "explanation": "The notice states: 'The heating, ventilation, and air conditioning system will be upgraded on the 5th and 6th floors.'"
+            },
+            {
+              "id": "p7-012-3",
+              "stem": "What is the duration of the fire safety inspection?",
+              "options": [
+                "Two hours",
+                "Three hours",
+                "Four hours",
+                "The entire day"
+              ],
+              "answer": 1,
+              "explanation": "The notice states the fire safety inspection will take place from '9:00 AM - 12:00 PM,' which is three hours."
+            },
+            {
+              "id": "p7-012-4",
+              "stem": "The word 'intermittently' in the fire safety section is closest in meaning to:",
+              "options": [
+                "continuously without stopping",
+                "occasionally and at irregular intervals",
+                "loudly and clearly audible",
+                "briefly at the beginning only"
+              ],
+              "answer": 1,
+              "explanation": "'Intermittently' means occurring at irregular intervals, not continuously. The fire alarms may sound occasionally during the inspection."
             }
           ]
         }

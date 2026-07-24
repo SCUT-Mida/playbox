@@ -872,10 +872,10 @@ export class AppUI {
         </div>
 
         <div class="bank-card">
-          <div class="bank-card__title">检查更新</div>
-          <p class="bank-update-hint">点击下方按钮，从服务器获取最新题库。有新版本时会自动更新。</p>
+          <div class="bank-card__title">同步题库</div>
+          <p class="bank-update-hint">内置 ${bank.totalQuestions} 道题目，每次自测/考试随机抽题。点击下方按钮可从云端同步最新题库（开发者更新题目后，点此获取）。</p>
           <button class="bank-update-btn" data-act="check-update" type="button">
-            🔄 检查更新
+            🔄 同步最新题库
           </button>
         </div>
 

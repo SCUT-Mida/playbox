@@ -220,8 +220,10 @@ export function research(state, techKey, fid = PLAYER(state)) {
   return { ok: true, msg: `开始研究，预计 ${turns} 回合完成（-${TECH_COST_GOLD} 金）` };
 }
 
-// —— 军事：出征 ——
-export function campaign(state, fromCityId, toCityId, generalId, troops, formation, fid = PLAYER(state), rng) {
+// —— 军事：出征（主帅 + 最多 2 名副将）——
+// deputyIds（可选）：随主帅出征的副将 id 列表，须为己方、在出发城、非主将、非俘虏；超出 2 名取前 2 名。
+// 副将提供攻击加成，并可于单挑时替主帅出阵（见 combat.js）。
+export function campaign(state, fromCityId, toCityId, generalId, troops, formation, fid = PLAYER(state), rng, deputyIds = []) {
   const r = rng || Math.random;
   const from = cityById(state, fromCityId);
   const to = cityById(state, toCityId);
@@ -232,6 +234,17 @@ export function campaign(state, fromCityId, toCityId, generalId, troops, formati
   const g = heroById(state, generalId);
   if (!g || g.factionId !== fid || g.status === 'prisoner' || g.cityId !== fromCityId) {
     return { ok: false, msg: '主将不可用' };
+  }
+  // 副将校验：己方、在出发城、非俘虏、非主将，去重并限 2 名
+  const deputies = [];
+  const seen = new Set([generalId]);
+  for (const id of (Array.isArray(deputyIds) ? deputyIds : [])) {
+    if (deputies.length >= 2) break;
+    if (!id || seen.has(id)) continue;
+    const d = heroById(state, id);
+    if (!d || d.factionId !== fid || d.status === 'prisoner' || d.cityId !== fromCityId) continue;
+    seen.add(id);
+    deputies.push(d);
   }
   troops = Math.max(0, Math.floor(troops));
   if (troops <= 0) return { ok: false, msg: '出兵数量无效' };
@@ -244,7 +257,7 @@ export function campaign(state, fromCityId, toCityId, generalId, troops, formati
 
   from.soldiers -= troops;
 
-  const attacker = { factionId: fid, general: g, soldiers: troops, training: from.training, formation: formation || 'normal' };
+  const attacker = { factionId: fid, general: g, deputies, soldiers: troops, training: from.training, formation: formation || 'normal' };
   const defGeneral = bestDefender(state, toCityId) || { id: '__militia__', name: '守城民兵', stats: { l: 50, w: 50, i: 40, p: 40, c: 40 }, skill: null };
   const defender = {
     factionId: to.ownerFactionId, general: defGeneral, soldiers: to.soldiers,
@@ -255,7 +268,7 @@ export function campaign(state, fromCityId, toCityId, generalId, troops, formati
   runBattle(battle, state, r);
 
   let won = battle.result === 'attacker';
-  applyCampaignResult(state, battle, from, to, g, fid, r);
+  applyCampaignResult(state, battle, from, to, g, fid, r, deputies);
   // 占领后立即判定胜负（不必等到回合结束），让 UI 的 afterAction 即时弹出结算
   if (won) checkGameOver(state);
 
@@ -284,7 +297,7 @@ function nearestFriendlyCity(state, fromCityId, fid) {
 }
 
 // 结算出征结果（占领 / 溃败 / 俘虏）
-function applyCampaignResult(state, battle, from, to, attackerGen, fid, rng) {
+function applyCampaignResult(state, battle, from, to, attackerGen, fid, rng, deputies = []) {
   const won = battle.result === 'attacker';
   const captorFid = won ? fid : to.ownerFactionId;
   const oldOwnerFid = battle.defender ? battle.defender.factionId : null; // 城陷前归属（败方）
@@ -354,6 +367,15 @@ function applyCampaignResult(state, battle, from, to, attackerGen, fid, rng) {
         sh.status = 'free';
         sh.discovered = true; // 名义上原驻此城，可见
       }
+    }
+  }
+
+  // 副将随主帅入驻新占之城（被俘者除外）；失利则副将留驻出发城，无需迁移。
+  if (won && deputies && deputies.length) {
+    for (const d of deputies) {
+      if (d.status === 'prisoner') continue;
+      clearHeroOffices(state, d.id); // 离开发起城，卸除其在出发城可能担任的职官
+      d.cityId = to.id;
     }
   }
 }

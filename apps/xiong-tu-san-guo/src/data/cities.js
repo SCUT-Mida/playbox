@@ -80,6 +80,20 @@ export const CITIES = [
 
 export const CITY_MAP = Object.fromEntries(CITIES.map((c) => [c.id, c]));
 
+// 城池规模分三等：大城(3) / 中城(2) / 小城(1)，依据人口上限（popMax）划分。
+// 用于地图图标大小与 UI 区分——大城为州郡治所、小城为边陲县邑，直观体现体量差异。
+// 阈值与历史设定一致：洛阳/成都/邺/长安/建业/许昌/襄阳为大城，南中诸郡为小城。
+export function cityTier(city) {
+  if (!city) return 2;
+  const p = city.popMax || city.maxPopulation || 0; // 兼容静态数据(popMax)与运行时城市(maxPopulation)
+  if (p >= 85000) return 3; // 大城
+  if (p >= 72000) return 2; // 中城
+  return 1; // 小城
+}
+// tier → CSS 尺寸修饰类名
+export const TIER_CLASS = { 3: 'map-dot--lg', 2: 'map-dot--md', 1: 'map-dot--sm' };
+export const TIER_NAME = { 3: '大城', 2: '中城', 1: '小城' };
+
 // 地图背景的地理标注（viewBox 0 0 1000 760 坐标）：河流与州郡名，
 // 仅作方位参考、提升地图可读性，不参与任何逻辑。
 export const MAP_RIVERS = [

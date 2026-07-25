@@ -114,6 +114,24 @@ ok(document.querySelector('.battle-log') !== null, '战报弹窗渲染');
 document.querySelector('.modal__foot button').click();
 await sleep(3);
 
+// ---------- 6b) 城池图标分级 + 出征主帅/副将 UI ----------
+ui.tab = 'map'; ui.renderContent(); await sleep(3);
+ok(document.querySelectorAll('.map-dot--lg').length > 0, '地图含大城图标（map-dot--lg）');
+ok(document.querySelectorAll('.map-dot--sm').length > 0, '地图含小城图标（map-dot--sm）');
+ok(document.querySelector('.map-dot__battlement') !== null, '城池图标含雉堞造型（非纯圆圈）');
+ok(document.querySelector('.map-dot').style.borderRadius !== '50%', '城池图标为城堡形而非圆形');
+// 打开敌城（许昌，邻接玩家洛阳）→ 出征弹窗含主帅 / 副将
+const xcLabel = Array.from(document.querySelectorAll('.map-label')).find((b) => b.textContent.includes('许昌'));
+const xcDot = xcLabel && xcLabel.previousElementSibling;
+ok(!!xcDot, '找到许昌敌城图标');
+if (xcDot) { xcDot.click(); await sleep(5); }
+const campBtn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent.includes('出征攻打'));
+if (campBtn) { campBtn.click(); await sleep(5); }
+ok(document.querySelector('.dep-list') !== null, '出征弹窗含副将勾选区');
+ok(Array.from(document.querySelectorAll('label')).some((l) => l.textContent.includes('主帅')), '出征弹窗含主帅选择');
+ok(Array.from(document.querySelectorAll('label')).some((l) => l.textContent.includes('副将')), '出征弹窗含副将选择');
+if (document.querySelector('.modal__foot button')) { document.querySelector('.modal__foot button').click(); await sleep(3); }
+
 // ---------- 7) 存档可往返 ----------
 localStorage.setItem('__probe__', '1');
 ok(localStorage.getItem('xtsg_save_v1') != null, '对局已自动存档到 localStorage');

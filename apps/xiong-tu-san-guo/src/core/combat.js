@@ -29,7 +29,26 @@ export function attackValue(force, state) {
   const soldiers = Math.max(0, force.soldiers);
   const forge = techMult(state, force.factionId, 'forge', 0.05);
   const form = FORMATIONS[force.formation] || FORMATIONS.normal;
-  return (war * 0.4 + lead * 0.3 + soldiers * 0.01) * forge * trainingCoeff(force.training) * form.atk;
+  return (war * 0.4 + lead * 0.3 + soldiers * 0.01) * forge * trainingCoeff(force.training) * form.atk * (1 + deputyBonus(force.deputies));
+}
+
+// 副将加成：每名副将按其有效武力 + 统率折算少量攻击加成；
+// 单将上限 +10%、合计上限 +20%——武将众多时主帅偕副将出征更具优势。
+function deputyBonus(deputies) {
+  if (!deputies || !deputies.length) return 0;
+  let b = 0;
+  for (const d of deputies) {
+    if (!d) continue;
+    b += Math.min(0.10, ((effWar(d) + effLead(d)) / 100) * 0.04);
+  }
+  return Math.min(0.20, b);
+}
+
+// 一支部队中武力最高者（主帅 + 副将中择优），单挑时出阵——副将可替主帅迎战。
+function bestWarrior(force) {
+  const cands = [force.general, ...((force && force.deputies) || [])].filter(Boolean);
+  if (!cands.length) return null;
+  return cands.reduce((a, b) => (effWar(a) >= effWar(b) ? a : b));
 }
 
 // 构造战局
@@ -74,17 +93,23 @@ function resolveRound(b, state, rng) {
 }
 
 // 单挑判定（每回合最多一次，触发后决出胜负）
+// 攻方由主帅 + 副将中武力最高者出阵（副将可替战），守方由其主将迎战。
 function tryDuel(b, rng) {
   if (b.duel) return false;
-  const ag = b.attacker.general;
+  const ag = bestWarrior(b.attacker);
   const dg = b.defender.general;
   if (!ag || !dg) return false;
   const diff = Math.abs(effWar(ag) - effWar(dg));
   if (diff <= DUEL_THRESHOLD) return false;
   if (!chance(rng, DUEL_CHANCE)) return false;
   const attackerWins = effWar(ag) > effWar(dg);
-  b.duel = { winner: attackerWins ? 'attacker' : 'defender', loser: attackerWins ? 'defender' : 'attacker' };
-  b.log.push(`⚔️ ${ag.name} 与 ${dg.name} 阵前单挑！${(attackerWins ? ag : dg).name} 武艺更胜一筹，一合斩将，败军溃散！`);
+  b.duel = {
+    winner: attackerWins ? 'attacker' : 'defender',
+    loser: attackerWins ? 'defender' : 'attacker',
+    aDuelist: ag, dDuelist: dg,
+  };
+  const aTag = (b.attacker.deputies && b.attacker.deputies.includes(ag)) ? '（副将）' : '';
+  b.log.push(`⚔️ ${ag.name}${aTag} 与 ${dg.name} 阵前单挑！${(attackerWins ? ag : dg).name} 武艺更胜一筹，一合斩将，败军溃散！`);
   return true;
 }
 
@@ -96,14 +121,14 @@ export function runBattle(b, state, rng) {
 
     // 单挑（前置，可一击定胜负）
     if (tryDuel(b, rng)) {
-      const loserSide = b.duel.loser;
-      const winnerSide = b.duel.winner;
-      const loserGen = b[loserSide].general;
-      b[loserSide].soldiers = Math.round(b[loserSide].soldiers * (1 - DUEL_ROUT_RATIO));
+      const { winner, loser, aDuelist, dDuelist } = b.duel;
+      const loserDuelist = loser === 'attacker' ? aDuelist : dDuelist;
+      const winnerDuelist = winner === 'attacker' ? aDuelist : dDuelist;
+      b[loser].soldiers = Math.round(b[loser].soldiers * (1 - DUEL_ROUT_RATIO));
       // 君主不可被俘（仅败走），避免势力因失主而僵死
-      b.prisoner = loserGen && !isLord(loserGen) ? loserGen.id : null;
-      b.result = winnerSide;
-      b.log.push(`${b[winnerSide].general.name} 赢下单挑，${loserGen.name}${b.prisoner ? ' 被俘' : ' 败走'}，敌军溃败！`);
+      b.prisoner = loserDuelist && !isLord(loserDuelist) && loserDuelist.id !== '__militia__' ? loserDuelist.id : null;
+      b.result = winner;
+      b.log.push(`${winnerDuelist.name} 赢下单挑，${loserDuelist.name}${b.prisoner ? ' 被俘' : ' 败走'}，敌军溃败！`);
       break;
     }
 

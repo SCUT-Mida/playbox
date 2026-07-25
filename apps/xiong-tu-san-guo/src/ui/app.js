@@ -11,7 +11,7 @@ import {
   TRAINING_MAX, FACTION_COLORS, NEUTRAL_COLOR, seasonOf, clamp,
   CITY_OFFICES, cmdCostOf,
 } from '../config.js';
-import { CITIES, CITY_MAP, MAP_RIVERS, MAP_REGIONS, CAPITAL_IDS } from '../data/cities.js';
+import { CITIES, CITY_MAP, MAP_RIVERS, MAP_REGIONS, CAPITAL_IDS, cityTier, TIER_CLASS, TIER_NAME } from '../data/cities.js';
 import { HEROES, HERO_MAP, FACTION_SEEDS } from '../data/heroes.js';
 import { newGame, resolveTurn, cityById, heroById, factionById, playerFaction,
   neighbors, heroesOfFaction, heroesInCity, wildHeroesInCity, prisonersOfFaction,
@@ -42,7 +42,8 @@ function fmtTroops(n) {
 }
 
 // 共享地图画布：SVG 河流 / 州郡名作背景，城市点为绝对定位按钮。
-// nodes: [{ id, name, x, y, color, isPlayer, isCapital, badge, isSel, dimmed }]
+// 城市点为「城堡」造型：城体（按规模大/中/小分级）+ 顶部雉堞 + 旧都👑，不再千篇一律圆圈。
+// nodes: [{ id, name, x, y, color, tier, isPlayer, isCapital, badge, isSel, dimmed }]
 // onPick(cityId) 点击城市回调。返回 .map-wrap 元素。
 function buildMapCanvas(nodes, onPick) {
   const wrap = h('div', { class: 'map-wrap' });
@@ -82,14 +83,18 @@ function buildMapCanvas(nodes, onPick) {
   }
   wrap.appendChild(svg);
 
-  // 城市点
+  // 城市点（城堡图标，规模分级）
   for (const n of nodes) {
     const center = n.badge != null ? n.badge : n.name.slice(0, 1);
+    const tier = n.tier || 2;
+    const color = n.color || NEUTRAL_COLOR;
     const dot = h('button', {
-      class: `map-dot${n.isPlayer ? ' map-dot--player' : ''}${n.isSel ? ' map-dot--selected' : ''}${n.dimmed ? ' map-dot--dim' : ''}${n.isCapital ? ' map-dot--capital' : ''}`,
-      style: { left: `${(n.x / 1000) * 100}%`, top: `${(n.y / 760) * 100}%`, background: n.color || NEUTRAL_COLOR },
+      class: `map-dot ${TIER_CLASS[tier] || TIER_CLASS[2]}${n.isPlayer ? ' map-dot--player' : ''}${n.isSel ? ' map-dot--selected' : ''}${n.dimmed ? ' map-dot--dim' : ''}${n.isCapital ? ' map-dot--capital' : ''}`,
+      style: { left: `${(n.x / 1000) * 100}%`, top: `${(n.y / 760) * 100}%`, background: color },
+      title: `${n.name}（${TIER_NAME[tier]}）`,
       onClick: () => onPick && onPick(n.id),
-    }, n.isCapital ? h('span', { class: 'map-dot__crown' }, '👑') : null,
+    }, h('span', { class: 'map-dot__battlement', style: { background: color } }),
+      n.isCapital ? h('span', { class: 'map-dot__crown' }, '👑') : null,
       h('span', { class: `map-dot__txt${n.badge != null ? ' map-dot__txt--badge' : ''}` }, center));
     wrap.appendChild(dot);
     wrap.appendChild(h('span', { class: 'map-label', style: { left: `${(n.x / 1000) * 100}%`, top: `${(n.y / 760) * 100}%` } }, n.name));
@@ -230,6 +235,7 @@ export class GameUI {
     const pickNodes = CITIES.map((c) => ({
       id: c.id, name: c.name, x: c.x, y: c.y, adjacent: c.adjacent,
       color: CAPITAL_COLOR[c.id] || NEUTRAL_COLOR,
+      tier: cityTier(c),
       isCapital: !!SEED_BY_CAPITAL[c.id],
       isSel: this.startCityPick === c.id,
       dimmed: !!this.startCityPick && this.startCityPick !== c.id,
@@ -276,6 +282,7 @@ export class GameUI {
         h('span', { class: 'hero-card__sub' }, `${c.trait.name} · ${c.trait.desc}`),
       ),
       h('div', { class: 'panel__rows' },
+        r('规模', `${TIER_NAME[cityTier(c)]}（人口上限 ${c.popMax.toLocaleString()}）`),
         r('人口', `${c.pop0.toLocaleString()} / ${c.popMax.toLocaleString()}`),
         r('驻军', c.soldiers0.toLocaleString()),
         r('城防', c.defense0.toLocaleString()),
@@ -373,6 +380,7 @@ export class GameUI {
       return {
         id: c.id, name: c.name, x: c.x, y: c.y, adjacent: c.adjacent,
         color: fac ? fac.color : NEUTRAL_COLOR,
+        tier: cityTier(c),
         isPlayer, isCapital: CAPITAL_IDS.includes(c.id),
         isSel: this.selectedCityId === c.id,
         badge: c.ownerFactionId != null ? fmtTroops(c.soldiers) : null,
@@ -384,10 +392,12 @@ export class GameUI {
       h('span', null, h('i', { class: 'lg lg--neutral' }), '空城'),
       h('span', null, h('i', { class: 'lg lg--foe' }), '诸侯'),
       h('span', null, '👑', '旧都'),
+      h('span', null, h('i', { class: 'lg lg--lg' }), '大城'),
+      h('span', null, h('i', { class: 'lg lg--sm' }), '小城'),
     );
     this.content.appendChild(h('div', null,
       h('h3', null, '九州形势图'),
-      h('p', { class: 'hint' }, '点击城市查看详情与指令。金边为己方，灰点为空城，他色为诸侯；👑为诸侯旧都，据之可收其旧部。'),
+      h('p', { class: 'hint' }, '点击城市查看详情。城池图标按规模分大/中/小三等（大城图标更大）；金边为己方、灰色为空城、他色为诸侯，👑为诸侯旧都。'),
       wrap,
       legend,
     ));
@@ -422,6 +432,7 @@ export class GameUI {
     const r = (k, v) => h('div', null, h('span', { class: 'muted' }, k), ' ', v);
     return h('div', { class: 'panel__rows' },
       r('归属', c.ownerFactionId != null ? (factionById(s, c.ownerFactionId)?.name || '—') : '空城'),
+      r('规模', `${TIER_NAME[cityTier(c)]}（人口上限 ${c.maxPopulation.toLocaleString()}）`),
       r('人口', `${Math.round(c.population)} / ${c.maxPopulation}`),
       r('士兵', Math.round(c.soldiers)),
       r('城防', `${Math.round(c.defense)}`),
@@ -593,7 +604,7 @@ export class GameUI {
     }, '输送');
   }
 
-  // —— 出征 ——
+  // —— 出征（主帅 + 副将）——
   uiCampaign(target) {
     const s = this.state;
     // 可出发的己方邻城
@@ -603,29 +614,51 @@ export class GameUI {
     const formSel = h('select', null, Object.entries(FORMATIONS).map(([k, f]) => h('option', { value: k }, `${f.name}（${f.desc}）`)));
     const genSel = h('select');
     const troopsIn = h('input', { type: 'number', value: 1000, min: 100, step: 100, style: { width: '5rem' } });
+    // 副将勾选区：随出发城 / 主将变化而刷新；最多 2 名。
+    const depWrap = h('div', { class: 'dep-list' });
+    const renderDeputies = (srcId, mainId) => {
+      clear(depWrap);
+      const gens = heroesInCity(s, srcId, s.playerFactionId).filter((g2) => g2.id !== mainId);
+      if (!gens.length) { depWrap.appendChild(h('span', { class: 'muted' }, '城中无其他武将可任副将')); return; }
+      for (const g2 of gens) {
+        const cb = h('input', { type: 'checkbox', value: g2.id });
+        cb.addEventListener('change', () => {
+          const boxes = Array.from(depWrap.querySelectorAll('input[type=checkbox]'));
+          const checked = boxes.filter((c2) => c2.checked).length;
+          boxes.forEach((c2) => { c2.disabled = false; });
+          if (checked >= 2) boxes.filter((c2) => !c2.checked).forEach((c2) => { c2.disabled = true; });
+        });
+        depWrap.appendChild(h('label', { class: 'dep-item' }, cb,
+          h('span', null, `${g2.name}（武${g2.stats.w}·统${g2.stats.l}）`)));
+      }
+    };
     const refreshGenerals = () => {
       const src = cityById(s, srcSel.value);
       const gens = heroesInCity(s, src.id, s.playerFactionId);
       clear(genSel);
-      if (!gens.length) { genSel.appendChild(h('option', null, '无可用武将')); return; }
+      if (!gens.length) { genSel.appendChild(h('option', null, '无可用武将')); renderDeputies(src.id, null); return; }
       for (const g of gens) genSel.appendChild(h('option', { value: g.id }, `${g.name}（统${g.stats.l} · 上限${troopCap(s, g)}）`));
       const g = gens[0];
       troopsIn.max = Math.min(src.soldiers, troopCap(s, g));
       troopsIn.value = Math.min(parseInt(troopsIn.value, 10) || 1000, parseInt(troopsIn.max, 10));
+      renderDeputies(src.id, genSel.value);
     };
     srcSel.addEventListener('change', refreshGenerals);
+    genSel.addEventListener('change', () => renderDeputies(srcSel.value, genSel.value));
     const body = h('div', null,
       h('p', { class: 'hint' }, `攻打 ${target.name}（守军 ${Math.round(target.soldiers)} · 城防 ${Math.round(target.defense)}）`),
       h('div', { class: 'create__field' }, h('label', null, '出发城市'), srcSel),
-      h('div', { class: 'create__field' }, h('label', null, '主将'), genSel),
+      h('div', { class: 'create__field' }, h('label', null, '主帅'), genSel),
+      h('div', { class: 'create__field' }, h('label', null, '副将（最多 2 名 · 提升攻击、可替战）'), depWrap),
       h('div', { class: 'create__field' }, h('label', null, '出兵数量（按路程耗粮）'), troopsIn),
       h('div', { class: 'create__field' }, h('label', null, '阵型'), formSel),
     );
     this.openForm('出征', body, () => {
       const src = cityById(s, srcSel.value);
       const g = heroById(s, genSel.value);
-      if (!g) { this.toast('请选择主将'); return; }
-      const r = A.campaign(s, src.id, target.id, g.id, parseInt(troopsIn.value, 10) || 0, formSel.value);
+      if (!g) { this.toast('请选择主帅'); return; }
+      const deputyIds = Array.from(depWrap.querySelectorAll('input[type=checkbox]:checked')).map((c2) => c2.value);
+      const r = A.campaign(s, src.id, target.id, g.id, parseInt(troopsIn.value, 10) || 0, formSel.value, s.playerFactionId, Math.random, deputyIds);
       this.closeModal();
       if (r.battle) this.showBattleReport(r.battle, r.won, r.msg);
       else this.toast(r.msg);
@@ -653,10 +686,16 @@ export class GameUI {
 
   showBattleReport(battle, won, titleMsg) {
     const a = battle.attacker; const d = battle.defender;
+    const aDeputies = a.deputies && a.deputies.length;
     const body = h('div', null,
       h('div', { class: 'force-vs' },
-        h('div', { class: 'force-vs__side' }, h('b', null, a.general.name), h('div', { class: 'muted' }, `攻方 · ${Math.round(a.soldiers)} 兵`)),
-        h('div', { class: 'force-vs__side' }, h('b', null, d.general.name), h('div', { class: 'muted' }, `守方 · ${Math.round(d.soldiers)} 兵 · 城${Math.round(d.defense)}`)),
+        h('div', { class: 'force-vs__side' },
+          h('b', null, a.general.name),
+          h('div', { class: 'muted' }, `主帅 · 攻方 · ${Math.round(a.soldiers)} 兵`),
+          aDeputies ? h('div', { class: 'muted' }, `副将：${a.deputies.map((x) => x.name).join('、')}`) : null),
+        h('div', { class: 'force-vs__side' },
+          h('b', null, d.general.name),
+          h('div', { class: 'muted' }, `守方 · ${Math.round(d.soldiers)} 兵 · 城${Math.round(d.defense)}`)),
       ),
       h('div', { class: 'battle-log' }, battle.log.map((l) => h('p', null, l))),
       h('p', { class: won ? 'center' : 'center muted', style: { color: won ? 'var(--good)' : 'var(--bad)', fontWeight: 700 } }, won ? '⚔ 大胜！城池归我！' : '⚔ 兵败而归。'),

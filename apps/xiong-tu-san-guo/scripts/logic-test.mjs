@@ -1,6 +1,6 @@
 // 纯逻辑自测（不依赖浏览器/DOM）。运行：npm test
-import { CITIES, CITY_MAP, adjacencyValid } from '../src/data/cities.js';
-import { HEROES, FACTION_SEEDS, makeGenericGeneral } from '../src/data/heroes.js';
+import { CITIES, CITY_MAP, adjacencyValid, cityTier } from '../src/data/cities.js';
+import { HEROES, FACTION_SEEDS, makeGenericGeneral, makeWildGeneral } from '../src/data/heroes.js';
 import { makeRng } from '../src/core/rng.js';
 import { parseSkill, techMult } from '../src/core/tech.js';
 import { cityGoldIncome, cityGrainIncome, factionGoldIncome, factionGrainNet, cityDefenseValue, governorEconMult, generalDefMult } from '../src/core/economy.js';
@@ -272,6 +272,58 @@ const before3 = cmdRemaining(se, 0);
 const exp3 = A.explore(se, 'luoyang', 0, makeRng(7));
 ok(exp3.ok && exp3.noCost === true && exp3.discovered.length === 0, '无在野名将时探索不耗指令');
 eq(cmdRemaining(se, 0), before3, '无在野时指令不变');
+
+console.log('—— 城池规模分级 ——');
+eq(cityTier(CITY_MAP.luoyang), 3, '洛阳为大城（tier 3）');
+eq(cityTier(CITY_MAP.chengdu), 3, '成都为大城（tier 3）');
+eq(cityTier(CITY_MAP.jiangling), 2, '江陵为中城（tier 2）');
+eq(cityTier(CITY_MAP.wuwei), 1, '武威为小城（tier 1）');
+eq(cityTier(CITY_MAP.jianning), 1, '建宁为小城（tier 1）');
+const t3 = CITIES.filter((c) => cityTier(c) === 3).length;
+ok(t3 >= 5 && t3 <= 9, `大城数量合理 (实际 ${t3})`);
+
+console.log('—— 在野随机人物 ——');
+eq(makeWildGeneral(makeRng(2), 5).id, 'genwild_5', 'makeWildGeneral id 唯一可控');
+ok(HEROES.every((h) => !h.generic), '静态名将表不含随机人物（随机人物运行时生成）');
+const sw = newGame({ lordName: '群雄', startCity: 'luoyang', stats, rng: makeRng(41) });
+const genericWilds = sw.heroes.filter((h) => h.generic && h.wild);
+ok(genericWilds.length >= 18, `各城散布随机在野人物 (实际 ${genericWilds.length})`);
+// 每座城至少 1 名在野（名将 + 随机）
+let citiesWithWild = 0;
+for (const c of sw.cities) if (sw.heroes.some((h) => h.wild && h.cityId === c.id)) citiesWithWild++;
+eq(citiesWithWild, 18, '每座城至少有 1 名在野人物');
+ok(genericWilds.filter((g) => g.cityId !== sw.heroes.find((h) => h.isPlayerLord).cityId).every((g) => g.discovered === false), '非起兵之城的随机在野人物初始未发现（需探索）');
+ok(genericWilds.every((g) => g.stats && Number.isFinite(g.stats.w)), '随机在野人物具备随机属性');
+// 探索可发现随机人物（与名将同流程）
+const genericInLy = genericWilds.find((g) => g.cityId === 'luoyang');
+if (genericInLy) {
+  genericInLy.discovered = false;
+  const expW = A.explore(sw, 'luoyang', 0, makeRng(8));
+  ok(expW.ok, '探索可发现随机在野人物');
+}
+
+console.log('—— 主帅 + 副将 ——');
+// 副将攻击加成：相同主帅 / 兵力，带副将者攻击值更高
+const baseForce = { general: { stats: { l: 80, w: 80, i: 50, p: 50, c: 50 }, skill: null }, soldiers: 1000, training: 50, formation: 'normal', factionId: 0 };
+const depForce = { ...baseForce, deputies: [{ stats: { l: 90, w: 90, i: 50, p: 50, c: 50 }, skill: null }, { stats: { l: 70, w: 70, i: 50, p: 50, c: 50 }, skill: null }] };
+ok(attackValue(depForce, s) > attackValue(baseForce, s), '副将提升部队攻击值');
+// 出征偕副将：胜利后副将随主帅入驻新城；非法 / 重复 id 被过滤
+const sd = newGame({ lordName: '主帅', startCity: 'luoyang', stats, rng: makeRng(51) });
+function injectDeputy(st, idx, st2) { const g = makeGenericGeneral(makeRng(idx), 8000 + idx); g.factionId = 0; g.status = 'free'; g.cityId = 'luoyang'; g.stats = st2; st.heroes.push(g); return g; }
+const depA = injectDeputy(sd, 11, { l: 80, w: 90, i: 50, p: 50, c: 50 });
+const depB = injectDeputy(sd, 12, { l: 70, w: 70, i: 50, p: 50, c: 50 });
+const wanD = cityById(sd, 'wan');
+wanD.ownerFactionId = null; wanD.soldiers = 100; wanD.defense = 50;
+cityById(sd, 'luoyang').soldiers = 5000;
+const lordD = sd.heroes.find((h) => h.isPlayerLord);
+// 含 1 个非法 id（不存在）+ 1 个重复，应被安全过滤
+const campD = A.campaign(sd, 'luoyang', 'wan', lordD.id, 3000, 'assault', 0, makeRng(9), [depA.id, depB.id, '不存在的id', depA.id]);
+ok(campD.ok && campD.battle, '主帅+副将出征执行成功');
+ok(campD.battle.attacker.deputies.length === 2, `出战副将数为 2（实际 ${campD.battle.attacker.deputies.length}）`);
+if (campD.won) {
+  ok(depA.cityId === 'wan' || depA.status === 'prisoner', '副将 A 胜利后入驻新城或被俘');
+  ok(depB.cityId === 'wan' || depB.status === 'prisoner', '副将 B 胜利后入驻新城或被俘');
+}
 
 console.log(`\n结果：${pass} 通过，${fail} 失败`);
 process.exit(fail ? 1 : 0);

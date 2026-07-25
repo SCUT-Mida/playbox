@@ -149,3 +149,30 @@ export function makeGenericGeneral(rng, index) {
     skill: null,
   };
 }
+
+// 在野「乡野人物」可携带的小技能池（弱化版，体现「随机人物」偶有奇才的惊喜感）
+const GENERIC_WILD_SKILLS = [
+  { name: '骁勇', effect: 'war:0.06' },
+  { name: '善守', effect: 'def:0.08' },
+  { name: '练兵', effect: 'train:0.10' },
+  { name: '勤政', effect: 'p_grow:0.06' },
+  { name: '机敏', effect: 'trick:0.06' },
+  { name: '善御', effect: 'cap:0.06' },
+];
+// 生成在野随机人物：能力波动更大（既可能平庸，也可能藏龙卧虎），约三成携带一项弱技能。
+// 用于开局散布各城，与名将并列，增加探索与登用的可玩度。
+export function makeWildGeneral(rng, index) {
+  const r = rng || Math.random;
+  const name = GENERIC_SURNAMES[Math.floor(r() * GENERIC_SURNAMES.length)]
+    + GENERIC_GIVENS[Math.floor(r() * GENERIC_GIVENS.length)];
+  const ri = (lo, hi) => Math.floor(lo + r() * (hi - lo));
+  const skill = r() < 0.3 ? GENERIC_WILD_SKILLS[Math.floor(r() * GENERIC_WILD_SKILLS.length)] : null;
+  return {
+    id: `genwild_${index}`,
+    name,
+    generic: true,
+    loyalty: ri(45, 80),
+    stats: { l: ri(38, 90), w: ri(38, 92), i: ri(32, 88), p: ri(32, 84), c: ri(35, 86) },
+    skill: skill ? { ...skill } : null,
+  };
+}

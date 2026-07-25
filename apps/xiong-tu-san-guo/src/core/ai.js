@@ -79,7 +79,13 @@ export function aiTurn(state, fid, rng) {
           const foePow = n.soldiers + (n.defense || 0) * 0.5;
           if (myPow > foePow * 1.5 && c.soldiers > 800) {
             const troops = Math.min(c.soldiers - 200, Math.floor(c.soldiers * 0.7));
-            const res = A.campaign(state, c.id, n.id, attacker.id, troops, 'assault', fid, r);
+            // 武将众多时主帅偕副将出征（择城中武力 / 统率较高者最多 2 名）
+            const deputies = heroesOfFaction(state, fid)
+              .filter((h) => h.cityId === c.id && h.status === 'free' && h.id !== attacker.id)
+              .sort((x, y) => ((y.stats.w || 0) + (y.stats.l || 0)) - ((x.stats.w || 0) + (x.stats.l || 0)))
+              .slice(0, 2)
+              .map((h) => h.id);
+            const res = A.campaign(state, c.id, n.id, attacker.id, troops, 'assault', fid, r, deputies);
             if (res.ok) {
               state.turnLog.push(`⚔️ ${state.factions.find((f) => f.id === fid).name} 出兵攻打 ${n.name}${res.won ? '并攻陷之' : '，未能攻克'}。`);
               acted = true;

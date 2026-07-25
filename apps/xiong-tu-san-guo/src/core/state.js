@@ -5,7 +5,7 @@
 import {
   CITIES, CITY_MAP,
 } from '../data/cities.js';
-import { HEROES, HERO_MAP, FACTION_SEEDS, makeGenericGeneral } from '../data/heroes.js';
+import { HEROES, HERO_MAP, FACTION_SEEDS, makeGenericGeneral, makeWildGeneral } from '../data/heroes.js';
 import {
   GAME_VERSION, CMD_BASE, CMD_PER_CITY, TRAINING_BASE,
   FACTION_COLORS, PLAYER_COLOR, GRAIN_UPKEEP_PER_SOLDIER, TECH_COST_TURNS, TECH_MAX_LEVEL,
@@ -231,6 +231,23 @@ export function newGame({ lordName, startCity, stats, rng } = {}) {
       g.factionId = f;
       g.cityId = seed.capital;
       g.status = 'free';
+      state.heroes.push(g);
+    }
+  }
+
+  // —— 在野随机人物：每座城散布 1 名（约三成概率再多 1 名）能力随机的乡野豪杰 ——
+  // 与名将并列于在野池，可探索 / 登用，弥补「在野只有名将」的单调，提升可玩度。
+  let wildIdx = 0;
+  for (const c of state.cities) {
+    const n = 1 + (chance(r, 0.3) ? 1 : 0);
+    for (let i = 0; i < n; i++) {
+      const g = makeWildGeneral(r, ++wildIdx);
+      g.id = `genwild_${c.id}_${i}`; // 城内唯一
+      g.wild = true;
+      g.factionId = null;
+      g.cityId = c.id;
+      g.status = 'free';
+      g.discovered = false;
       state.heroes.push(g);
     }
   }

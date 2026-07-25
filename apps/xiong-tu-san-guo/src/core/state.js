@@ -9,6 +9,7 @@ import { HEROES, HERO_MAP, FACTION_SEEDS, makeGenericGeneral } from '../data/her
 import {
   GAME_VERSION, CMD_BASE, CMD_PER_CITY, TRAINING_BASE,
   FACTION_COLORS, PLAYER_COLOR, GRAIN_UPKEEP_PER_SOLDIER, TECH_COST_TURNS, TECH_MAX_LEVEL,
+  CITY_OFFICES, officeField,
 } from '../config.js';
 import { skillBonus, techMult, ensureTechLevels } from './tech.js';
 import { chance } from './rng.js';
@@ -29,6 +30,25 @@ export const neighbors = (state, cityId) => {
 export const heroesOfFaction = (state, fid) => state.heroes.filter((h) => h.factionId === fid && h.status !== 'prisoner');
 export const prisonersOfFaction = (state, fid) => state.heroes.filter((h) => h.prisonerOf === fid);
 export const lordOf = (state, fid) => state.heroes.find((h) => h.factionId === fid && (h.isPlayerLord || h.lord));
+
+// —— 城市职官 ——
+// 取某城某职官在任武将（不在任 / 不在本城 / 被俘 均视为空）。
+export function officeHolder(state, city, key) {
+  if (!city) return null;
+  const id = city[officeField(key)];
+  if (!id) return null;
+  const h = heroById(state, id);
+  if (!h || h.status === 'prisoner' || h.cityId !== city.id) return null;
+  return h;
+}
+// 卸除某武将的一切职官（调遣 / 被俘 / 城陷时调用，杜绝悬挂引用）。
+export function clearHeroOffices(state, heroId) {
+  for (const c of state.cities) {
+    for (const o of CITY_OFFICES) {
+      if (c[o.field] === heroId) c[o.field] = null;
+    }
+  }
+}
 
 // 一座城市内的己方在岗武将（free / deployed，排除俘虏、在野）
 export function heroesInCity(state, cityId, fid) {
@@ -120,7 +140,8 @@ export function newGame({ lordName, startCity, stats, rng } = {}) {
       soldiers: c.soldiers0, defenseBase: c.defense0, defense: c.defense0,
       gold: c.gold0, grain: c.grain0, // 城库（攻陷时被缴获）
       farmLevel: 1, marketLevel: 1, wallLevel: 1,
-      governorHeroId: null, adjacent: c.adjacent.slice(),
+      governorHeroId: null, generalHeroId: null, strategistHeroId: null,
+      adjacent: c.adjacent.slice(),
       training: TRAINING_BASE,
     });
   }

@@ -80,6 +80,27 @@ export const CITIES = [
 
 export const CITY_MAP = Object.fromEntries(CITIES.map((c) => [c.id, c]));
 
+// 地图背景的地理标注（viewBox 0 0 1000 760 坐标）：河流与州郡名，
+// 仅作方位参考、提升地图可读性，不参与任何逻辑。
+export const MAP_RIVERS = [
+  { name: '黄河', d: 'M 60 250 C 220 205, 360 260, 500 220 S 760 175, 950 205' },
+  { name: '长江', d: 'M 80 615 C 240 575, 400 625, 560 588 S 800 555, 960 590' },
+];
+export const MAP_REGIONS = [
+  { name: '关西', x: 175, y: 345 },
+  { name: '河北', x: 645, y: 195 },
+  { name: '中原', x: 560, y: 405 },
+  { name: '江东', x: 835, y: 470 },
+  { name: '荆楚', x: 515, y: 565 },
+  { name: '益州', x: 270, y: 525 },
+  { name: '南中', x: 360, y: 650 },
+];
+
+// 八路诸侯旧都（玩家占据时其旧部转为在野）。派生自 FACTION_SEEDS，集中导出便于 UI 标注。
+export const CAPITAL_IDS = [
+  'xuchang', 'ye', 'jianye', 'changan', 'jiangling', 'wuwei', 'chengdu', 'beiping',
+];
+
 // 邻接关系自检：确保双向一致（开发期辅助，构建期不抛错）
 export function adjacencyValid() {
   for (const c of CITIES) {

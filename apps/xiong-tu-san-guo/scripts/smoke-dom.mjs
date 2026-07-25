@@ -45,7 +45,13 @@ ok(document.querySelector('.launcher__menu button') !== null, '启动器有「�
 ui.showCreate();
 await sleep(5);
 ok(document.querySelector('.create') !== null, '进入创角页');
-ok(document.querySelectorAll('.city-pick__item').length === 18, '可选 18 座城市');
+ok(document.querySelectorAll('.create .map-dot').length === 18, '创角地图可选 18 座城市');
+// 点选地图上的洛阳，应出现城市详情面板
+const createLuoyang = Array.from(document.querySelectorAll('.create .map-dot'))[0];
+createLuoyang.click();
+await sleep(5);
+ok(document.querySelector('.city-detail') !== null, '点选起兵之城后展示详情面板');
+ui.startCityPick = 'luoyang';
 const nameInput = document.querySelector('.create input[type=text]');
 nameInput.value = '玄德';
 nameInput.dispatchEvent(new window.Event('input'));
@@ -69,11 +75,15 @@ for (const [tab, sel] of Object.entries(tabSignatures)) {
 
 // ---------- 4) 城务：打开己方城市并执行内政 ----------
 ui.tab = 'map'; ui.renderContent(); await sleep(3);
-const luoyangDot = Array.from(document.querySelectorAll('.map-dot')).find((b) => b.textContent.includes('洛阳'));
-ok(!!luoyangDot, '找到洛阳城市点');
+// 城市名在 .map-label 上；其前一个兄弟即对应城市点
+const lyLabel = Array.from(document.querySelectorAll('.map-label')).find((b) => b.textContent.includes('洛阳'));
+const luoyangDot = lyLabel && lyLabel.previousElementSibling;
+ok(!!luoyangDot && luoyangDot.classList.contains('map-dot'), '找到洛阳城市点');
 luoyangDot.click();
 await sleep(5);
 ok(document.querySelector('.modal') !== null, '点击城市弹出城务弹窗');
+ok(document.querySelector('.offices') !== null, '城务弹窗含职官面板（太守/将军/军师）');
+ok(document.querySelectorAll('.cmd-cost').length > 0, '指令按钮标注消耗（令1/免费）');
 const farmBtn = Array.from(document.querySelectorAll('.cmd-btn')).find((b) => b.textContent.includes('农田'));
 ok(!!farmBtn, '城务含「开发农田」指令');
 farmBtn.click();

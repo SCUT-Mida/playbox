@@ -21,16 +21,39 @@ function traitMult(city, type) {
   return city.trait && city.trait.type === type ? 1 + city.trait.value : 1;
 }
 
+// 取本城某职官武将（须在城、非俘虏），用于结算职官加成。
+// 此处不 import state.js（避免与 state↔economy 循环依赖），就地查表。
+function officeHero(state, city, field) {
+  const id = city && city[field];
+  if (!id || !state || !state.heroes) return null;
+  const h = state.heroes.find((x) => x.id === id);
+  if (!h || h.status === 'prisoner' || h.cityId !== city.id) return null;
+  return h;
+}
+
+// 太守政治对经济收益的加成：政治 50 为基准，每点约 +0.25%，满 100 约 +12.5%。
+export function governorEconMult(state, city) {
+  const gov = officeHero(state, city, 'governorHeroId');
+  if (!gov) return 1;
+  return 1 + Math.max(0, (gov.stats.p || 50) - 50) / 400;
+}
+// 将军统率对城防的加成：统率 50 为基准，满 100 约 +12.5%。
+export function generalDefMult(state, city) {
+  const gen = officeHero(state, city, 'generalHeroId');
+  if (!gen) return 1;
+  return 1 + Math.max(0, (gen.stats.l || 50) - 50) / 400;
+}
+
 // 商业收入（每回合，单城）
 export function cityGoldIncome(state, city) {
   const base = city.marketLevel * GOLD_PER_MARKET + city.population * GOLD_PER_POP;
-  return base * traitMult(city, 'commerce') * techMult(state, city.ownerFactionId, 'commerce', 0.1);
+  return base * traitMult(city, 'commerce') * techMult(state, city.ownerFactionId, 'commerce', 0.1) * governorEconMult(state, city);
 }
 
 // 粮食产量（每回合，单城）
 export function cityGrainIncome(state, city) {
   const base = city.farmLevel * GRAIN_PER_FARM;
-  return base * traitMult(city, 'grain') * techMult(state, city.ownerFactionId, 'agri', 0.1);
+  return base * traitMult(city, 'grain') * techMult(state, city.ownerFactionId, 'agri', 0.1) * governorEconMult(state, city);
 }
 
 // 势力每回合金钱总收入（含特性 / 科技）
@@ -52,11 +75,11 @@ export function factionGrainNet(state, factionId) {
   return { prod, upkeep, net: prod - upkeep };
 }
 
-// 城防值（基础 × 城防特性 × 筑城科技 × 城墙等级加成）
+// 城防值（基础 × 城防特性 × 筑城科技 × 城墙等级加成 × 将军统率加成）
 export function cityDefenseValue(state, city) {
   const base = city.defenseBase || 0;
   const wallBoost = 1 + (city.wallLevel - 1) * 0.15;
-  return base * traitMult(city, 'defense') * techMult(state, city.ownerFactionId, 'wall', 0.2) * wallBoost;
+  return base * traitMult(city, 'defense') * techMult(state, city.ownerFactionId, 'wall', 0.2) * wallBoost * generalDefMult(state, city);
 }
 
 // 单城人口增长（依赖太守或君主政治）

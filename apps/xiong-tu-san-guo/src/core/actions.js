@@ -178,7 +178,8 @@ export function appointGovernor(state, cityId, heroId, fid = PLAYER(state)) {
 // —— 科技：开始研究 ——
 export function research(state, techKey, fid = PLAYER(state)) {
   if (!Object.prototype.hasOwnProperty.call(state.techLevels, techKey)) return { ok: false, msg: '未知科技' };
-  if (state.research) return { ok: false, msg: '已有研究进行中' };
+  state.researchByFaction = state.researchByFaction || {};
+  if (state.researchByFaction[fid]) return { ok: false, msg: '本势力已有研究进行中' };
   if (techLevel(state, techKey) >= TECH_MAX_LEVEL) return { ok: false, msg: '该科技已满级' };
   if (!spendCmd(state, fid)) return { ok: false, msg: '指令点不足' };
   if (facMoney(state, fid) < TECH_COST_GOLD) { refundCmd(state, fid); return { ok: false, msg: '金钱不足' }; }
@@ -186,7 +187,7 @@ export function research(state, techKey, fid = PLAYER(state)) {
   const lord = lordOf(state, fid);
   const intel = lord ? lord.stats.i : 50;
   const turns = Math.max(1, Math.round(TECH_COST_TURNS - intel / 60));
-  state.research = { key: techKey, turnsLeft: turns };
+  state.researchByFaction[fid] = { key: techKey, turnsLeft: turns };
   return { ok: true, msg: `开始研究，预计 ${turns} 回合完成（-${TECH_COST_GOLD} 金）` };
 }
 
@@ -245,6 +246,8 @@ function applyCampaignResult(state, battle, from, to, attackerGen, fid, rng) {
     to.soldiers = survivors;
     to.training = from.training;
     attackerGen.cityId = to.id;
+    // 主将原为出发城太守时，须解除旧职，避免同一武将被两城同时引用为太守
+    if (from.governorHeroId === attackerGen.id) from.governorHeroId = null;
     if (!to.governorHeroId || !heroById(state, to.governorHeroId)) to.governorHeroId = attackerGen.id;
     // 缴获城库
     const lootGold = to.gold || 0;

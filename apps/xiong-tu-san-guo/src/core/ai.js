@@ -57,8 +57,8 @@ export function aiTurn(state, fid, rng) {
       }
     }
 
-    // 3) 科技研究
-    if (!acted && !state.research && chance(r, 0.3)) {
+    // 3) 科技研究（本势力独立研究槽）
+    if (!acted && !(state.researchByFaction && state.researchByFaction[fid]) && chance(r, 0.3)) {
       const fac = state.factions.find((f) => f.id === fid);
       if (fac.money >= TECH_COST_GOLD) {
         const keys = ['agri', 'commerce', 'forge', 'wall', 'trick', 'leadership'];

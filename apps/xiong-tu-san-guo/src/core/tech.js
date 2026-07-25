@@ -39,7 +39,7 @@ export function techLevel(state, techKey) {
   return (state && state.techLevels && state.techLevels[techKey]) || 0;
 }
 
-// 当前正在研究的科技
-export function activeResearch(state) {
-  return state && state.research ? state.research : null;
+// 当前正在研究的科技（按势力独立槽）
+export function activeResearch(state, fid) {
+  return state && state.researchByFaction ? (state.researchByFaction[fid] || null) : null;
 }

@@ -8,7 +8,7 @@ import {
 import { HEROES, HERO_MAP, FACTION_SEEDS, makeGenericGeneral } from '../data/heroes.js';
 import {
   GAME_VERSION, CMD_BASE, CMD_PER_CITY, TRAINING_BASE,
-  FACTION_COLORS, PLAYER_COLOR, GRAIN_UPKEEP_PER_SOLDIER, TECH_COST_TURNS,
+  FACTION_COLORS, PLAYER_COLOR, GRAIN_UPKEEP_PER_SOLDIER, TECH_COST_TURNS, TECH_MAX_LEVEL,
 } from '../config.js';
 import { skillBonus, techMult } from './tech.js';
 import { chance } from './rng.js';
@@ -86,7 +86,7 @@ export function newGame({ lordName, startCity, stats, rng } = {}) {
     cities: [],
     heroes: [],
     techLevels: { agri: 0, commerce: 0, forge: 0, wall: 0, trick: 0, leadership: 0 },
-    research: null, // { key, turnsLeft }
+    researchByFaction: {}, // { [fid]: { key, turnsLeft } } —— 研究进度槽按势力独立
     cmdUsedByFaction: {},
     log: [],
     turnLog: [],
@@ -159,6 +159,7 @@ export function newGame({ lordName, startCity, stats, rng } = {}) {
       loyalty: h.loyalty, stats: { ...h.stats },
       skill: h.skill ? { ...h.skill } : null, generic: !!h.generic, wild: false,
     };
+    let demotedToWild = false; // 势力未生成（都城被玩家所占）→ 君主降为在野，不再视作君主
     if (h.serve) {
       const f = facIdByKey[h.serve];
       if (f != null) {
@@ -174,6 +175,7 @@ export function newGame({ lordName, startCity, stats, rng } = {}) {
         copy.status = 'free';
         copy.wild = true;
         copy.discovered = true; // 名义上原属此城，直接可见
+        demotedToWild = true;
       }
     } else if (h.wild) {
       copy.factionId = null;
@@ -184,7 +186,7 @@ export function newGame({ lordName, startCity, stats, rng } = {}) {
     } else {
       continue;
     }
-    if (h.lord) copy.lord = true;
+    if (h.lord && !demotedToWild) copy.lord = true;
     state.heroes.push(copy);
   }
 
@@ -278,16 +280,18 @@ export function resolveTurn(state, aiModule, rng) {
     }
   }
 
-  // —— 科技推进 ——
-  if (state.research) {
-    state.research.turnsLeft -= 1;
-    if (state.research.turnsLeft <= 0) {
-      const k = state.research.key;
-      state.techLevels[k] = Math.min(3, state.techLevels[k] + 1);
-      if (!playerFaction(state).aiControlled) {
-        state.turnLog.push(`🔬 科技突破：研究完成（${k} 升至 ${state.techLevels[k]} 级）。`);
+  // —— 科技推进（逐势力独立研究槽，互不阻塞）——
+  state.researchByFaction = state.researchByFaction || {};
+  for (const fac of state.factions) {
+    const res = state.researchByFaction[fac.id];
+    if (!res) continue;
+    res.turnsLeft -= 1;
+    if (res.turnsLeft <= 0) {
+      state.techLevels[res.key] = Math.min(TECH_MAX_LEVEL, state.techLevels[res.key] + 1);
+      if (fac.id === state.playerFactionId) {
+        state.turnLog.push(`🔬 科技突破：研究完成（${res.key} 升至 ${state.techLevels[res.key]} 级）。`);
       }
-      state.research = null;
+      delete state.researchByFaction[fac.id];
     }
   }
 

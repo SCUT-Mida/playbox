@@ -611,7 +611,7 @@ export class GameUI {
   // ============ 科技 ============
   renderTech() {
     const s = this.state;
-    const research = s.research;
+    const research = s.researchByFaction && s.researchByFaction[s.playerFactionId];
     this.content.appendChild(h('div', null,
       h('h3', null, '科技树（势力共享）'),
       research ? h('div', { class: 'panel', style: { marginBottom: '0.6rem' } },

@@ -11,7 +11,7 @@ import {
 } from '../src/config.js';
 import {
   newGame, cityById, heroesOfFaction, cmdPoints, cmdRemaining,
-  troopCap, resolveTurn, checkGameOver, neighbors, wildHeroesInCity,
+  troopCap, troopCapForce, resolveTurn, checkGameOver, neighbors, wildHeroesInCity,
   officeHolder, clearHeroOffices,
 } from '../src/core/state.js';
 import * as A from '../src/core/actions.js';
@@ -473,6 +473,82 @@ for (let i = 0; i < 400; i++) {
 }
 ok(nonMarketUpgraded, 'AI 会升级农田 / 城墙（farmLevel/wallLevel 不再长期停在 1）');
 ok(cityUpgraded, 'AI 三项资源触顶后会升级城池（upgradeCity 不再是死代码）');
+
+console.log('—— 武将跨城调遣（任意己方城直达，不限邻接）——');
+const sMov = newGame({ lordName: '调遣', startCity: 'luoyang', stats, rng: makeRng(45) });
+// 成都与洛阳不相邻，占领后应可直达
+cityById(sMov, 'chengdu').ownerFactionId = 0;
+const lordMov = sMov.heroes.find((h) => h.isPlayerLord);
+ok(!cityById(sMov, 'luoyang').adjacent.includes('chengdu'), '洛阳与成都不相邻（测试前提）');
+eq(A.moveHero(sMov, lordMov.id, 'chengdu', 0).ok, true, '武将可调往不相邻的己方城（疆域内急行军）');
+eq(sMov.heroes.find((h) => h.id === lordMov.id).cityId, 'chengdu', '武将已抵达成都');
+eq(cityById(sMov, 'luoyang').governorHeroId, null, '调离后原城太守引用清空（无悬挂）');
+ok(governorsConsistent(sMov), '跨城调遣后全局太守一致性成立');
+// 仍不可调往非己方城
+eq(A.moveHero(sMov, lordMov.id, 'jianye', 0).ok, false, '不可调往非己方城市');
+
+console.log('—— 出征统兵上限：主帅 + 副将相加 ——');
+const sCap = newGame({ lordName: '统兵', startCity: 'luoyang', stats, rng: makeRng(46) });
+const capLord = sCap.heroes.find((h) => h.isPlayerLord);
+function injectCap(idx, st) { const g = makeGenericGeneral(makeRng(idx), 6000 + idx); g.factionId = 0; g.status = 'free'; g.cityId = 'luoyang'; g.stats = st; sCap.heroes.push(g); return g; }
+const capDep1 = injectCap(111, { l: 80, w: 80, i: 50, p: 50, c: 50 });
+const capDep2 = injectCap(112, { l: 70, w: 70, i: 50, p: 50, c: 50 });
+const mainOnly = troopCap(sCap, capLord);
+eq(troopCapForce(sCap, capLord, [capDep1, capDep2]), mainOnly + troopCap(sCap, capDep1) + troopCap(sCap, capDep2), '统兵上限 = 主帅 + 各副将相加');
+ok(troopCapForce(sCap, capLord, [capDep1, capDep2]) > mainOnly, '偕副将统兵上限高于单主帅');
+// 相同超额兵力：不带副将不可出征，带副将即可
+cityById(sCap, 'wan').ownerFactionId = null; cityById(sCap, 'wan').soldiers = 50; cityById(sCap, 'wan').defense = 30;
+cityById(sCap, 'luoyang').soldiers = mainOnly + 5000;
+const overMain = mainOnly + 500;
+eq(A.campaign(sCap, 'luoyang', 'wan', capLord.id, overMain, 'normal', 0, makeRng(3)).ok, false, '不带副将时超出主帅统兵上限不可出征');
+sCap.cmdUsedByFaction = {};
+cityById(sCap, 'wan').ownerFactionId = null; cityById(sCap, 'wan').soldiers = 50; cityById(sCap, 'wan').defense = 30;
+cityById(sCap, 'luoyang').soldiers = mainOnly + 5000;
+ok(A.campaign(sCap, 'luoyang', 'wan', capLord.id, overMain, 'assault', 0, makeRng(4), [capDep1.id, capDep2.id]).ok, '偕副将时相同兵力在合计上限内可出征');
+
+console.log('—— 在野武将名字唯一（杜绝同名混淆）——');
+const usedN2 = new Set();
+const nmA = makeWildGeneral(() => 0, 10, usedN2); // rng=0 → 必得「李成」
+const nmB = makeWildGeneral(() => 0, 11, usedN2); // 撞名 → 「李成二」
+ok(nmA.name !== nmB.name, `撞名时追加后缀区分（${nmA.name} vs ${nmB.name}）`);
+eq(makeWildGeneral(makeRng(2), 5).id, 'genwild_5', '不传 usedNames 时 id / 行为不变（向后兼容）');
+const sNm = newGame({ lordName: '群英', startCity: 'luoyang', stats, rng: makeRng(47) });
+const allNames = sNm.heroes.map((hh) => hh.name);
+eq(new Set(allNames).size, allNames.length, '新局全部武将名字两两不同（无同名武将）');
+
+console.log('—— 攻城被俘：武将不再莫名消失 ——');
+let capturedState = null;
+for (let seed = 300; seed < 720 && !capturedState; seed++) {
+  const sg = newGame({ lordName: '被俘', startCity: 'luoyang', stats, rng: makeRng(seed) });
+  const gen = makeGenericGeneral(makeRng(seed * 3), 5000 + seed);
+  gen.factionId = 0; gen.status = 'free'; gen.cityId = 'luoyang';
+  gen.stats = { l: 50, w: 30, i: 30, p: 30, c: 30 }; sg.heroes.push(gen);
+  cityById(sg, 'luoyang').soldiers = 3000;
+  const wanG2 = cityById(sg, 'wan');
+  wanG2.ownerFactionId = 1; wanG2.soldiers = 99999; wanG2.defense = 99999;
+  const res = A.campaign(sg, 'luoyang', 'wan', gen.id, 2000, 'normal', 0, makeRng(seed));
+  if (!res.ok) continue;
+  const genAfter = sg.heroes.find((h) => h.id === gen.id);
+  if (!res.won && genAfter.status === 'prisoner') { capturedState = sg; break; }
+}
+ok(capturedState, '覆盖到攻城失利 + 主将被俘场景');
+if (capturedState) {
+  const prisoner = capturedState.heroes.find((h) => h.status === 'prisoner' && h.factionId === 0);
+  ok(prisoner && prisoner.factionId === 0, '被俘武将仍属玩家势力（名录「被俘在外」可展示，不再消失）');
+  ok(prisoner && prisoner.prisonerOf === 1, '被俘武将标记关押方');
+  // 灭其关押势力 → 俘虏获释归还
+  const lordC = capturedState.heroes.find((h) => h.isPlayerLord);
+  for (const c of capturedState.cities) c.ownerFactionId = (c.id === 'wan') ? 1 : 0;
+  cityById(capturedState, 'wan').ownerFactionId = 1;
+  cityById(capturedState, 'wan').soldiers = 10; cityById(capturedState, 'wan').defense = 5;
+  cityById(capturedState, 'luoyang').soldiers = 50000;
+  capturedState.cmdUsedByFaction = {};
+  const fall = A.campaign(capturedState, 'luoyang', 'wan', lordC.id, 8000, 'assault', 0, makeRng(2));
+  if (fall.ok && fall.won) {
+    eq(prisoner.status, 'free', '关押势力覆灭 → 被俘武将获释归还');
+    eq(prisoner.prisonerOf, null, '获释后关押标记清除');
+  }
+}
 
 console.log(`\n结果：${pass} 通过，${fail} 失败`);
 process.exit(fail ? 1 : 0);

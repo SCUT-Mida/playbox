@@ -11,7 +11,7 @@ import {
 import { citiesOf } from './economy.js';
 import { effLead } from './combat.js';
 import { chance } from './rng.js';
-import { TECH_COST_GOLD } from '../config.js';
+import { TECH_COST_GOLD, buildCapForCity, cityUpgradeGoldCost, CITY_MAX_LEVEL } from '../config.js';
 
 // 单个 AI 势力行动
 export function aiTurn(state, fid, rng) {
@@ -24,11 +24,12 @@ export function aiTurn(state, fid, rng) {
   while (cmdRemaining(state, fid) > 0 && guard++ < 30) {
     let acted = false;
 
-    // 1) 内政：国库充盈（金钱 > 600）才升市场——有钱才投资，优于设计文档初稿"金币低于 500 升市场"的被动策略；兵不足人口 20% 则征兵
+    // 1) 内政：国库充盈（金钱 > 600）才升市场——有钱才投资；市场达到当前城池上限后，若三项资源满级则升级城池以解锁更高上限；兵不足人口 20% 则征兵
     for (const c of cities) {
       if (cmdRemaining(state, fid) <= 0) break;
       const fac = state.factions.find((f) => f.id === fid);
-      if (fac.money > 600 && c.marketLevel < 5 && chance(r, 0.5)) {
+      const cap = buildCapForCity(c);
+      if (fac.money > 600 && c.marketLevel < cap && chance(r, 0.5)) {
         if (A.developMarket(state, c.id, fid).ok) { acted = true; break; }
       }
     }
@@ -37,6 +38,20 @@ export function aiTurn(state, fid, rng) {
       if (c.soldiers < c.population * 0.2) {
         const recruitN = Math.min(800, Math.floor(c.population * 0.05));
         if (recruitN > 50 && A.recruit(state, c.id, recruitN, fid).ok) { acted = true; break; }
+      }
+    }
+    // 城池升级：富余金钱 + 三项资源已满当前上限 + 未到顶 → 升城（解锁更高上限 / 收益）
+    if (!acted) {
+      const fac = state.factions.find((f) => f.id === fid);
+      for (const c of cities) {
+        if (cmdRemaining(state, fid) <= 0) break;
+        c.level = c.level || 1;
+        if (c.level >= CITY_MAX_LEVEL) continue;
+        const cap = buildCapForCity(c);
+        const ready = c.farmLevel >= cap && c.marketLevel >= cap && c.wallLevel >= cap;
+        if (ready && fac.money >= cityUpgradeGoldCost(c.level) + 500 && chance(r, 0.6)) {
+          if (A.upgradeCity(state, c.id, fid).ok) { acted = true; break; }
+        }
       }
     }
 

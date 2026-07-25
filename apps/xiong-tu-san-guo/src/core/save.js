@@ -37,6 +37,8 @@ export function loadGame() {
 //   1) 旧版科技等级为全局 state.techLevels（所有势力共享），现改为按势力独立的
 //      state.techLevelsByFaction。旧存档中已研究的科技视作玩家势力掌握；AI 从 0 起算。
 //   2) 新增城市职官将军 / 军师（generalHeroId / strategistHeroId），旧存档城市缺省 → 补 null。
+//   3) 新增城池等级（c.level）：旧存档城市缺省 → 补 1（资源 / 科技上限按基础值）。
+//   4) 新增在野人物补充序列（state.wildSeq）：旧存档缺省 → 补 0。
 function migrateSave(state) {
   if (!state) return state;
   if (!state.techLevelsByFaction) {
@@ -45,10 +47,12 @@ function migrateSave(state) {
       : {};
     delete state.techLevels;
   }
+  if (state.wildSeq == null) state.wildSeq = 0;
   if (Array.isArray(state.cities)) {
     for (const c of state.cities) {
       if (c.generalHeroId === undefined) c.generalHeroId = null;
       if (c.strategistHeroId === undefined) c.strategistHeroId = null;
+      if (c.level == null) c.level = 1;
     }
   }
   return state;

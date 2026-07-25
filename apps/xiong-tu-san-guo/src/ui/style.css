@@ -206,6 +206,13 @@
 .xtsg .cmd-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; margin-top: 0.6rem; }
 .xtsg .cmd-btn { padding: 0.5rem 0.2rem; font-size: 0.78rem; }
 
+/* —— 商贸 · 城建面板 —— */
+.xtsg .commerce-block {
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px;
+  padding: 0.55rem 0.7rem; margin-top: 0.6rem;
+}
+.xtsg .commerce-block .cmd-grid { margin-top: 0.2rem; }
+
 /* —— 列表卡片 —— */
 .xtsg .card-list { display: flex; flex-direction: column; gap: 0.55rem; }
 .xtsg .hero-card, .xtsg .city-card {

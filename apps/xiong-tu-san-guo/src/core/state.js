@@ -8,15 +8,19 @@ import {
 import { HEROES, HERO_MAP, FACTION_SEEDS, makeGenericGeneral, makeWildGeneral } from '../data/heroes.js';
 import {
   GAME_VERSION, CMD_BASE, CMD_PER_CITY, TRAINING_BASE,
-  FACTION_COLORS, PLAYER_COLOR, GRAIN_UPKEEP_PER_SOLDIER, TECH_COST_TURNS, TECH_MAX_LEVEL,
+  FACTION_COLORS, PLAYER_COLOR, GRAIN_UPKEEP_PER_SOLDIER, TECH_COST_TURNS,
   CITY_OFFICES, officeField,
 } from '../config.js';
-import { skillBonus, techMult, ensureTechLevels } from './tech.js';
+import { skillBonus, techMult, ensureTechLevels, techMaxLevel } from './tech.js';
 import { chance } from './rng.js';
 import {
   citiesOf, cityGoldIncome, cityGrainIncome, cityPopGrowth, cityDefenseValue,
 } from './economy.js';
 import { effLead, effWar } from './combat.js';
+
+// 在野人物补充参数
+const WILD_REPLENISH_CHANCE = 0.45; // 每回合补充一名在野人物的概率
+const WILD_PER_CITY_CAP = 6; // 每座城在野人物上限（含名将），超过不再向该城补充
 
 // —— 查询辅助 ——
 export const cityById = (state, id) => state.cities.find((c) => c.id === id);
@@ -108,6 +112,7 @@ export function newGame({ lordName, startCity, stats, rng } = {}) {
     techLevelsByFaction: {}, // { [fid]: { key: level } } —— 科技等级按势力独立存储
     researchByFaction: {}, // { [fid]: { key, turnsLeft } } —— 研究进度槽按势力独立
     cmdUsedByFaction: {},
+    wildSeq: 0, // 在野随机人物 id 序列（含回合补充生成时的去重计数）
     log: [],
     turnLog: [],
     over: null,
@@ -139,6 +144,7 @@ export function newGame({ lordName, startCity, stats, rng } = {}) {
       population: c.pop0, maxPopulation: c.popMax,
       soldiers: c.soldiers0, defenseBase: c.defense0, defense: c.defense0,
       gold: c.gold0, grain: c.grain0, // 城库（攻陷时被缴获）
+      level: 1, // 城池等级：升级后解锁更高的资源 / 科技等级上限
       farmLevel: 1, marketLevel: 1, wallLevel: 1,
       governorHeroId: null, generalHeroId: null, strategistHeroId: null,
       adjacent: c.adjacent.slice(),
@@ -235,11 +241,12 @@ export function newGame({ lordName, startCity, stats, rng } = {}) {
     }
   }
 
-  // —— 在野随机人物：每座城散布 1 名（约三成概率再多 1 名）能力随机的乡野豪杰 ——
-  // 与名将并列于在野池，可探索 / 登用，弥补「在野只有名将」的单调，提升可玩度。
+  // —— 在野随机人物：每座城散布 2 名（约六成概率再多 1 名）能力随机的乡野豪杰 ——
+  // 与名将并列于在野池，可探索 / 登用，弥补「在野只有名将、探索不到」的单调，提升可玩度。
+  // 数量较旧版翻倍，确保几乎每次探索都「有人可寻」。
   let wildIdx = 0;
   for (const c of state.cities) {
-    const n = 1 + (chance(r, 0.3) ? 1 : 0);
+    const n = 2 + (chance(r, 0.6) ? 1 : 0);
     for (let i = 0; i < n; i++) {
       const g = makeWildGeneral(r, ++wildIdx);
       g.id = `genwild_${c.id}_${i}`; // 城内唯一
@@ -251,6 +258,7 @@ export function newGame({ lordName, startCity, stats, rng } = {}) {
       state.heroes.push(g);
     }
   }
+  state.wildSeq = wildIdx;
 
   // 初始城防归位
   for (const c of state.cities) c.defense = maxDefense(state, c);
@@ -319,6 +327,7 @@ export function resolveTurn(state, aiModule, rng) {
   }
 
   // —— 科技推进（逐势力独立研究槽、独立等级，互不阻塞、互不共享）——
+  // 上限随该势力最高城池等级提升（见 techMaxLevel），城池升级后可继续突破科技天花板。
   state.researchByFaction = state.researchByFaction || {};
   for (const fac of state.factions) {
     const res = state.researchByFaction[fac.id];
@@ -327,7 +336,7 @@ export function resolveTurn(state, aiModule, rng) {
     if (res.turnsLeft <= 0) {
       // 仅对本势力加级；其他势力（含同时研究同项科技者）的等级不受影响
       const tbl = ensureTechLevels(state, fac.id);
-      tbl[res.key] = Math.min(TECH_MAX_LEVEL, (tbl[res.key] || 0) + 1);
+      tbl[res.key] = Math.min(techMaxLevel(state, fac.id), (tbl[res.key] || 0) + 1);
       if (fac.id === state.playerFactionId) {
         state.turnLog.push(`🔬 科技突破：研究完成（${res.key} 升至 ${tbl[res.key]} 级）。`);
       }
@@ -338,6 +347,30 @@ export function resolveTurn(state, aiModule, rng) {
   // —— AI 行动 ——
   if (aiModule && typeof aiModule.aiTurnAll === 'function') {
     aiModule.aiTurnAll(state, r);
+  }
+
+  // —— 在野人物补充（人才流动）——
+  // 每回合有一定概率在某座城池新出现一名在野豪杰，避免中后期「无人在野、探索落空」。
+  // 每城在野上限 WILD_PER_CITY_CAP，超过则不再补充到该城。
+  state.wildSeq = state.wildSeq || 0;
+  if (chance(r, WILD_REPLENISH_CHANCE)) {
+    const candidates = state.cities.filter((c) =>
+      state.heroes.filter((h) => h.wild && h.cityId === c.id && h.status !== 'gone').length < WILD_PER_CITY_CAP);
+    if (candidates.length) {
+      const home = candidates[Math.floor(r() * candidates.length)];
+      state.wildSeq += 1;
+      const g = makeWildGeneral(r, state.wildSeq);
+      g.id = `genwild_dyn_${state.wildSeq}`; // 动态补充：全局唯一
+      g.wild = true;
+      g.factionId = null;
+      g.cityId = home.id;
+      g.status = 'free';
+      g.discovered = false;
+      state.heroes.push(g);
+      if (home.ownerFactionId === state.playerFactionId) {
+        state.turnLog.push(`👂 ${home.name} 城外有新的在野人物风闻，可前往探访。`);
+      }
+    }
   }
 
   // —— 名将忠诚度自然漂移（轻微）——

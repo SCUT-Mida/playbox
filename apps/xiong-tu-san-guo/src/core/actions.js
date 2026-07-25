@@ -8,12 +8,15 @@ import {
   checkGameOver, clearHeroOffices, officeHolder,
 } from './state.js';
 import { citiesOf, recruitCost } from './economy.js';
-import { skillBonus, techMult, techLevel, TECH_KEYS } from './tech.js';
+import { skillBonus, techMult, techLevel, techMaxLevel, TECH_KEYS } from './tech.js';
 import { createBattle, runBattle, effLead, effWar } from './combat.js';
 import { chance, shuffle } from './rng.js';
 import {
-  BUILD_MAX, buildCost, TRAINING_MAX, FORMATIONS, STRATAGEMS,
-  TECH_MAX_LEVEL, TECH_COST_GOLD, TECH_COST_TURNS, RECRUIT_LOYALTY_THRESHOLD,
+  buildCapForCity, buildCost, TRAINING_MAX, FORMATIONS, STRATAGEMS,
+  TECH_COST_GOLD, TECH_COST_TURNS, RECRUIT_LOYALTY_THRESHOLD,
+  CITY_MAX_LEVEL, cityUpgradeGoldCost,
+  EXCHANGE_FEE, exchangeRate,
+  TRADE_GRAIN_COST, TRADE_SEIZED_CHANCE, tradeGoldYield,
   CITY_OFFICES, OFFICE_MAP, officeField,
 } from '../config.js';
 
@@ -35,7 +38,8 @@ const isPlayer = (state, fid) => fid === state.playerFactionId;
 export function developFarm(state, cityId, fid = PLAYER(state)) {
   const c = cityById(state, cityId);
   if (!c || c.ownerFactionId !== fid) return { ok: false, msg: '该城非你所属' };
-  if (c.farmLevel >= BUILD_MAX) return { ok: false, msg: '农田已达满级' };
+  const cap = buildCapForCity(c);
+  if (c.farmLevel >= cap) return { ok: false, msg: `农田已达本城上限（Lv${cap}，升级城池可提升）` };
   if (!spendCmd(state, fid)) return { ok: false, msg: '指令点不足' };
   const cost = buildCost(c.farmLevel);
   if (facMoney(state, fid) < cost) { refundCmd(state, fid); return { ok: false, msg: '金钱不足' }; }
@@ -48,7 +52,8 @@ export function developFarm(state, cityId, fid = PLAYER(state)) {
 export function developMarket(state, cityId, fid = PLAYER(state)) {
   const c = cityById(state, cityId);
   if (!c || c.ownerFactionId !== fid) return { ok: false, msg: '该城非你所属' };
-  if (c.marketLevel >= BUILD_MAX) return { ok: false, msg: '市集已达满级' };
+  const cap = buildCapForCity(c);
+  if (c.marketLevel >= cap) return { ok: false, msg: `市集已达本城上限（Lv${cap}，升级城池可提升）` };
   if (!spendCmd(state, fid)) return { ok: false, msg: '指令点不足' };
   const cost = buildCost(c.marketLevel);
   if (facMoney(state, fid) < cost) { refundCmd(state, fid); return { ok: false, msg: '金钱不足' }; }
@@ -61,7 +66,8 @@ export function developMarket(state, cityId, fid = PLAYER(state)) {
 export function buildWall(state, cityId, fid = PLAYER(state)) {
   const c = cityById(state, cityId);
   if (!c || c.ownerFactionId !== fid) return { ok: false, msg: '该城非你所属' };
-  if (c.wallLevel >= BUILD_MAX) return { ok: false, msg: '城墙已达满级' };
+  const cap = buildCapForCity(c);
+  if (c.wallLevel >= cap) return { ok: false, msg: `城墙已达本城上限（Lv${cap}，升级城池可提升）` };
   if (!spendCmd(state, fid)) return { ok: false, msg: '指令点不足' };
   const cost = buildCost(c.wallLevel);
   if (facMoney(state, fid) < cost) { refundCmd(state, fid); return { ok: false, msg: '金钱不足' }; }
@@ -69,6 +75,81 @@ export function buildWall(state, cityId, fid = PLAYER(state)) {
   c.wallLevel += 1;
   c.defense = maxDefense(state, c);
   return { ok: true, msg: `${c.name} 城墙升至 ${c.wallLevel} 级，城防加固` };
+}
+
+// —— 内政：升级城池 ——
+// 前置：三项资源（农田 / 市集 / 城墙）均须达到当前资源上限（满级开发后方可升城），
+// 并支付 cityUpgradeGoldCost 金钱。升级后城池等级 +1，三项资源上限随之 +5，
+// 势力最高城池升级还会抬高科技等级上限。城池等级同时小幅提升本城收入与城防（见 economy.js）。
+export function upgradeCity(state, cityId, fid = PLAYER(state)) {
+  const c = cityById(state, cityId);
+  if (!c || c.ownerFactionId !== fid) return { ok: false, msg: '该城非你所属' };
+  c.level = c.level || 1;
+  if (c.level >= CITY_MAX_LEVEL) return { ok: false, msg: `${c.name} 已达最高城池等级` };
+  const cap = buildCapForCity(c);
+  if (c.farmLevel < cap || c.marketLevel < cap || c.wallLevel < cap) {
+    return { ok: false, msg: `须先将军田/市集/城墙均升至 Lv${cap} 方可升级城池` };
+  }
+  if (!spendCmd(state, fid)) return { ok: false, msg: '指令点不足' };
+  const cost = cityUpgradeGoldCost(c.level);
+  if (facMoney(state, fid) < cost) { refundCmd(state, fid); return { ok: false, msg: '金钱不足' }; }
+  factionById(state, fid).money -= cost;
+  c.level += 1;
+  c.defense = maxDefense(state, c); // 城池等级抬升城防上限，即时回满
+  const newCap = buildCapForCity(c);
+  return { ok: true, msg: `${c.name} 城池升至 ${c.level} 级！资源上限解锁至 Lv${newCap}（-${cost} 金）` };
+}
+
+// —— 商业：资源对换（金 ↔ 粮）——
+// kind='buy'：以金换粮；kind='sell'：以粮换金。每次消耗 1 指令。
+// 汇率随本城市集等级与商贸科技提升；卖出按 EXCHANGE_FEE 折价，杜绝无脑套利。
+export function exchange(state, cityId, kind, amount, fid = PLAYER(state)) {
+  const c = cityById(state, cityId);
+  if (!c || c.ownerFactionId !== fid) return { ok: false, msg: '该城非你所属' };
+  if (kind !== 'buy' && kind !== 'sell') return { ok: false, msg: '未知兑换方向' };
+  amount = Math.max(0, Math.floor(amount));
+  if (amount <= 0) return { ok: false, msg: '兑换数量无效' };
+  if (!spendCmd(state, fid)) return { ok: false, msg: '指令点不足' };
+  const fac = factionById(state, fid);
+  const rate = exchangeRate(state, c); // 每金可换粮数
+  if (kind === 'buy') {
+    if (fac.money < amount) { refundCmd(state, fid); return { ok: false, msg: '金钱不足' }; }
+    fac.money -= amount;
+    const grain = Math.floor(amount * rate);
+    fac.grain += grain;
+    return { ok: true, msg: `${c.name} 市集以 ${amount} 金换得 ${grain} 粮（汇率 1金≈${rate.toFixed(2)}粮）` };
+  }
+  // sell：以粮换金，按 EXCHANGE_FEE 折价
+  if (fac.grain < amount) { refundCmd(state, fid); return { ok: false, msg: '军粮不足' }; }
+  fac.grain -= amount;
+  const gold = Math.floor((amount / rate) * EXCHANGE_FEE);
+  fac.money += gold;
+  return { ok: true, msg: `${c.name} 市集以 ${amount} 粮换得 ${gold} 金（折价 ${Math.round(EXCHANGE_FEE * 100)}%）` };
+}
+
+// —— 商业：相邻城池贸易 ——
+// 从己方城市派商队前往相邻的非己方城市（中立 / 他国），换取金钱。
+// 消耗 1 指令 + TRADE_GRAIN_COST 军粮（商队辎重）。目标为他国城市时有 TRADE_SEIZED_CHANCE
+// 概率被劫掠（血本无归）；中立城市稳赚。收益随本城市集等级、目标城规模与商贸科技提升。
+export function trade(state, fromCityId, toCityId, fid = PLAYER(state), rng) {
+  const r = rng || Math.random;
+  const from = cityById(state, fromCityId);
+  const to = cityById(state, toCityId);
+  if (!from || !to) return { ok: false, msg: '城市无效' };
+  if (from.ownerFactionId !== fid) return { ok: false, msg: '出发城非你所属' };
+  if (to.ownerFactionId === fid) return { ok: false, msg: '无需与己方城市通商（金粮本就共享）' };
+  if (!from.adjacent.includes(toCityId)) return { ok: false, msg: '两城不相邻，无法通商' };
+  if (!spendCmd(state, fid)) return { ok: false, msg: '指令点不足' };
+  const fac = factionById(state, fid);
+  if (fac.grain < TRADE_GRAIN_COST) { refundCmd(state, fid); return { ok: false, msg: '军粮不足以筹备商队' }; }
+  fac.grain -= TRADE_GRAIN_COST;
+  // 与他国通商：有被劫掠风险
+  if (to.ownerFactionId != null && chance(r, TRADE_SEIZED_CHANCE)) {
+    return { ok: true, msg: `🚫 商队赴 ${to.name} 途中遭劫，辎重尽失（-${TRADE_GRAIN_COST} 粮）`, success: false };
+  }
+  const gold = tradeGoldYield(state, from, to);
+  fac.money += gold;
+  return { ok: true, msg: `🧧 商队自 ${from.name} 抵 ${to.name} 通商，获利 ${gold} 金（-${TRADE_GRAIN_COST} 粮）`, success: true, gold };
 }
 
 // —— 内政：征兵 ——
@@ -209,7 +290,9 @@ export function research(state, techKey, fid = PLAYER(state)) {
   if (!TECH_KEYS.includes(techKey)) return { ok: false, msg: '未知科技' };
   state.researchByFaction = state.researchByFaction || {};
   if (state.researchByFaction[fid]) return { ok: false, msg: '本势力已有研究进行中' };
-  if (techLevel(state, fid, techKey) >= TECH_MAX_LEVEL) return { ok: false, msg: '该科技已满级' };
+  if (techLevel(state, fid, techKey) >= techMaxLevel(state, fid)) {
+    return { ok: false, msg: '该科技已达当前上限（升级城池可解锁更高上限）' };
+  }
   if (!spendCmd(state, fid)) return { ok: false, msg: '指令点不足' };
   if (facMoney(state, fid) < TECH_COST_GOLD) { refundCmd(state, fid); return { ok: false, msg: '金钱不足' }; }
   factionById(state, fid).money -= TECH_COST_GOLD;

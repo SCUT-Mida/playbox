@@ -7,9 +7,11 @@ import './style.css';
 import { attachKeyboardShell } from '../../../_lib/keyboard-shell.js';
 import { h, clear, bar } from './dom.js';
 import {
-  TECHS, FORMATIONS, STRATAGEMS, BUILD_MAX, TECH_MAX_LEVEL, TECH_COST_GOLD,
+  TECHS, FORMATIONS, STRATAGEMS, TECH_COST_GOLD,
   TRAINING_MAX, FACTION_COLORS, NEUTRAL_COLOR, seasonOf, clamp,
   CITY_OFFICES, cmdCostOf,
+  buildCapForCity, cityUpgradeGoldCost, CITY_MAX_LEVEL, exchangeRate,
+  TRADE_GRAIN_COST, tradeGoldYield,
 } from '../config.js';
 import { CITIES, CITY_MAP, MAP_RIVERS, MAP_REGIONS, CAPITAL_IDS, cityTier, TIER_CLASS, TIER_NAME } from '../data/cities.js';
 import { HEROES, HERO_MAP, FACTION_SEEDS } from '../data/heroes.js';
@@ -18,7 +20,7 @@ import { newGame, resolveTurn, cityById, heroById, factionById, playerFaction,
   troopCap, cmdPoints, cmdRemaining, bestDefender, lordOf, maxDefense, officeHolder } from '../core/state.js';
 import { citiesOf, factionGoldIncome, factionGrainNet, governorEconMult, generalDefMult } from '../core/economy.js';
 import { effLead, effWar } from '../core/combat.js';
-import { techLevel } from '../core/tech.js';
+import { techLevel, techMaxLevel } from '../core/tech.js';
 import * as A from '../core/actions.js';
 import { aiTurnAll } from '../core/ai.js';
 import { hasSave, saveGame, loadGame, clearSave } from '../core/save.js';
@@ -429,16 +431,19 @@ export class GameUI {
     const gov = officeHolder(s, c, 'governor');
     const gen = officeHolder(s, c, 'general');
     const strat = officeHolder(s, c, 'strategist');
+    const cap = buildCapForCity(c);
+    const lvl = c.level || 1;
     const r = (k, v) => h('div', null, h('span', { class: 'muted' }, k), ' ', v);
     return h('div', { class: 'panel__rows' },
       r('归属', c.ownerFactionId != null ? (factionById(s, c.ownerFactionId)?.name || '—') : '空城'),
       r('规模', `${TIER_NAME[cityTier(c)]}（人口上限 ${c.maxPopulation.toLocaleString()}）`),
+      r('城池等级', `${lvl} / ${CITY_MAX_LEVEL}（资源上限 Lv${cap}）`),
       r('人口', `${Math.round(c.population)} / ${c.maxPopulation}`),
       r('士兵', Math.round(c.soldiers)),
       r('城防', `${Math.round(c.defense)}`),
-      r('农田', `Lv${c.farmLevel}`),
-      r('市集', `Lv${c.marketLevel}`),
-      r('城墙', `Lv${c.wallLevel}`),
+      r('农田', `Lv${c.farmLevel} / ${cap}`),
+      r('市集', `Lv${c.marketLevel} / ${cap}`),
+      r('城墙', `Lv${c.wallLevel} / ${cap}`),
       r('训练度', c.training),
       r('太守', gov ? `${gov.name}（政${gov.stats.p}）` : '—'),
       r('将军', gen ? `${gen.name}（统${gen.stats.l}）` : '—'),
@@ -472,14 +477,16 @@ export class GameUI {
   openOwnedCity(c) {
     const s = this.state;
     const fid = s.playerFactionId;
-    // refresh=true：动作在弹窗内就地完成后，重绘城务弹窗以刷新兵数/等级/职官/在野列表
+    // refresh=true：动作在弹窗内就地完成后，重绘城务弹窗以刷新兵数/等级/职官/在野列表。
+    // fn 若返回 { ok, msg }（如内政指令）则就地提示并按需刷新；
+    // fn 若自行打开表单（如资源对换 / 贸易）则返回 undefined，仅做后续统一刷新。
     const cmdBtn = (label, fn, { danger, refresh, cost } = {}) => h('button', {
       class: `cmd-btn ${danger ? 'btn-danger' : 'btn-primary'}`,
       onClick: () => {
         const r = fn();
-        if (r.msg) this.toast(r.msg);
+        if (r && r.msg) this.toast(r.msg);
         this.afterAction();
-        if (refresh && r.ok) this.openOwnedCity(c);
+        if (refresh && r && r.ok) this.openOwnedCity(c);
       },
     }, label, costTag(cost));
     // 探索的实际消耗：仍有未发现名将才耗 1 指令，否则免费（动态标注，避免误导）
@@ -497,6 +504,29 @@ export class GameUI {
       h('button', { class: 'btn-jade', onClick: () => this.uiMoveHero(c) }, '调遣武将', costTag(cmdCostOf('moveHero'))),
       h('button', { class: 'btn-primary', onClick: () => this.uiTransport(c) }, '输送资源', costTag(cmdCostOf('transport'))),
     );
+    // 商业行：升级城池 / 资源对换（金↔粮）/ 相邻贸易
+    const cap = buildCapForCity(c);
+    const cLevel = c.level || 1;
+    const cityMaxed = cLevel >= CITY_MAX_LEVEL;
+    const cityReady = c.farmLevel >= cap && c.marketLevel >= cap && c.wallLevel >= cap;
+    const upCost = cityUpgradeGoldCost(cLevel);
+    const tradeTargets = neighbors(s, c.id).filter((n) => n.ownerFactionId !== s.playerFactionId);
+    const commerce = h('div', { class: 'commerce-block' },
+      h('div', { class: 'hint', style: { marginBottom: '0.3rem' } }, '商贸 · 城建'),
+      h('div', { class: 'cmd-grid' },
+        cmdBtn(cityMaxed ? `城池满级 Lv${cLevel}` : `升级城池 Lv${cLevel}→${cLevel + 1}`,
+          () => A.upgradeCity(s, c.id, s.playerFactionId),
+          { refresh: true, cost: cityMaxed ? null : cmdCostOf('upgradeCity') }),
+        cmdBtn('资源对换', () => this.uiExchange(c), { cost: cmdCostOf('exchange') }),
+        cmdBtn(tradeTargets.length ? '通商贸易' : '无邻接商路',
+          () => this.uiTrade(c),
+          { cost: tradeTargets.length ? cmdCostOf('trade') : null }),
+      ),
+      h('div', { class: 'hint', style: { marginTop: '0.25rem' } },
+        cityMaxed ? '城池已达最高等级。'
+          : (cityReady ? `三项资源已满 Lv${cap}，升级需 ${upCost} 金（解锁资源上限至 Lv${cap + 5}）。`
+            : `三项资源均达 Lv${cap} 后方可升级城池（当前 田${c.farmLevel}/市${c.marketLevel}/墙${c.wallLevel}）。`)),
+    );
     // 在野名将登用入口
     const wilds = wildHeroesInCity(s, c.id).filter((w) => w.discovered);
     const wildBlock = wilds.length ? h('div', { style: { marginTop: '0.6rem' } },
@@ -504,8 +534,52 @@ export class GameUI {
       h('div', { class: 'hero-card__foot' }, wilds.map((w) => h('button', { class: 'btn-ghost', onClick: () => { const r = A.recruitHero(s, w.id); this.toast(r.msg); this.afterAction(); if (r.ok) this.openOwnedCity(c); } }, `登用 ${w.name}`, costTag(cmdCostOf('recruitHero'))))),
     ) : null;
 
-    const body = h('div', null, this.cityHeader(c), this.cityRows(c), grid, this.officesBlock(c, true), advBtns, wildBlock);
+    const body = h('div', null, this.cityHeader(c), this.cityRows(c), grid, commerce, this.officesBlock(c, true), advBtns, wildBlock);
     this.openModal({ title: `城务 · ${c.name}`, body, foot: [h('button', { class: 'btn-ghost grow', onClick: () => this.closeModal() }, '关闭')] });
+  }
+
+  // —— 资源对换（金 ↔ 粮）——
+  uiExchange(c) {
+    const s = this.state;
+    const fac = playerFaction(s);
+    const rate = exchangeRate(s, c);
+    const dirSel = h('select', null,
+      h('option', { value: 'buy' }, `买粮（金→粮）：1金≈${rate.toFixed(2)}粮`),
+      h('option', { value: 'sell' }, `卖粮（粮→金）：约${(1 / rate * 0.7).toFixed(3)}金/粮（七折）`),
+    );
+    const amtIn = h('input', { type: 'number', value: 500, min: 1, step: 50, style: { width: '5rem' } });
+    const body = h('div', null,
+      h('p', { class: 'hint' }, `金 ${Math.round(fac.money)} · 粮 ${Math.round(fac.grain)}。市集等级与商贸科技越高，汇率越优。`),
+      h('div', { class: 'create__field' }, h('label', null, '兑换方向'), dirSel),
+      h('div', { class: 'create__field' }, h('label', null, '数量（金 或 粮）'), amtIn),
+    );
+    this.openForm('资源对换', body, () => {
+      const r = A.exchange(s, c.id, dirSel.value, parseInt(amtIn.value, 10) || 0, s.playerFactionId);
+      this.toast(r.msg); this.closeModal(); this.afterAction();
+      if (r.ok) this.openOwnedCity(c);
+    }, '兑换');
+  }
+
+  // —— 相邻贸易 ——
+  uiTrade(c) {
+    const s = this.state;
+    const fac = playerFaction(s);
+    const targets = neighbors(s, c.id).filter((n) => n.ownerFactionId !== s.playerFactionId);
+    if (!targets.length) { this.toast('无相邻的非己方城市可通商'); return; }
+    const tSel = h('select', null, targets.map((n) => {
+      const kind = n.ownerFactionId == null ? '中立' : (factionById(s, n.ownerFactionId)?.name || '他国');
+      const yield_ = tradeGoldYield(s, c, n);
+      const risky = n.ownerFactionId != null ? '（他国·有劫掠风险）' : '';
+      return h('option', { value: n.id }, `${n.name}（${kind}）· 预计 +${yield_} 金${risky}`);
+    }));
+    const body = h('div', null,
+      h('p', { class: 'hint' }, `派商队前往相邻非己方城市通商。消耗 ${TRADE_GRAIN_COST} 粮（当前 ${Math.round(fac.grain)}）。中立城市稳赚；他国城市有被劫掠风险。`),
+      h('div', { class: 'create__field' }, h('label', null, '通商目标'), tSel),
+    );
+    this.openForm('通商贸易', body, () => {
+      const r = A.trade(s, c.id, tSel.value, s.playerFactionId, Math.random);
+      this.toast(r.msg); this.closeModal(); this.afterAction();
+    }, '派出商队');
   }
 
   openEnemyCity(c) {
@@ -732,6 +806,7 @@ export class GameUI {
           h('div', { class: 'panel__rows' },
             h('div', null, h('span', { class: 'muted' }, '兵'), ' ', Math.round(c.soldiers)),
             h('div', null, h('span', { class: 'muted' }, '防'), ' ', Math.round(c.defense)),
+            h('div', null, h('span', { class: 'muted' }, '城池'), ` Lv${c.level || 1}`),
             h('div', null, h('span', { class: 'muted' }, '田/市/墙'), ` ${c.farmLevel}/${c.marketLevel}/${c.wallLevel}`),
             h('div', null, h('span', { class: 'muted' }, '守将'), ' ', gov ? gov.name : '—'),
           ),
@@ -807,17 +882,20 @@ export class GameUI {
   // ============ 科技 ============
   renderTech() {
     const s = this.state;
-    const research = s.researchByFaction && s.researchByFaction[s.playerFactionId];
+    const fid = s.playerFactionId;
+    const techMax = techMaxLevel(s, fid);
+    const research = s.researchByFaction && s.researchByFaction[fid];
     this.content.appendChild(h('div', null,
       h('h3', null, '科技树（势力独有）'),
+      h('p', { class: 'hint' }, `当前科技上限 Lv${techMax} —— 升级城池可解锁更高上限（势力最高城池等级越高，科技天花板越高）。`),
       research ? h('div', { class: 'panel', style: { marginBottom: '0.6rem' } },
         h('div', null, h('b', null, `正在研究：${TECHS[research.key].name}`), ` · 剩余 ${research.turnsLeft} 回合`),
       ) : null,
       h('div', { class: 'tech-grid' }, Object.entries(TECHS).map(([k, t]) => {
-        const lv = techLevel(s, s.playerFactionId, k);
-        const maxed = lv >= TECH_MAX_LEVEL;
+        const lv = techLevel(s, fid, k);
+        const maxed = lv >= techMax;
         const ongoing = research && research.key === k;
-        const dots = Array.from({ length: TECH_MAX_LEVEL }, (_, i) => h('i', { class: i < lv ? 'on' : '' }));
+        const dots = Array.from({ length: techMax }, (_, i) => h('i', { class: i < lv ? 'on' : '' }));
         return h('div', { class: 'tech-card' },
           h('div', { class: 'tech-card__head' },
             h('span', { class: 'tech-card__icon' }, t.icon),
@@ -825,7 +903,7 @@ export class GameUI {
             h('span', { class: 'tech-lv' }, dots),
           ),
           h('div', { class: 'hero-card__foot' },
-            h('span', { class: 'hero-card__sub' }, maxed ? '已满级' : `下级 ${TECH_COST_GOLD} 金`),
+            h('span', { class: 'hero-card__sub' }, `${lv}/${techMax}${maxed ? ' · 已满' : ''}`),
             h('span', { class: 'grow' }),
             h('button', {
               class: 'btn-primary', disabled: maxed || !!research,

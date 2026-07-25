@@ -1,0 +1,112 @@
+// DOM 冒烟测试：用 jsdom 驱动真实 UI 流程（启动 → 创角 → 对局 → 标签 → 城务 → 结束回合）。
+// 运行：node scripts/smoke-dom.mjs   （需先 npm install jsdom）
+import { JSDOM } from 'jsdom';
+import { register } from 'node:module';
+
+register('./_css-loader.mjs', import.meta.url);
+
+const dom = new JSDOM('<!DOCTYPE html><div id="game-container"></div>', {
+  url: 'http://localhost/',
+  pretendToBeVisual: true,
+});
+const { window } = dom;
+for (const k of ['document', 'window', 'localStorage', 'navigator', 'HTMLElement', 'Node', 'Element', 'getComputedStyle', 'CustomEvent', 'MouseEvent', 'Event']) {
+  if (window[k] === undefined) continue;
+  try { globalThis[k] = window[k]; } catch (_) {}
+}
+globalThis.requestAnimationFrame = (fn) => setTimeout(fn, 0);
+
+let pass = 0, fail = 0;
+const ok = (c, m) => { if (c) pass++; else { fail++; console.error('  ✗ FAIL:', m); } };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+let lastToast = '';
+const watchToasts = () => {
+  const wrap = document.querySelector('.toast-wrap');
+  if (!wrap) return;
+  new window.MutationObserver((muts) => {
+    for (const m of muts) for (const n of m.addedNodes) if (n.classList && n.classList.contains('toast')) lastToast = n.textContent;
+  }).observe(wrap, { childList: true });
+};
+
+const { createGame } = await import(new URL('../src/main.js', import.meta.url).href);
+const A = await import(new URL('../src/core/actions.js', import.meta.url).href);
+localStorage.clear();
+const ui = createGame(document.getElementById('game-container'));
+window.__XTSG = ui;
+watchToasts();
+await sleep(10);
+
+// ---------- 1) 启动器 ----------
+ok(document.querySelector('.launcher') !== null, '渲染启动器');
+ok(document.querySelector('.launcher__menu button') !== null, '启动器有「新游戏」按钮');
+
+// ---------- 2) 创角 ----------
+ui.showCreate();
+await sleep(5);
+ok(document.querySelector('.create') !== null, '进入创角页');
+ok(document.querySelectorAll('.city-pick__item').length === 18, '可选 18 座城市');
+const nameInput = document.querySelector('.create input[type=text]');
+nameInput.value = '玄德';
+nameInput.dispatchEvent(new window.Event('input'));
+ui.startCityPick = 'luoyang';
+ui.beginGame();
+await sleep(5);
+ok(document.querySelector('.game') !== null, '进入对局主界面');
+ok(document.querySelector('.topbar') !== null, '顶栏已渲染');
+ok(document.querySelectorAll('.tab').length === 5, '五个标签');
+ok(document.querySelectorAll('.map-dot').length === 18, '地图渲染 18 个城市点');
+
+// ---------- 3) 切换标签（逐个验证签名元素）----------
+const tabSignatures = {
+  faction: '.city-card', heroes: '.card-list', tech: '.tech-grid', system: '.sys-list', map: '.map-dot',
+};
+for (const [tab, sel] of Object.entries(tabSignatures)) {
+  ui.tab = tab; ui.renderTabbar(); ui.renderContent();
+  await sleep(3);
+  ok(document.querySelector(sel) !== null, `「${tab}」标签渲染（${sel}）`);
+}
+
+// ---------- 4) 城务：打开己方城市并执行内政 ----------
+ui.tab = 'map'; ui.renderContent(); await sleep(3);
+const luoyangDot = Array.from(document.querySelectorAll('.map-dot')).find((b) => b.textContent.includes('洛阳'));
+ok(!!luoyangDot, '找到洛阳城市点');
+luoyangDot.click();
+await sleep(5);
+ok(document.querySelector('.modal') !== null, '点击城市弹出城务弹窗');
+const farmBtn = Array.from(document.querySelectorAll('.cmd-btn')).find((b) => b.textContent.includes('农田'));
+ok(!!farmBtn, '城务含「开发农田」指令');
+farmBtn.click();
+await sleep(5);
+
+// ---------- 5) 结束回合 ----------
+ui.tab = 'system'; ui.renderContent(); await sleep(3);
+// 直接驱动结算（跳过确认弹窗）
+ui.doEndTurn();
+await sleep(20);
+ok(document.querySelector('.modal') !== null || document.querySelector('.gameover') !== null, '结算后弹出简报或结束界面');
+ok(ui.state.turn === 2 || ui.state.over != null, '回合推进或游戏结束');
+
+// ---------- 6) 战报弹窗渲染（驱动一次真实出征）----------
+ui.tab = 'map'; ui.renderContent(); await sleep(3);
+// 造势：洛阳兵足，邻接宛城设为中立薄弱，直接调用动作层出征并渲染战报
+const s = ui.state;
+const ly = s.cities.find((c) => c.id === 'luoyang');
+const wan = s.cities.find((c) => c.id === 'wan');
+ly.soldiers = 5000;
+wan.ownerFactionId = null; wan.soldiers = 300; wan.defense = 200;
+const lord = s.heroes.find((h) => h.isPlayerLord);
+const camp = A.campaign(s, 'luoyang', 'wan', lord.id, 2000, 'assault', s.playerFactionId, Math.random);
+ok(camp.ok && camp.battle, '出征产出战斗对象');
+ui.showBattleReport(camp.battle, camp.won, camp.msg);
+await sleep(5);
+ok(document.querySelector('.battle-log') !== null, '战报弹窗渲染');
+document.querySelector('.modal__foot button').click();
+await sleep(3);
+
+// ---------- 7) 存档可往返 ----------
+localStorage.setItem('__probe__', '1');
+ok(localStorage.getItem('xtsg_save_v1') != null, '对局已自动存档到 localStorage');
+
+console.log(`\nDOM 冒烟结果：${pass} 通过，${fail} 失败`);
+process.exit(fail ? 1 : 0);

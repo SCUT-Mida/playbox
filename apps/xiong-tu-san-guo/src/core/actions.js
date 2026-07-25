@@ -3,14 +3,14 @@
 // 消耗指令点（cmd）的动作通过 spendCmd 统一计费；任命太守、输送等少数免费。
 // ============================================================================
 import {
-  cityById, heroById, factionById, playerFaction, neighbors, heroesInCity,
+  cityById, heroById, factionById, neighbors, heroesInCity,
   wildHeroesInCity, heroesOfFaction, bestDefender, troopCap, cmdRemaining, maxDefense, lordOf,
   checkGameOver,
 } from './state.js';
 import { citiesOf, recruitCost } from './economy.js';
 import { skillBonus, techMult, techLevel, TECH_KEYS } from './tech.js';
 import { createBattle, runBattle, effLead, effWar } from './combat.js';
-import { chance, rangeInt } from './rng.js';
+import { chance } from './rng.js';
 import {
   BUILD_MAX, buildCost, TRAINING_MAX, FORMATIONS, STRATAGEMS,
   TECH_MAX_LEVEL, TECH_COST_GOLD, TECH_COST_TURNS, RECRUIT_LOYALTY_THRESHOLD,
@@ -294,6 +294,8 @@ function applyCampaignResult(state, battle, from, to, attackerGen, fid, rng) {
       const capCity = citiesOf(state, captorFid)[0];
       if (capCity) ph.cityId = capCity.id;
       if (ph.id === to.governorHeroId) to.governorHeroId = null;
+      // 攻方主将（出征失利被俘）若原为出发城太守，须解除旧职，与【胜利】分支对称
+      if (ph.id === from.governorHeroId) from.governorHeroId = null;
       state.turnLog.push(`⛓️ ${ph.name} 被俘。`);
     } else if (ph) {
       // 中立势力俘获 → 释放为在野
@@ -405,6 +407,9 @@ export function moveHero(state, heroId, toCityId, fid = PLAYER(state)) {
   const from = cityById(state, h.cityId);
   if (!from || !from.adjacent.includes(toCityId)) return { ok: false, msg: '两城不相邻' };
   h.cityId = toCityId;
+  // 武将调离后，若其原为出发城太守，须解除旧职，
+  // 否则 from.governorHeroId 会指向已不在本城的武将（违反"太守必在本城"不变量）
+  if (from.governorHeroId === heroId) from.governorHeroId = null;
   return { ok: true, msg: `${h.name} 调往 ${to.name}` };
 }
 

@@ -119,6 +119,51 @@ if (camp.won) {
   ok(true, '出征未克（随机结果）');
 }
 
+console.log('—— 太守引用一致性：调任 / 出征失利后无悬挂 ——');
+// 不变量：任意城市的太守必在本城（governorHeroId 指向的武将 cityId === 该城，且未被俘）
+function governorsConsistent(st) {
+  for (const c of st.cities) {
+    if (c.governorHeroId == null) continue;
+    const g = st.heroes.find((h) => h.id === c.governorHeroId);
+    if (!g || g.cityId !== c.id || g.status === 'prisoner') return false;
+  }
+  return true;
+}
+// 1) 调任：太守调离原城 → 原城太守引用须清空（修复 moveHero 悬挂）
+const sMove = newGame({ lordName: '调任', startCity: 'luoyang', stats, rng: makeRng(20) });
+cityById(sMove, 'wan').ownerFactionId = 0; // 玩家另占宛城（与洛阳相邻）
+const moveLord = sMove.heroes.find((h) => h.isPlayerLord);
+eq(A.appointGovernor(sMove, 'luoyang', moveLord.id, 0).ok, true, '任命君主为洛阳太守');
+eq(cityById(sMove, 'luoyang').governorHeroId, moveLord.id, '洛阳太守已任命');
+eq(A.moveHero(sMove, moveLord.id, 'wan', 0).ok, true, '调遣太守至宛城');
+eq(sMove.heroes.find((h) => h.id === moveLord.id).cityId, 'wan', '武将 cityId 已变更为宛城');
+eq(cityById(sMove, 'luoyang').governorHeroId, null, '调离后洛阳太守引用已清空（无悬挂）');
+ok(governorsConsistent(sMove), '调任后全局太守一致性成立');
+// 2) 出征失利被俘：主将为出发城太守、战败被俘 → 出发城太守引用须清空（修复失败分支不对称）
+let captureCleared = false;
+for (let seed = 200; seed < 600 && !captureCleared; seed++) {
+  const sd = newGame({ lordName: '出征', startCity: 'luoyang', stats, rng: makeRng(seed) });
+  cityById(sd, 'luoyang').soldiers = 50000;
+  // 加入一名非君主武将作为洛阳太守兼主将（武力弱，易败；可被俘）
+  const gen = makeGenericGeneral(makeRng(seed * 7), 9000 + seed);
+  gen.factionId = 0; gen.status = 'free'; gen.cityId = 'luoyang';
+  gen.stats = { l: 60, w: 40, i: 40, p: 40, c: 40 };
+  sd.heroes.push(gen);
+  A.appointGovernor(sd, 'luoyang', gen.id, 0);
+  eq(cityById(sd, 'luoyang').governorHeroId, gen.id, '出征前洛阳太守为主将');
+  const wanD = cityById(sd, 'wan');
+  wanD.ownerFactionId = 1; wanD.soldiers = 999999; wanD.defense = 99999; // 强敌，确保攻方失利
+  const res = A.campaign(sd, 'luoyang', 'wan', gen.id, 1000, 'normal', 0, makeRng(seed));
+  if (!res.ok) continue;
+  ok(governorsConsistent(sd), `出征后太守一致性（seed ${seed}）`);
+  const genAfter = sd.heroes.find((h) => h.id === gen.id);
+  if (!res.won && genAfter && genAfter.status === 'prisoner') {
+    captureCleared = true;
+    eq(cityById(sd, 'luoyang').governorHeroId, null, '主将战败被俘 → 出发城太守引用已清空');
+  }
+}
+ok(captureCleared, '覆盖到出征失利+主将被俘的失败分支');
+
 console.log('—— 回合结算（含 AI）——');
 const s3 = newGame({ lordName: '结算测试', startCity: 'luoyang', stats, rng: makeRng(11) });
 const turn1 = s3.turn;

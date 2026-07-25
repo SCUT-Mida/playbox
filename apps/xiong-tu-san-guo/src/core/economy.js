@@ -5,6 +5,7 @@
 import {
   GOLD_PER_MARKET, GOLD_PER_POP, GRAIN_PER_FARM, GRAIN_UPKEEP_PER_SOLDIER,
   POP_GROWTH_RATE, POP_GROWTH_POL_DIVISOR, TRAINING_BASE,
+  RECRUIT_GOLD_PER_SOLDIER, RECRUIT_POP_PER_SOLDIER,
 } from '../config.js';
 import { techMult } from './tech.js';
 
@@ -67,8 +68,9 @@ export function cityPopGrowth(state, city, politics) {
 
 // 征兵消耗：金钱 / 人口（受征兵特性影响——人口消耗降低）
 export function recruitCost(city, count) {
-  const popCost = count * (1 / (1 + (city.trait && city.trait.type === 'recruit' ? city.trait.value : 0)));
-  return { gold: count * 1.5, pop: popCost };
+  const traitBonus = city.trait && city.trait.type === 'recruit' ? city.trait.value : 0;
+  const popCost = (count * RECRUIT_POP_PER_SOLDIER) / (1 + traitBonus);
+  return { gold: count * RECRUIT_GOLD_PER_SOLDIER, pop: popCost };
 }
 
 export { TRAINING_BASE };

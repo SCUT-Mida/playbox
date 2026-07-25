@@ -6,7 +6,7 @@
 // ============================================================================
 import * as A from './actions.js';
 import {
-  cmdRemaining, heroesOfFaction, neighbors, lordOf, heroById,
+  cmdRemaining, heroesOfFaction, neighbors, lordOf,
 } from './state.js';
 import { citiesOf } from './economy.js';
 import { effLead } from './combat.js';
@@ -24,7 +24,7 @@ export function aiTurn(state, fid, rng) {
   while (cmdRemaining(state, fid) > 0 && guard++ < 30) {
     let acted = false;
 
-    // 1) 内政：金币低则升市场；兵不足人口 20% 则征兵
+    // 1) 内政：国库充盈（金钱 > 600）才升市场——有钱才投资，优于设计文档初稿"金币低于 500 升市场"的被动策略；兵不足人口 20% 则征兵
     for (const c of cities) {
       if (cmdRemaining(state, fid) <= 0) break;
       const fac = state.factions.find((f) => f.id === fid);

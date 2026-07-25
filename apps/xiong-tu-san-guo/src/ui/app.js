@@ -337,16 +337,23 @@ export class GameUI {
   openOwnedCity(c) {
     const s = this.state;
     const fid = s.playerFactionId;
-    const cmdBtn = (label, fn, danger) => h('button', {
-      class: `cmd-btn ${danger ? 'btn-danger' : 'btn-primary'}`, onClick: () => { const r = fn(); if (r.msg) this.toast(r.msg); this.afterAction(); },
+    // refresh=true：动作在弹窗内就地完成后，重绘城务弹窗以刷新兵数/等级/在野列表（征兵另开子弹窗，不在此重绘）
+    const cmdBtn = (label, fn, danger, refresh) => h('button', {
+      class: `cmd-btn ${danger ? 'btn-danger' : 'btn-primary'}`,
+      onClick: () => {
+        const r = fn();
+        if (r.msg) this.toast(r.msg);
+        this.afterAction();
+        if (refresh && r.ok) this.openOwnedCity(c);
+      },
     }, label);
     const grid = h('div', { class: 'cmd-grid' },
-      cmdBtn(`农田 Lv${c.farmLevel}`, () => A.developFarm(s, c.id)),
-      cmdBtn(`市集 Lv${c.marketLevel}`, () => A.developMarket(s, c.id)),
-      cmdBtn(`城墙 Lv${c.wallLevel}`, () => A.buildWall(s, c.id)),
+      cmdBtn(`农田 Lv${c.farmLevel}`, () => A.developFarm(s, c.id), false, true),
+      cmdBtn(`市集 Lv${c.marketLevel}`, () => A.developMarket(s, c.id), false, true),
+      cmdBtn(`城墙 Lv${c.wallLevel}`, () => A.buildWall(s, c.id), false, true),
       cmdBtn('征兵', () => this.uiRecruit(c)),
-      cmdBtn('操练', () => A.train(s, c.id)),
-      cmdBtn('探索', () => A.explore(s, c.id)),
+      cmdBtn('操练', () => A.train(s, c.id), false, true),
+      cmdBtn('探索', () => A.explore(s, c.id), false, true),
     );
     const advBtns = h('div', { class: 'hero-card__foot' },
       h('button', { class: 'btn-jade', onClick: () => this.uiAppoint(c) }, '任命太守'),
@@ -357,7 +364,7 @@ export class GameUI {
     const wilds = wildHeroesInCity(s, c.id).filter((w) => w.discovered);
     const wildBlock = wilds.length ? h('div', { style: { marginTop: '0.6rem' } },
       h('div', { class: 'hint' }, '本城在野名将：'),
-      h('div', { class: 'hero-card__foot' }, wilds.map((w) => h('button', { class: 'btn-ghost', onClick: () => { const r = A.recruitHero(s, w.id); this.toast(r.msg); this.afterAction(); } }, `登用 ${w.name}`))),
+      h('div', { class: 'hero-card__foot' }, wilds.map((w) => h('button', { class: 'btn-ghost', onClick: () => { const r = A.recruitHero(s, w.id); this.toast(r.msg); this.afterAction(); if (r.ok) this.openOwnedCity(c); } }, `登用 ${w.name}`))),
     ) : null;
 
     const body = h('div', null, this.cityHeader(c), this.cityRows(c), grid, advBtns, wildBlock);

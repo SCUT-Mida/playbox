@@ -329,7 +329,6 @@ export class GameUI {
       r('农田', `Lv${c.farmLevel}`),
       r('市集', `Lv${c.marketLevel}`),
       r('城墙', `Lv${c.wallLevel}`),
-      r('兵营', `Lv${c.barracksLevel}`),
       r('训练度', c.training),
       r('太守', gov ? gov.name : '—'),
     );
@@ -613,12 +612,12 @@ export class GameUI {
     const s = this.state;
     const research = s.researchByFaction && s.researchByFaction[s.playerFactionId];
     this.content.appendChild(h('div', null,
-      h('h3', null, '科技树（势力共享）'),
+      h('h3', null, '科技树（势力独有）'),
       research ? h('div', { class: 'panel', style: { marginBottom: '0.6rem' } },
         h('div', null, h('b', null, `正在研究：${TECHS[research.key].name}`), ` · 剩余 ${research.turnsLeft} 回合`),
       ) : null,
       h('div', { class: 'tech-grid' }, Object.entries(TECHS).map(([k, t]) => {
-        const lv = techLevel(s, k);
+        const lv = techLevel(s, s.playerFactionId, k);
         const maxed = lv >= TECH_MAX_LEVEL;
         const ongoing = research && research.key === k;
         const dots = Array.from({ length: TECH_MAX_LEVEL }, (_, i) => h('i', { class: i < lv ? 'on' : '' }));
@@ -638,7 +637,7 @@ export class GameUI {
           ),
         );
       })),
-      h('p', { class: 'hint', style: { marginTop: '0.6rem' } }, '研究每级消耗 800 金，约 3 回合（君主智力可缩短），完成后势力全城共享加成。'),
+      h('p', { class: 'hint', style: { marginTop: '0.6rem' } }, '研究每级消耗 800 金，约 3 回合（君主智力可缩短），完成后本势力全城共享加成，各势力科技互不共享。'),
     ));
   }
 

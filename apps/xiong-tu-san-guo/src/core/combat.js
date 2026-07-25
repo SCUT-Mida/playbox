@@ -27,7 +27,7 @@ export function attackValue(force, state) {
   const war = effWar(g);
   const lead = effLead(g);
   const soldiers = Math.max(0, force.soldiers);
-  const forge = techMult(state, 'forge', 0.05);
+  const forge = techMult(state, force.factionId, 'forge', 0.05);
   const form = FORMATIONS[force.formation] || FORMATIONS.normal;
   return (war * 0.4 + lead * 0.3 + soldiers * 0.01) * forge * trainingCoeff(force.training) * form.atk;
 }

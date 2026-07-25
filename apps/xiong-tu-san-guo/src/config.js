@@ -6,7 +6,7 @@
 export const SAVE_KEY = 'xtsg_save_v1';
 export const GAME_VERSION = 1;
 
-export const BUILD_MAX = 5; // 城市建筑等级上限（农田 / 市集 / 兵营 / 城墙 / 工坊）
+export const BUILD_MAX = 5; // 城市建筑等级上限（农田 / 市集 / 城墙）
 export const TRAINING_BASE = 50; // 士兵默认训练度
 export const TRAINING_MAX = 100;
 

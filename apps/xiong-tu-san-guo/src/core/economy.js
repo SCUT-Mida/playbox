@@ -23,13 +23,13 @@ function traitMult(city, type) {
 // 商业收入（每回合，单城）
 export function cityGoldIncome(state, city) {
   const base = city.marketLevel * GOLD_PER_MARKET + city.population * GOLD_PER_POP;
-  return base * traitMult(city, 'commerce') * techMult(state, 'commerce', 0.1);
+  return base * traitMult(city, 'commerce') * techMult(state, city.ownerFactionId, 'commerce', 0.1);
 }
 
 // 粮食产量（每回合，单城）
 export function cityGrainIncome(state, city) {
   const base = city.farmLevel * GRAIN_PER_FARM;
-  return base * traitMult(city, 'grain') * techMult(state, 'agri', 0.1);
+  return base * traitMult(city, 'grain') * techMult(state, city.ownerFactionId, 'agri', 0.1);
 }
 
 // 势力每回合金钱总收入（含特性 / 科技）
@@ -55,7 +55,7 @@ export function factionGrainNet(state, factionId) {
 export function cityDefenseValue(state, city) {
   const base = city.defenseBase || 0;
   const wallBoost = 1 + (city.wallLevel - 1) * 0.15;
-  return base * traitMult(city, 'defense') * techMult(state, 'wall', 0.2) * wallBoost;
+  return base * traitMult(city, 'defense') * techMult(state, city.ownerFactionId, 'wall', 0.2) * wallBoost;
 }
 
 // 单城人口增长（依赖太守或君主政治）

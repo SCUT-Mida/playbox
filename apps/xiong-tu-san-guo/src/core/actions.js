@@ -8,11 +8,11 @@ import {
   checkGameOver,
 } from './state.js';
 import { citiesOf, recruitCost } from './economy.js';
-import { skillBonus, techMult, techLevel } from './tech.js';
+import { skillBonus, techMult, techLevel, TECH_KEYS } from './tech.js';
 import { createBattle, runBattle, effLead, effWar } from './combat.js';
 import { chance, rangeInt } from './rng.js';
 import {
-  BUILD_MAX, buildCost, TRAINING_BASE, TRAINING_MAX, FORMATIONS, STRATAGEMS,
+  BUILD_MAX, buildCost, TRAINING_MAX, FORMATIONS, STRATAGEMS,
   TECH_MAX_LEVEL, TECH_COST_GOLD, TECH_COST_TURNS, RECRUIT_LOYALTY_THRESHOLD,
 } from '../config.js';
 
@@ -84,8 +84,6 @@ export function recruit(state, cityId, count, fid = PLAYER(state)) {
   fac.money -= gold;
   c.population -= Math.round(pop);
   c.soldiers += count;
-  // 兵营等级提升新兵训练度起点
-  if (c.training < TRAINING_BASE + (c.barracksLevel - 1) * 5) c.training = TRAINING_BASE + (c.barracksLevel - 1) * 5;
   return { ok: true, msg: `${c.name} 征兵 ${count}（-${Math.round(gold)} 金，-${Math.round(pop)} 人口）` };
 }
 
@@ -139,7 +137,7 @@ export function recruitHero(state, heroId, fid = PLAYER(state), rng) {
   const roster = heroesInCity(state, h.cityId, fid);
   const charm = roster.length ? Math.max(...roster.map((x) => x.stats.c)) : 50;
   const cBonus = roster.length ? Math.max(...roster.map((x) => skillBonus(x).c_recruit)) : 0;
-  let p = 0.25 + (charm - h.loyalty) / 200 + cBonus + techMult(state, 'trick', 0.05) - 1;
+  let p = 0.25 + (charm - h.loyalty) / 200 + cBonus + techMult(state, fid, 'trick', 0.05) - 1;
   p = Math.max(0.05, Math.min(0.95, p));
   if (chance(r, p)) {
     h.wild = false;
@@ -177,10 +175,10 @@ export function appointGovernor(state, cityId, heroId, fid = PLAYER(state)) {
 
 // —— 科技：开始研究 ——
 export function research(state, techKey, fid = PLAYER(state)) {
-  if (!Object.prototype.hasOwnProperty.call(state.techLevels, techKey)) return { ok: false, msg: '未知科技' };
+  if (!TECH_KEYS.includes(techKey)) return { ok: false, msg: '未知科技' };
   state.researchByFaction = state.researchByFaction || {};
   if (state.researchByFaction[fid]) return { ok: false, msg: '本势力已有研究进行中' };
-  if (techLevel(state, techKey) >= TECH_MAX_LEVEL) return { ok: false, msg: '该科技已满级' };
+  if (techLevel(state, fid, techKey) >= TECH_MAX_LEVEL) return { ok: false, msg: '该科技已满级' };
   if (!spendCmd(state, fid)) return { ok: false, msg: '指令点不足' };
   if (facMoney(state, fid) < TECH_COST_GOLD) { refundCmd(state, fid); return { ok: false, msg: '金钱不足' }; }
   factionById(state, fid).money -= TECH_COST_GOLD;
@@ -234,10 +232,32 @@ export function campaign(state, fromCityId, toCityId, generalId, troops, formati
   return { ok: true, won, battle, msg: won ? `攻克 ${to.name}！` : `攻打 ${to.name} 失利。`, log: msgs };
 }
 
+// BFS 查找距 fromCityId 最近且归属 fid 的城市（按邻接跳数）；无则返回 null
+function nearestFriendlyCity(state, fromCityId, fid) {
+  if (!cityById(state, fromCityId)) return null;
+  const seen = new Set([fromCityId]);
+  const queue = [fromCityId];
+  while (queue.length) {
+    const cur = cityById(state, queue.shift());
+    if (!cur) continue;
+    for (const adj of cur.adjacent) {
+      if (seen.has(adj)) continue;
+      seen.add(adj);
+      const c = cityById(state, adj);
+      if (!c) continue;
+      if (c.ownerFactionId === fid) return c;
+      queue.push(adj);
+    }
+  }
+  return null;
+}
+
 // 结算出征结果（占领 / 溃败 / 俘虏）
 function applyCampaignResult(state, battle, from, to, attackerGen, fid, rng) {
   const won = battle.result === 'attacker';
   const captorFid = won ? fid : to.ownerFactionId;
+  const oldOwnerFid = battle.defender ? battle.defender.factionId : null; // 城陷前归属（败方）
+  const prisonerId = battle.prisoner;
 
   if (won) {
     // 占领：幸存兵力转为新守军，主将入驻
@@ -248,7 +268,8 @@ function applyCampaignResult(state, battle, from, to, attackerGen, fid, rng) {
     attackerGen.cityId = to.id;
     // 主将原为出发城太守时，须解除旧职，避免同一武将被两城同时引用为太守
     if (from.governorHeroId === attackerGen.id) from.governorHeroId = null;
-    if (!to.governorHeroId || !heroById(state, to.governorHeroId)) to.governorHeroId = attackerGen.id;
+    // 城已易主：败方太守须撤换，由攻方主将入驻出任太守
+    to.governorHeroId = attackerGen.id;
     // 缴获城库
     const lootGold = to.gold || 0;
     const lootGrain = to.grain || 0;
@@ -279,6 +300,25 @@ function applyCampaignResult(state, battle, from, to, attackerGen, fid, rng) {
       ph.status = 'free';
       ph.wild = true;
       ph.discovered = false;
+    }
+  }
+
+  // 城陷善后：未俘获的败方武将不可滞留于已被占领的城——
+  // 迁至其势力最近的友城；若势力已无城可守，则转为在野（可被他方登用）。
+  if (won && oldOwnerFid != null) {
+    const stragglers = state.heroes.filter((h) =>
+      h.factionId === oldOwnerFid && h.cityId === to.id
+      && h.status !== 'prisoner' && h.id !== prisonerId);
+    const dest = stragglers.length ? nearestFriendlyCity(state, to.id, oldOwnerFid) : null;
+    for (const sh of stragglers) {
+      if (dest) {
+        sh.cityId = dest.id;
+      } else {
+        sh.wild = true;
+        sh.factionId = null;
+        sh.status = 'free';
+        sh.discovered = true; // 名义上原驻此城，可见
+      }
     }
   }
 }
@@ -325,7 +365,7 @@ export function stratagem(state, fromCityId, toCityId, type, fid = PLAYER(state)
   const intel = caster.stats ? caster.stats.i : 50;
   const targetGen = bestDefender(state, toCityId);
   const tIntel = targetGen && targetGen.stats ? targetGen.stats.i : 45;
-  let p = 0.35 + (intel - tIntel) / 200 + techMult(state, 'trick', 0.05) - 1;
+  let p = 0.35 + (intel - tIntel) / 200 + techMult(state, fid, 'trick', 0.05) - 1;
   p = Math.max(0.05, Math.min(0.9, p));
 
   if (!chance(r, p)) {

@@ -10,7 +10,7 @@ import {
   GAME_VERSION, CMD_BASE, CMD_PER_CITY, TRAINING_BASE,
   FACTION_COLORS, PLAYER_COLOR, GRAIN_UPKEEP_PER_SOLDIER, TECH_COST_TURNS, TECH_MAX_LEVEL,
 } from '../config.js';
-import { skillBonus, techMult } from './tech.js';
+import { skillBonus, techMult, ensureTechLevels } from './tech.js';
 import { chance } from './rng.js';
 import {
   citiesOf, cityGoldIncome, cityGrainIncome, cityPopGrowth, cityDefenseValue,
@@ -43,15 +43,15 @@ export function wildHeroesInCity(state, cityId) {
 // 带兵上限：统率 × 100 × (1 + 统御技能) × 统御科技
 export function troopCap(state, hero) {
   if (!hero) return 0;
-  return Math.round(hero.stats.l * 100 * (1 + skillBonus(hero).cap) * techMult(state, 'leadership', 0.1));
+  return Math.round(hero.stats.l * 100 * (1 + skillBonus(hero).cap) * techMult(state, hero.factionId, 'leadership', 0.1));
 }
 
-// 指令点数：基础 + 每多一城 + 君主政治加成
+// 指令点数：基础 + 每多一城 + 君主政治加成（政治 / 20，使高政治君主确有更多指令）
 export function cmdPoints(state, fid) {
   const n = citiesOf(state, fid).length;
   const lord = lordOf(state, fid);
   const pol = lord ? lord.stats.p : 50;
-  return CMD_BASE + CMD_PER_CITY * Math.max(0, n - 1) + Math.floor(pol / 100);
+  return CMD_BASE + CMD_PER_CITY * Math.max(0, n - 1) + Math.floor(pol / 20);
 }
 export function cmdRemaining(state, fid) {
   return Math.max(0, cmdPoints(state, fid) - (state.cmdUsedByFaction?.[fid] || 0));
@@ -85,7 +85,7 @@ export function newGame({ lordName, startCity, stats, rng } = {}) {
     factions: [],
     cities: [],
     heroes: [],
-    techLevels: { agri: 0, commerce: 0, forge: 0, wall: 0, trick: 0, leadership: 0 },
+    techLevelsByFaction: {}, // { [fid]: { key: level } } —— 科技等级按势力独立存储
     researchByFaction: {}, // { [fid]: { key, turnsLeft } } —— 研究进度槽按势力独立
     cmdUsedByFaction: {},
     log: [],
@@ -119,7 +119,7 @@ export function newGame({ lordName, startCity, stats, rng } = {}) {
       population: c.pop0, maxPopulation: c.popMax,
       soldiers: c.soldiers0, defenseBase: c.defense0, defense: c.defense0,
       gold: c.gold0, grain: c.grain0, // 城库（攻陷时被缴获）
-      farmLevel: 1, marketLevel: 1, barracksLevel: 1, wallLevel: 1, workshopLevel: 0,
+      farmLevel: 1, marketLevel: 1, wallLevel: 1,
       governorHeroId: null, adjacent: c.adjacent.slice(),
       training: TRAINING_BASE,
     });
@@ -280,16 +280,18 @@ export function resolveTurn(state, aiModule, rng) {
     }
   }
 
-  // —— 科技推进（逐势力独立研究槽，互不阻塞）——
+  // —— 科技推进（逐势力独立研究槽、独立等级，互不阻塞、互不共享）——
   state.researchByFaction = state.researchByFaction || {};
   for (const fac of state.factions) {
     const res = state.researchByFaction[fac.id];
     if (!res) continue;
     res.turnsLeft -= 1;
     if (res.turnsLeft <= 0) {
-      state.techLevels[res.key] = Math.min(TECH_MAX_LEVEL, state.techLevels[res.key] + 1);
+      // 仅对本势力加级；其他势力（含同时研究同项科技者）的等级不受影响
+      const tbl = ensureTechLevels(state, fac.id);
+      tbl[res.key] = Math.min(TECH_MAX_LEVEL, (tbl[res.key] || 0) + 1);
       if (fac.id === state.playerFactionId) {
-        state.turnLog.push(`🔬 科技突破：研究完成（${res.key} 升至 ${state.techLevels[res.key]} 级）。`);
+        state.turnLog.push(`🔬 科技突破：研究完成（${res.key} 升至 ${tbl[res.key]} 级）。`);
       }
       delete state.researchByFaction[fac.id];
     }

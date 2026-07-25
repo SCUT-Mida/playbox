@@ -29,8 +29,22 @@ export function loadGame() {
   try {
     const raw = storage ? storage.getItem(SAVE_KEY) : null;
     if (!raw) return null;
-    return JSON.parse(raw);
+    return migrateSave(JSON.parse(raw));
   } catch (_) { return null; }
+}
+
+// 存档兼容：旧版科技等级为全局 state.techLevels（所有势力共享），
+// 现改为按势力独立的 state.techLevelsByFaction。旧存档中已研究的科技
+// 视作玩家势力掌握；AI 势力从 0 起算。
+function migrateSave(state) {
+  if (!state) return state;
+  if (!state.techLevelsByFaction) {
+    state.techLevelsByFaction = state.techLevels
+      ? { [state.playerFactionId]: { ...state.techLevels } }
+      : {};
+    delete state.techLevels;
+  }
+  return state;
 }
 
 export function clearSave() {

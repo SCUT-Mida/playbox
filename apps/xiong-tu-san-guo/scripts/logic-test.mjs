@@ -3,11 +3,12 @@ import { CITIES, CITY_MAP, adjacencyValid } from '../src/data/cities.js';
 import { HEROES, FACTION_SEEDS, makeGenericGeneral } from '../src/data/heroes.js';
 import { makeRng } from '../src/core/rng.js';
 import { parseSkill, techMult } from '../src/core/tech.js';
-import { cityGoldIncome, cityGrainIncome, factionGoldIncome, factionGrainNet } from '../src/core/economy.js';
+import { cityGoldIncome, cityGrainIncome, factionGoldIncome, factionGrainNet, cityDefenseValue, governorEconMult, generalDefMult } from '../src/core/economy.js';
 import { createBattle, runBattle, effWar, attackValue } from '../src/core/combat.js';
 import {
   newGame, cityById, heroesOfFaction, cmdPoints, cmdRemaining,
   troopCap, resolveTurn, checkGameOver, neighbors, wildHeroesInCity,
+  officeHolder, clearHeroOffices,
 } from '../src/core/state.js';
 import * as A from '../src/core/actions.js';
 import { aiTurnAll } from '../src/core/ai.js';
@@ -194,6 +195,83 @@ function bfsReachable(state, start) {
   return seen;
 }
 eq(bfsReachable(s, 'luoyang').size, 18, '从洛阳可达全部 18 城（地图连通）');
+
+console.log('—— 城市职官：太守 / 将军 / 军师 ——');
+const so = newGame({ lordName: '职官', startCity: 'luoyang', stats, rng: makeRng(31) });
+const ly2 = cityById(so, 'luoyang');
+eq(ly2.generalHeroId, null, '新城将军虚位');
+eq(ly2.strategistHeroId, null, '新城军师虚位');
+// 注入三名不同特长武将
+function inject(idx, st) { const g = makeGenericGeneral(makeRng(idx), 7000 + idx); g.factionId = 0; g.status = 'free'; g.cityId = 'luoyang'; g.stats = st; so.heroes.push(g); return g; }
+const polH = inject(2, { l: 60, w: 60, i: 60, p: 100, c: 60 });
+const genH = inject(3, { l: 100, w: 60, i: 60, p: 60, c: 60 });
+const lowH = inject(4, { l: 60, w: 60, i: 60, p: 50, c: 60 });
+// 太守政治影响农商业收入（高政治 > 低政治）
+A.appointGovernor(so, 'luoyang', lowH.id, 0);
+const goldLow = cityGoldIncome(so, ly2);
+A.appointGovernor(so, 'luoyang', polH.id, 0);
+const goldHigh = cityGoldIncome(so, ly2);
+ok(goldHigh > goldLow, `高政治太守提升商业收入 (${goldLow.toFixed(1)} → ${goldHigh.toFixed(1)})`);
+ok(governorEconMult(so, ly2) > 1, '太守经济乘数 > 1');
+// 将军统率影响城防
+const defNone = cityDefenseValue(so, ly2);
+A.appointGeneral(so, 'luoyang', genH.id, 0);
+const defGen = cityDefenseValue(so, ly2);
+ok(defGen > defNone, `高统率将军提升城防 (${defNone.toFixed(1)} → ${defGen.toFixed(1)})`);
+ok(generalDefMult(so, ly2) > 1, '将军城防乘数 > 1');
+eq(officeHolder(so, ly2, 'general').id, genH.id, 'officeHolder 返回在任将军');
+// 一人不可兼多职：就任新职前旧职自动卸除
+A.appointGovernor(so, 'luoyang', genH.id, 0);
+eq(ly2.governorHeroId, genH.id, '将军转任太守');
+eq(ly2.generalHeroId, null, '转任太守后将军旧职卸除');
+A.appointGeneral(so, 'luoyang', genH.id, 0);
+eq(ly2.generalHeroId, genH.id, '太守转任将军');
+eq(ly2.governorHeroId, null, '转任将军后太守旧职卸除');
+// 军师任命
+A.appointStrategist(so, 'luoyang', polH.id, 0);
+eq(ly2.strategistHeroId, polH.id, '军师任命成功');
+// 调离本城 → 其职官引用清空（无悬挂）
+cityById(so, 'wan').ownerFactionId = 0; // 宛城归玩家，与洛阳相邻
+eq(A.moveHero(so, genH.id, 'wan', 0).ok, true, '将军调往宛城');
+eq(ly2.generalHeroId, null, '将军调离后本城将军引用清空');
+function officesConsistent(st) {
+  for (const c of st.cities) {
+    for (const key of ['governor', 'general', 'strategist']) {
+      const h = officeHolder(st, c, key);
+      const raw = c[{ governor: 'governorHeroId', general: 'generalHeroId', strategist: 'strategistHeroId' }[key]];
+      if (!raw) continue;
+      if (!h) return false; // 引用存在但持有者不在城 / 被俘 → 违反不变量
+    }
+  }
+  return true;
+}
+ok(officesConsistent(so), '调离后全局职官一致性成立');
+// clearHeroOffices 直接清空一切职官
+A.appointGovernor(so, 'luoyang', polH.id, 0);
+clearHeroOffices(so, polH.id);
+eq(ly2.governorHeroId, null, 'clearHeroOffices 清空太守');
+
+console.log('—— 探索：不再徒劳无功 ——');
+const se = newGame({ lordName: '探索', startCity: 'luoyang', stats, rng: makeRng(33) });
+ok(wildHeroesInCity(se, 'luoyang').length >= 1, '洛阳初始有在野名将');
+// 起兵之城在野名将默认已「风闻」；此处重置为未发现，模拟新征服城市的探索
+for (const w of wildHeroesInCity(se, 'luoyang')) w.discovered = false;
+const cmd0 = cmdRemaining(se, 0);
+const exp1 = A.explore(se, 'luoyang', 0, makeRng(5));
+ok(exp1.ok && exp1.newly && exp1.newly.length >= 1, '探索保证至少发现一位在野名将（不徒劳）');
+eq(cmdRemaining(se, 0), cmd0 - 1, '发现名将消耗 1 指令');
+// 全部已发现 → 不再消耗指令
+const before2 = cmdRemaining(se, 0);
+for (const w of wildHeroesInCity(se, 'luoyang')) w.discovered = true;
+const exp2 = A.explore(se, 'luoyang', 0, makeRng(6));
+ok(exp2.ok && exp2.noCost === true, '全部已发现时探索不耗指令');
+eq(cmdRemaining(se, 0), before2, '全部已发现时指令不变');
+// 城中已无任何在野名将 → 不耗指令且无所获
+for (const w of se.heroes.filter((h) => h.wild && h.cityId === 'luoyang')) w.status = 'gone';
+const before3 = cmdRemaining(se, 0);
+const exp3 = A.explore(se, 'luoyang', 0, makeRng(7));
+ok(exp3.ok && exp3.noCost === true && exp3.discovered.length === 0, '无在野名将时探索不耗指令');
+eq(cmdRemaining(se, 0), before3, '无在野时指令不变');
 
 console.log(`\n结果：${pass} 通过，${fail} 失败`);
 process.exit(fail ? 1 : 0);

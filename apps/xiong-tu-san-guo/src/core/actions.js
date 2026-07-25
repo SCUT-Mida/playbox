@@ -5,15 +5,16 @@
 import {
   cityById, heroById, factionById, neighbors, heroesInCity,
   wildHeroesInCity, heroesOfFaction, bestDefender, troopCap, cmdRemaining, maxDefense, lordOf,
-  checkGameOver,
+  checkGameOver, clearHeroOffices, officeHolder,
 } from './state.js';
 import { citiesOf, recruitCost } from './economy.js';
 import { skillBonus, techMult, techLevel, TECH_KEYS } from './tech.js';
 import { createBattle, runBattle, effLead, effWar } from './combat.js';
-import { chance } from './rng.js';
+import { chance, shuffle } from './rng.js';
 import {
   BUILD_MAX, buildCost, TRAINING_MAX, FORMATIONS, STRATAGEMS,
   TECH_MAX_LEVEL, TECH_COST_GOLD, TECH_COST_TURNS, RECRUIT_LOYALTY_THRESHOLD,
+  CITY_OFFICES, OFFICE_MAP, officeField,
 } from '../config.js';
 
 const PLAYER = (state) => state.playerFactionId;
@@ -87,7 +88,7 @@ export function recruit(state, cityId, count, fid = PLAYER(state)) {
   return { ok: true, msg: `${c.name} 征兵 ${count}（-${Math.round(gold)} 金，-${Math.round(pop)} 人口）` };
 }
 
-// —— 内政：操练（提升训练度）——
+// —— 内政：操练（提升训练度；将军统率加成操练效率）——
 export function train(state, cityId, fid = PLAYER(state)) {
   const c = cityById(state, cityId);
   if (!c || c.ownerFactionId !== fid) return { ok: false, msg: '该城非你所属' };
@@ -96,32 +97,46 @@ export function train(state, cityId, fid = PLAYER(state)) {
   const cost = 200;
   if (facMoney(state, fid) < cost) { refundCmd(state, fid); return { ok: false, msg: '金钱不足' }; }
   factionById(state, fid).money -= cost;
-  c.training = Math.min(TRAINING_MAX, c.training + 8);
-  return { ok: true, msg: `${c.name} 操练部队，训练度 → ${c.training}` };
+  const general = officeHolder(state, c, 'general');
+  const gain = 8 + (general ? Math.max(0, (general.stats.l || 50) - 50) / 10 : 0); // 将军统率每点+0.1，满100约+5
+  c.training = Math.min(TRAINING_MAX, c.training + gain);
+  return { ok: true, msg: `${c.name} 操练部队，训练度 → ${c.training}${general ? `（${general.name} 督操）` : ''}` };
 }
 
 // —— 人事：探索（发现本城在野名将）——
+// 设计：避免「徒劳无功」——
+//   · 城中无任何在野名将 → 不耗指令，告知无可寻访；
+//   · 在野名将已全部发现 → 不耗指令，提示可登用；
+//   · 仍有未发现名将 → 耗 1 指令，且保证至少发现一位（魅力 / 军师智力越高，越可能多发现几位）。
 export function explore(state, cityId, fid = PLAYER(state), rng) {
   const r = rng || Math.random;
   const c = cityById(state, cityId);
   if (!c || c.ownerFactionId !== fid) return { ok: false, msg: '该城非你所属' };
+  const wilds = wildHeroesInCity(state, cityId);
+  if (!wilds.length) {
+    return { ok: true, noCost: true, msg: `${c.name} 四处寻访，并无名士风闻（可往他城探访）。`, discovered: [] };
+  }
+  const hidden = wilds.filter((w) => !w.discovered);
+  if (!hidden.length) {
+    return { ok: true, noCost: true, msg: `${c.name} 在野名将均已知晓，可择机登用。`, discovered: wilds };
+  }
   if (!spendCmd(state, fid)) return { ok: false, msg: '指令点不足' };
   const roster = heroesInCity(state, cityId, fid);
-  const charm = roster.length ? Math.max(...roster.map((h) => h.stats.c)) : 50;
-  const wilds = wildHeroesInCity(state, cityId);
+  let charm = roster.length ? Math.max(...roster.map((h) => h.stats.c)) : 50;
+  const strat = officeHolder(state, c, 'strategist'); // 军师智力辅助寻访
+  if (strat) charm += (strat.stats.i || 50) * 0.2;
+  // 保底发现一位（随机排序的首位），魅力 / 军师越高越可能顺带发现更多。
+  const order = shuffle(r, hidden);
   const newly = [];
-  for (const w of wilds) {
-    if (w.discovered) continue;
-    if (chance(r, 0.4 + charm / 400)) { w.discovered = true; newly.push(w); }
-  }
-  const discovered = wilds.filter((w) => w.discovered);
-  if (!newly.length && !discovered.length) {
-    return { ok: true, msg: `${c.name} 四处寻访，未发现可用之才。`, discovered: [] };
+  order[0].discovered = true; newly.push(order[0]);
+  for (let i = 1; i < order.length; i++) {
+    if (chance(r, 0.3 + charm / 600)) { order[i].discovered = true; newly.push(order[i]); }
+    else break;
   }
   return {
     ok: true,
-    msg: newly.length ? `${c.name} 探访得知：${newly.map((w) => w.name).join('、')} 在此隐居！` : `${c.name} 已有名将在野可登用。`,
-    discovered,
+    msg: `${c.name} 探访得知：${newly.map((w) => w.name).join('、')} 在此隐居！`,
+    discovered: wilds.filter((w) => w.discovered),
     newly,
   };
 }
@@ -135,7 +150,9 @@ export function recruitHero(state, heroId, fid = PLAYER(state), rng) {
   if (!c || c.ownerFactionId !== fid) return { ok: false, msg: '名将不在己方城市' };
   if (!spendCmd(state, fid)) return { ok: false, msg: '指令点不足' };
   const roster = heroesInCity(state, h.cityId, fid);
-  const charm = roster.length ? Math.max(...roster.map((x) => x.stats.c)) : 50;
+  let charm = roster.length ? Math.max(...roster.map((x) => x.stats.c)) : 50;
+  const strat = officeHolder(state, c, 'strategist'); // 军师智力辅助游说
+  if (strat) charm += (strat.stats.i || 50) * 0.2;
   const cBonus = roster.length ? Math.max(...roster.map((x) => skillBonus(x).c_recruit)) : 0;
   let p = 0.25 + (charm - h.loyalty) / 200 + cBonus + techMult(state, fid, 'trick', 0.05) - 1;
   p = Math.max(0.05, Math.min(0.95, p));
@@ -162,15 +179,29 @@ export function reward(state, heroId, fid = PLAYER(state)) {
   return { ok: true, msg: `赏赐 ${h.name}，忠诚 → ${h.loyalty}` };
 }
 
-// —— 人事：任命太守（免费）——
-export function appointGovernor(state, cityId, heroId, fid = PLAYER(state)) {
+// —— 人事：任命城市职官（太守 / 将军 / 军师，免费）——
+// 同一武将不可兼多职：就任前先卸除其旧职；将军就任后即时重算城防以体现统率加成。
+export function appointOffice(state, cityId, heroId, officeKey, fid = PLAYER(state)) {
   const c = cityById(state, cityId);
   const h = heroById(state, heroId);
+  const office = OFFICE_MAP[officeKey];
+  if (!office) return { ok: false, msg: '未知职官' };
   if (!c || c.ownerFactionId !== fid) return { ok: false, msg: '该城非你所属' };
   if (!h || h.factionId !== fid || h.status === 'prisoner') return { ok: false, msg: '该武将不可用' };
   if (h.cityId !== cityId) return { ok: false, msg: '武将须在本城方可任命' };
-  c.governorHeroId = heroId;
-  return { ok: true, msg: `${h.name} 出任 ${c.name} 太守` };
+  clearHeroOffices(state, heroId); // 卸除旧职，避免一人身兼数职
+  c[office.field] = heroId;
+  if (officeKey === 'general') c.defense = maxDefense(state, c); // 将军统率即时抬升城防上限
+  return { ok: true, msg: `${h.name} 出任 ${c.name}${office.name}` };
+}
+export function appointGovernor(state, cityId, heroId, fid = PLAYER(state)) {
+  return appointOffice(state, cityId, heroId, 'governor', fid);
+}
+export function appointGeneral(state, cityId, heroId, fid = PLAYER(state)) {
+  return appointOffice(state, cityId, heroId, 'general', fid);
+}
+export function appointStrategist(state, cityId, heroId, fid = PLAYER(state)) {
+  return appointOffice(state, cityId, heroId, 'strategist', fid);
 }
 
 // —— 科技：开始研究 ——
@@ -266,9 +297,9 @@ function applyCampaignResult(state, battle, from, to, attackerGen, fid, rng) {
     to.soldiers = survivors;
     to.training = from.training;
     attackerGen.cityId = to.id;
-    // 主将原为出发城太守时，须解除旧职，避免同一武将被两城同时引用为太守
-    if (from.governorHeroId === attackerGen.id) from.governorHeroId = null;
-    // 城已易主：败方太守须撤换，由攻方主将入驻出任太守
+    // 主将原在出发城身兼职官 → 卸除旧职，避免同一武将被两城同时引用为职官
+    clearHeroOffices(state, attackerGen.id);
+    // 城已易主：由攻方主将入驻出任太守（败方职官随城陷卸任，见下方散兵处理）
     to.governorHeroId = attackerGen.id;
     // 缴获城库
     const lootGold = to.gold || 0;
@@ -293,26 +324,28 @@ function applyCampaignResult(state, battle, from, to, attackerGen, fid, rng) {
       ph.prisonerOf = captorFid;
       const capCity = citiesOf(state, captorFid)[0];
       if (capCity) ph.cityId = capCity.id;
-      if (ph.id === to.governorHeroId) to.governorHeroId = null;
-      // 攻方主将（出征失利被俘）若原为出发城太守，须解除旧职，与【胜利】分支对称
-      if (ph.id === from.governorHeroId) from.governorHeroId = null;
+      // 被俘者卸除一切职官（无论原属 to 或 from），杜绝悬挂引用
+      clearHeroOffices(state, ph.id);
       state.turnLog.push(`⛓️ ${ph.name} 被俘。`);
     } else if (ph) {
       // 中立势力俘获 → 释放为在野
       ph.status = 'free';
       ph.wild = true;
       ph.discovered = false;
+      clearHeroOffices(state, ph.id);
     }
   }
 
   // 城陷善后：未俘获的败方武将不可滞留于已被占领的城——
   // 迁至其势力最近的友城；若势力已无城可守，则转为在野（可被他方登用）。
+  // 离城者一并卸除在陷城的职官（太守 / 将军 / 军师），维持「职官必在本城」不变量。
   if (won && oldOwnerFid != null) {
     const stragglers = state.heroes.filter((h) =>
       h.factionId === oldOwnerFid && h.cityId === to.id
       && h.status !== 'prisoner' && h.id !== prisonerId);
     const dest = stragglers.length ? nearestFriendlyCity(state, to.id, oldOwnerFid) : null;
     for (const sh of stragglers) {
+      clearHeroOffices(state, sh.id);
       if (dest) {
         sh.cityId = dest.id;
       } else {
@@ -365,9 +398,11 @@ export function stratagem(state, fromCityId, toCityId, type, fid = PLAYER(state)
     ? casterRoster.reduce((a, b) => ((a.stats.i || 0) >= (b.stats.i || 0) ? a : b))
     : { stats: { i: 50 } };
   const intel = caster.stats ? caster.stats.i : 50;
+  const strat = officeHolder(state, from, 'strategist'); // 军师坐镇，计略更易奏效
+  const stratBonus = strat ? Math.max(0, (strat.stats.i || 50) - 50) / 400 : 0;
   const targetGen = bestDefender(state, toCityId);
   const tIntel = targetGen && targetGen.stats ? targetGen.stats.i : 45;
-  let p = 0.35 + (intel - tIntel) / 200 + techMult(state, fid, 'trick', 0.05) - 1;
+  let p = 0.35 + (intel - tIntel) / 200 + techMult(state, fid, 'trick', 0.05) + stratBonus - 1;
   p = Math.max(0.05, Math.min(0.9, p));
 
   if (!chance(r, p)) {
@@ -407,9 +442,9 @@ export function moveHero(state, heroId, toCityId, fid = PLAYER(state)) {
   const from = cityById(state, h.cityId);
   if (!from || !from.adjacent.includes(toCityId)) return { ok: false, msg: '两城不相邻' };
   h.cityId = toCityId;
-  // 武将调离后，若其原为出发城太守，须解除旧职，
-  // 否则 from.governorHeroId 会指向已不在本城的武将（违反"太守必在本城"不变量）
-  if (from.governorHeroId === heroId) from.governorHeroId = null;
+  // 武将调离后卸除其在出发城的一切职官（太守 / 将军 / 军师），
+  // 否则职官引用会指向已不在本城的武将（违反「职官必在本城」不变量）
+  clearHeroOffices(state, heroId);
   return { ok: true, msg: `${h.name} 调往 ${to.name}` };
 }
 
@@ -467,4 +502,4 @@ function refundCmd(state, fid) {
   }
 }
 
-export { spendCmd, isPlayer, RECRUIT_LOYALTY_THRESHOLD, effLead, effWar, FORMATIONS };
+export { spendCmd, isPlayer, RECRUIT_LOYALTY_THRESHOLD, effLead, effWar, FORMATIONS, CITY_OFFICES };

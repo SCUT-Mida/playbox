@@ -33,9 +33,10 @@ export function loadGame() {
   } catch (_) { return null; }
 }
 
-// 存档兼容：旧版科技等级为全局 state.techLevels（所有势力共享），
-// 现改为按势力独立的 state.techLevelsByFaction。旧存档中已研究的科技
-// 视作玩家势力掌握；AI 势力从 0 起算。
+// 存档兼容：
+//   1) 旧版科技等级为全局 state.techLevels（所有势力共享），现改为按势力独立的
+//      state.techLevelsByFaction。旧存档中已研究的科技视作玩家势力掌握；AI 从 0 起算。
+//   2) 新增城市职官将军 / 军师（generalHeroId / strategistHeroId），旧存档城市缺省 → 补 null。
 function migrateSave(state) {
   if (!state) return state;
   if (!state.techLevelsByFaction) {
@@ -43,6 +44,12 @@ function migrateSave(state) {
       ? { [state.playerFactionId]: { ...state.techLevels } }
       : {};
     delete state.techLevels;
+  }
+  if (Array.isArray(state.cities)) {
+    for (const c of state.cities) {
+      if (c.generalHeroId === undefined) c.generalHeroId = null;
+      if (c.strategistHeroId === undefined) c.strategistHeroId = null;
+    }
   }
   return state;
 }

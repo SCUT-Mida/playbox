@@ -9,12 +9,14 @@ import { h, clear, bar } from './dom.js';
 import {
   TECHS, FORMATIONS, STRATAGEMS, BUILD_MAX, TECH_MAX_LEVEL, TECH_COST_GOLD,
   TRAINING_MAX, FACTION_COLORS, NEUTRAL_COLOR, seasonOf, clamp,
+  CITY_OFFICES, cmdCostOf,
 } from '../config.js';
-import { CITIES } from '../data/cities.js';
+import { CITIES, CITY_MAP, MAP_RIVERS, MAP_REGIONS, CAPITAL_IDS } from '../data/cities.js';
+import { HEROES, HERO_MAP, FACTION_SEEDS } from '../data/heroes.js';
 import { newGame, resolveTurn, cityById, heroById, factionById, playerFaction,
   neighbors, heroesOfFaction, heroesInCity, wildHeroesInCity, prisonersOfFaction,
-  troopCap, cmdPoints, cmdRemaining, bestDefender, lordOf, maxDefense } from '../core/state.js';
-import { citiesOf, factionGoldIncome, factionGrainNet } from '../core/economy.js';
+  troopCap, cmdPoints, cmdRemaining, bestDefender, lordOf, maxDefense, officeHolder } from '../core/state.js';
+import { citiesOf, factionGoldIncome, factionGrainNet, governorEconMult, generalDefMult } from '../core/economy.js';
 import { effLead, effWar } from '../core/combat.js';
 import { techLevel } from '../core/tech.js';
 import * as A from '../core/actions.js';
@@ -32,6 +34,85 @@ const TABS = [
   { key: 'tech', icon: '📜', label: '科技' },
   { key: 'system', icon: '⚙️', label: '系统' },
 ];
+
+// 兵力简写：1200 → 1.2k，800 → 800
+function fmtTroops(n) {
+  n = Math.max(0, Math.round(n || 0));
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+}
+
+// 共享地图画布：SVG 河流 / 州郡名作背景，城市点为绝对定位按钮。
+// nodes: [{ id, name, x, y, color, isPlayer, isCapital, badge, isSel, dimmed }]
+// onPick(cityId) 点击城市回调。返回 .map-wrap 元素。
+function buildMapCanvas(nodes, onPick) {
+  const wrap = h('div', { class: 'map-wrap' });
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('class', 'map-svg');
+  svg.setAttribute('viewBox', '0 0 1000 760');
+  svg.setAttribute('preserveAspectRatio', 'none');
+
+  // 州郡名（淡墨大字，仅方位参考）
+  for (const r of MAP_REGIONS) {
+    const t = document.createElementNS(svgNS, 'text');
+    t.setAttribute('x', r.x); t.setAttribute('y', r.y);
+    t.setAttribute('class', 'map-region'); t.textContent = r.name;
+    svg.appendChild(t);
+  }
+  // 河流（黄河 / 长江）
+  for (const rv of MAP_RIVERS) {
+    const p = document.createElementNS(svgNS, 'path');
+    p.setAttribute('d', rv.d); p.setAttribute('class', 'map-river');
+    svg.appendChild(p);
+  }
+  // 连线（仅当节点带 adjacent 时绘制，去重）
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+  for (const n of nodes) {
+    if (!n.adjacent) continue;
+    for (const nid of n.adjacent) {
+      if (n.id < nid && nodeMap.has(nid)) {
+        const m = nodeMap.get(nid);
+        const ln = document.createElementNS(svgNS, 'line');
+        ln.setAttribute('x1', n.x); ln.setAttribute('y1', n.y);
+        ln.setAttribute('x2', m.x); ln.setAttribute('y2', m.y);
+        ln.setAttribute('class', 'map-line');
+        svg.appendChild(ln);
+      }
+    }
+  }
+  wrap.appendChild(svg);
+
+  // 城市点
+  for (const n of nodes) {
+    const center = n.badge != null ? n.badge : n.name.slice(0, 1);
+    const dot = h('button', {
+      class: `map-dot${n.isPlayer ? ' map-dot--player' : ''}${n.isSel ? ' map-dot--selected' : ''}${n.dimmed ? ' map-dot--dim' : ''}${n.isCapital ? ' map-dot--capital' : ''}`,
+      style: { left: `${(n.x / 1000) * 100}%`, top: `${(n.y / 760) * 100}%`, background: n.color || NEUTRAL_COLOR },
+      onClick: () => onPick && onPick(n.id),
+    }, n.isCapital ? h('span', { class: 'map-dot__crown' }, '👑') : null,
+      h('span', { class: `map-dot__txt${n.badge != null ? ' map-dot__txt--badge' : ''}` }, center));
+    wrap.appendChild(dot);
+    wrap.appendChild(h('span', { class: 'map-label', style: { left: `${(n.x / 1000) * 100}%`, top: `${(n.y / 760) * 100}%` } }, n.name));
+  }
+  return wrap;
+}
+
+// 指令消耗小标签：令1 / 免费
+function costTag(cost) {
+  if (cost == null) return null;
+  return h('span', { class: `cmd-cost${cost === 0 ? ' cmd-cost--free' : ''}` }, cost === 0 ? '免费' : `令${cost}`);
+}
+
+// —— 创角期静态查表（不依赖 state）：在野名将按城聚合；诸侯旧都 → 种子势力 ——
+const WILD_BY_CITY = HEROES.reduce((acc, hh) => {
+  if (hh.wild) { (acc[hh.wild] = acc[hh.wild] || []).push(hh); }
+  return acc;
+}, {});
+const SEED_BY_CAPITAL = Object.fromEntries(FACTION_SEEDS.map((sd) => [sd.capital, sd]));
+const CAPITAL_COLOR = FACTION_SEEDS.reduce((acc, sd, i) => {
+  acc[sd.capital] = FACTION_COLORS[(i + 1) % FACTION_COLORS.length]; // +1 避开玩家红
+  return acc;
+}, {});
 
 export class GameUI {
   constructor(parent) {
@@ -145,28 +226,30 @@ export class GameUI {
       onClick: () => { t.stats = this.rollStats(); t.rerolls += 1; this.renderCreate(); } },
       `重新随机属性（${t.rerolls}/5）`);
 
-    const cityPick = h('div', { class: 'city-pick' }, CITIES.map((c) => {
-      const sel = this.startCityPick === c.id;
-      return h('button', {
-        class: `city-pick__item${sel ? ' city-pick__item--sel' : ''}`,
-        onClick: () => { this.startCityPick = c.id; this.renderCreate(); },
-      },
-        h('div', null, h('b', null, c.name)),
-        h('div', { class: 'muted' }, c.trait.name),
-      );
+    // 起兵之城：地图点选（ Capitals 标👑并淡染诸侯色），下方展示该城详情
+    const pickNodes = CITIES.map((c) => ({
+      id: c.id, name: c.name, x: c.x, y: c.y, adjacent: c.adjacent,
+      color: CAPITAL_COLOR[c.id] || NEUTRAL_COLOR,
+      isCapital: !!SEED_BY_CAPITAL[c.id],
+      isSel: this.startCityPick === c.id,
+      dimmed: !!this.startCityPick && this.startCityPick !== c.id,
     }));
+    const cityMap = buildMapCanvas(pickNodes, (id) => { this.startCityPick = id; this.renderCreate(); });
 
     const startBtn = h('button', { class: 'btn-primary btn-block',
+      disabled: !this.startCityPick,
       onClick: () => this.beginGame(),
-    }, '起兵出征');
+    }, this.startCityPick ? `于 ${CITY_MAP[this.startCityPick].name} 起兵出征` : '请先在地图上点选起兵之城');
 
     const wrap = h('div', { class: 'create' },
       h('h2', null, '一、立君'),
       h('div', { class: 'create__field' }, h('label', null, '君主姓名（2~4 个汉字）'), nameInput),
       h('div', { class: 'create__field' }, h('label', null, '君主属性'), statGrid, rerollBtn),
       h('h2', null, '二、择都'),
-      h('p', { class: 'hint' }, '选择起兵之城。占据诸侯旧都，其旧部将转为在野，可择机登用。'),
-      cityPick,
+      h('p', { class: 'hint' }, '点选地图上的城市作为起兵之地。👑为诸侯旧都，占据后其旧部将就地转为在野，可择机登用。'),
+      cityMap,
+      h('div', { style: { height: '0.6rem' } }),
+      this.renderCreateCityDetail(this.startCityPick),
       h('div', { style: { height: '0.8rem' } }),
       startBtn,
       h('div', { style: { height: '0.4rem' } }),
@@ -175,6 +258,37 @@ export class GameUI {
     this.stage.appendChild(wrap);
     // 挂载临时引用，便于 beginGame 读取输入框最新值
     this._nameInput = nameInput;
+  }
+
+  // 创角期：展示所选城市的资源、特性、在野名将 / 旧都旧部
+  renderCreateCityDetail(cityId) {
+    if (!cityId) return h('div', { class: 'city-detail city-detail--empty' }, h('span', { class: 'muted' }, '尚未择都——点选地图上一座城市查看详情。'));
+    const c = CITY_MAP[cityId];
+    const seed = SEED_BY_CAPITAL[cityId];
+    const wilds = WILD_BY_CITY[cityId] || [];
+    // 占据旧都时，该势力全部名将（含君主）转为在野，可登用
+    const oldOfficers = seed ? HEROES.filter((hh) => hh.serve === seed.key) : [];
+    const r = (k, v) => h('div', null, h('span', { class: 'muted' }, k), ' ', v);
+    return h('div', { class: 'city-detail' },
+      h('div', { class: 'panel__head' },
+        h('span', { class: 'panel__swatch', style: { background: CAPITAL_COLOR[cityId] || NEUTRAL_COLOR } }),
+        h('h4', null, c.name),
+        h('span', { class: 'hero-card__sub' }, `${c.trait.name} · ${c.trait.desc}`),
+      ),
+      h('div', { class: 'panel__rows' },
+        r('人口', `${c.pop0.toLocaleString()} / ${c.popMax.toLocaleString()}`),
+        r('驻军', c.soldiers0.toLocaleString()),
+        r('城防', c.defense0.toLocaleString()),
+        r('城库', `${c.gold0.toLocaleString()} 金 · ${c.grain0.toLocaleString()} 粮`),
+      ),
+      seed ? h('div', { class: 'hint', style: { marginTop: '0.4rem' } },
+        h('b', null, `诸侯旧都：${HERO_MAP[seed.lordId].name} 起家之地。`),
+        `占据此地，该势力不生成，其 ${oldOfficers.length} 名旧部（含君主）就地转为在野，可登用。`) : null,
+      wilds.length ? h('div', { style: { marginTop: '0.4rem' } },
+        h('div', { class: 'hint' }, '本城在野名将风闻：'),
+        h('div', { class: 'chip-row' }, wilds.map((w) => h('span', { class: 'chip' }, w.name))),
+      ) : h('div', { class: 'hint', style: { marginTop: '0.4rem' } }, '本城暂无在野名将风闻。'),
+    );
   }
 
   beginGame() {
@@ -215,13 +329,14 @@ export class GameUI {
     const goldIn = Math.round(factionGoldIncome(s, s.playerFactionId));
     const grainNet = factionGrainNet(s, s.playerFactionId);
     const cmd = cmdRemaining(s, s.playerFactionId);
+    const cmdTotal = cmdPoints(s, s.playerFactionId);
     clear(this.topbar);
     this.topbar.appendChild(h('div', { class: 'topbar__row' },
       h('span', { class: 'topbar__title' }, `${fac.name}`),
       h('span', { class: 'res-pill' }, `${seasonOf(s.turn)} · 第${s.turn}回合`),
       h('span', { class: 'res-pill' }, `金 `, h('b', null, Math.round(fac.money))),
       h('span', { class: 'res-pill' }, `粮 `, h('b', null, Math.round(fac.grain))),
-      h('span', { class: 'res-pill cmd-pill' }, `令 ${cmd}`),
+      h('span', { class: `res-pill cmd-pill${cmd === 0 ? ' cmd-pill--empty' : ''}` }, `令 ${cmd}/${cmdTotal}`),
     ));
     this.topbar.appendChild(h('div', { class: 'topbar__row', style: { marginTop: '0.35rem' } },
       h('span', { class: 'hint', style: { margin: 0 } }, `金 +${goldIn}/回 · 粮 ${Math.round(grainNet.net)}/回（产${Math.round(grainNet.prod)} 耗${Math.round(grainNet.upkeep)}）`),
@@ -252,50 +367,30 @@ export class GameUI {
   // ============ 地图 ============
   renderMap() {
     const s = this.state;
-    const wrap = h('div', { class: 'map-wrap' });
-    const svgNS = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(svgNS, 'svg');
-    svg.setAttribute('class', 'map-svg');
-    svg.setAttribute('viewBox', '0 0 1000 760');
-    svg.setAttribute('preserveAspectRatio', 'none');
-    // 连线（去重）
-    for (const c of s.cities) {
-      for (const nid of c.adjacent) {
-        if (c.id < nid) {
-          const n = cityById(s, nid);
-          const ln = document.createElementNS(svgNS, 'line');
-          ln.setAttribute('x1', c.x); ln.setAttribute('y1', c.y);
-          ln.setAttribute('x2', n.x); ln.setAttribute('y2', n.y);
-          ln.setAttribute('class', 'map-line');
-          svg.appendChild(ln);
-        }
-      }
-    }
-    wrap.appendChild(svg);
-    // 城市点
-    for (const c of s.cities) {
+    const nodes = s.cities.map((c) => {
       const fac = c.ownerFactionId != null ? factionById(s, c.ownerFactionId) : null;
-      const color = fac ? fac.color : NEUTRAL_COLOR;
       const isPlayer = c.ownerFactionId === s.playerFactionId;
-      const isSel = this.selectedCityId === c.id;
-      const dot = h('button', {
-        class: `map-dot${isPlayer ? ' map-dot--player' : ''}${isSel ? ' map-dot--selected' : ''}`,
-        style: { left: `${(c.x / 1000) * 100}%`, top: `${(c.y / 760) * 100}%`, background: color },
-        onClick: () => { this.selectedCityId = c.id; this.openCityMenu(c.id); },
-      }, c.name.slice(0, 2));
-      wrap.appendChild(dot);
-      wrap.appendChild(h('span', { class: 'map-label', style: { left: `${(c.x / 1000) * 100}%`, top: `${(c.y / 760) * 100}%` } }, c.name));
-    }
+      return {
+        id: c.id, name: c.name, x: c.x, y: c.y, adjacent: c.adjacent,
+        color: fac ? fac.color : NEUTRAL_COLOR,
+        isPlayer, isCapital: CAPITAL_IDS.includes(c.id),
+        isSel: this.selectedCityId === c.id,
+        badge: c.ownerFactionId != null ? fmtTroops(c.soldiers) : null,
+      };
+    });
+    const wrap = buildMapCanvas(nodes, (id) => { this.selectedCityId = id; this.openCityMenu(id); });
+    const legend = h('div', { class: 'map-legend' },
+      h('span', null, h('i', { class: 'lg lg--player' }), '己方'),
+      h('span', null, h('i', { class: 'lg lg--neutral' }), '空城'),
+      h('span', null, h('i', { class: 'lg lg--foe' }), '诸侯'),
+      h('span', null, '👑', '旧都'),
+    );
     this.content.appendChild(h('div', null,
       h('h3', null, '九州形势图'),
-      h('p', { class: 'hint' }, '点击城市查看详情与指令。金边为己方，灰点为空城，他色为诸侯。'),
+      h('p', { class: 'hint' }, '点击城市查看详情与指令。金边为己方，灰点为空城，他色为诸侯；👑为诸侯旧都，据之可收其旧部。'),
       wrap,
+      legend,
     ));
-    // 提示当前选中
-    if (this.selectedCityId) {
-      const c = cityById(s, this.selectedCityId);
-      this.content.appendChild(h('div', { class: 'hint center' }, `已选：${c ? c.name : '无'}（再次点击城市可操作）`));
-    }
   }
 
   // ============ 城市操作菜单 ============
@@ -303,7 +398,8 @@ export class GameUI {
     const s = this.state;
     const c = cityById(s, cityId);
     if (!c) return;
-    this.renderMap(); // 刷新选中态
+    // 不在此处重绘整张地图（弹窗会覆盖其上，关闭时 afterAction 自然刷新），
+    // 避免点击城市后地图下方重复出现选中提示的视觉 bug。
     const owned = c.ownerFactionId === s.playerFactionId;
     if (owned) this.openOwnedCity(c);
     else this.openEnemyCity(c);
@@ -319,10 +415,13 @@ export class GameUI {
     );
   }
   cityRows(c) {
-    const gov = c.governorHeroId ? heroById(this.state, c.governorHeroId) : null;
+    const s = this.state;
+    const gov = officeHolder(s, c, 'governor');
+    const gen = officeHolder(s, c, 'general');
+    const strat = officeHolder(s, c, 'strategist');
     const r = (k, v) => h('div', null, h('span', { class: 'muted' }, k), ' ', v);
     return h('div', { class: 'panel__rows' },
-      r('归属', c.ownerFactionId != null ? (factionById(this.state, c.ownerFactionId)?.name || '—') : '空城'),
+      r('归属', c.ownerFactionId != null ? (factionById(s, c.ownerFactionId)?.name || '—') : '空城'),
       r('人口', `${Math.round(c.population)} / ${c.maxPopulation}`),
       r('士兵', Math.round(c.soldiers)),
       r('城防', `${Math.round(c.defense)}`),
@@ -330,15 +429,40 @@ export class GameUI {
       r('市集', `Lv${c.marketLevel}`),
       r('城墙', `Lv${c.wallLevel}`),
       r('训练度', c.training),
-      r('太守', gov ? gov.name : '—'),
+      r('太守', gov ? `${gov.name}（政${gov.stats.p}）` : '—'),
+      r('将军', gen ? `${gen.name}（统${gen.stats.l}）` : '—'),
+      r('军师', strat ? `${strat.name}（智${strat.stats.i}）` : '—'),
+    );
+  }
+
+  // 城市职官面板：列出太守 / 将军 / 军师在任者与其加成；owned=true 时附任命入口。
+  officesBlock(c, owned) {
+    const s = this.state;
+    const econMult = governorEconMult(s, c);
+    const defMult = generalDefMult(s, c);
+    const rows = CITY_OFFICES.map((o) => {
+      const h2 = officeHolder(s, c, o.key);
+      const stat = h2 ? h2.stats[o.stat] : null;
+      return h('div', { class: 'office-row' },
+        h('span', { class: 'office-row__name' }, `${o.icon} ${o.name}`),
+        h('span', { class: 'office-row__who' }, h2 ? `${h2.name}（${o.statName}${stat}）` : '虚位以待'),
+        owned ? h('button', { class: 'btn-ghost office-row__btn', onClick: () => this.uiAppointOffice(c, o.key) },
+          h2 ? '更换' : '任命') : null,
+      );
+    });
+    const bonus = h('div', { class: 'hint', style: { marginTop: '0.3rem' } },
+      `本城加成：农商收入 ×${econMult.toFixed(2)}（太守政治）· 城防 ×${defMult.toFixed(2)}（将军统率）`);
+    return h('div', { class: 'offices' },
+      h('div', { class: 'offices__title' }, '城中职官'),
+      rows, bonus,
     );
   }
 
   openOwnedCity(c) {
     const s = this.state;
     const fid = s.playerFactionId;
-    // refresh=true：动作在弹窗内就地完成后，重绘城务弹窗以刷新兵数/等级/在野列表（征兵另开子弹窗，不在此重绘）
-    const cmdBtn = (label, fn, danger, refresh) => h('button', {
+    // refresh=true：动作在弹窗内就地完成后，重绘城务弹窗以刷新兵数/等级/职官/在野列表
+    const cmdBtn = (label, fn, { danger, refresh, cost } = {}) => h('button', {
       class: `cmd-btn ${danger ? 'btn-danger' : 'btn-primary'}`,
       onClick: () => {
         const r = fn();
@@ -346,28 +470,30 @@ export class GameUI {
         this.afterAction();
         if (refresh && r.ok) this.openOwnedCity(c);
       },
-    }, label);
+    }, label, costTag(cost));
+    // 探索的实际消耗：仍有未发现名将才耗 1 指令，否则免费（动态标注，避免误导）
+    const wildsAll = wildHeroesInCity(s, c.id);
+    const exploreCost = (wildsAll.length && wildsAll.some((w) => !w.discovered)) ? 1 : 0;
     const grid = h('div', { class: 'cmd-grid' },
-      cmdBtn(`农田 Lv${c.farmLevel}`, () => A.developFarm(s, c.id), false, true),
-      cmdBtn(`市集 Lv${c.marketLevel}`, () => A.developMarket(s, c.id), false, true),
-      cmdBtn(`城墙 Lv${c.wallLevel}`, () => A.buildWall(s, c.id), false, true),
-      cmdBtn('征兵', () => this.uiRecruit(c)),
-      cmdBtn('操练', () => A.train(s, c.id), false, true),
-      cmdBtn('探索', () => A.explore(s, c.id), false, true),
+      cmdBtn(`农田 Lv${c.farmLevel}`, () => A.developFarm(s, c.id), { refresh: true, cost: cmdCostOf('developFarm') }),
+      cmdBtn(`市集 Lv${c.marketLevel}`, () => A.developMarket(s, c.id), { refresh: true, cost: cmdCostOf('developMarket') }),
+      cmdBtn(`城墙 Lv${c.wallLevel}`, () => A.buildWall(s, c.id), { refresh: true, cost: cmdCostOf('buildWall') }),
+      cmdBtn('征兵', () => this.uiRecruit(c), { cost: cmdCostOf('recruit') }),
+      cmdBtn('操练', () => A.train(s, c.id), { refresh: true, cost: cmdCostOf('train') }),
+      cmdBtn('探索', () => A.explore(s, c.id), { refresh: true, cost: exploreCost }),
     );
     const advBtns = h('div', { class: 'hero-card__foot' },
-      h('button', { class: 'btn-jade', onClick: () => this.uiAppoint(c) }, '任命太守'),
-      h('button', { class: 'btn-jade', onClick: () => this.uiMoveHero(c) }, '调遣武将'),
-      h('button', { class: 'btn-primary', onClick: () => this.uiTransport(c) }, '输送资源'),
+      h('button', { class: 'btn-jade', onClick: () => this.uiMoveHero(c) }, '调遣武将', costTag(cmdCostOf('moveHero'))),
+      h('button', { class: 'btn-primary', onClick: () => this.uiTransport(c) }, '输送资源', costTag(cmdCostOf('transport'))),
     );
     // 在野名将登用入口
     const wilds = wildHeroesInCity(s, c.id).filter((w) => w.discovered);
     const wildBlock = wilds.length ? h('div', { style: { marginTop: '0.6rem' } },
       h('div', { class: 'hint' }, '本城在野名将：'),
-      h('div', { class: 'hero-card__foot' }, wilds.map((w) => h('button', { class: 'btn-ghost', onClick: () => { const r = A.recruitHero(s, w.id); this.toast(r.msg); this.afterAction(); if (r.ok) this.openOwnedCity(c); } }, `登用 ${w.name}`))),
+      h('div', { class: 'hero-card__foot' }, wilds.map((w) => h('button', { class: 'btn-ghost', onClick: () => { const r = A.recruitHero(s, w.id); this.toast(r.msg); this.afterAction(); if (r.ok) this.openOwnedCity(c); } }, `登用 ${w.name}`, costTag(cmdCostOf('recruitHero'))))),
     ) : null;
 
-    const body = h('div', null, this.cityHeader(c), this.cityRows(c), grid, advBtns, wildBlock);
+    const body = h('div', null, this.cityHeader(c), this.cityRows(c), grid, this.officesBlock(c, true), advBtns, wildBlock);
     this.openModal({ title: `城务 · ${c.name}`, body, foot: [h('button', { class: 'btn-ghost grow', onClick: () => this.closeModal() }, '关闭')] });
   }
 
@@ -376,9 +502,10 @@ export class GameUI {
     const body = h('div', null,
       this.cityHeader(c),
       this.cityRows(c),
+      this.officesBlock(c, false),
       h('div', { class: 'hero-card__foot' },
-        h('button', { class: 'btn-danger', onClick: () => this.uiCampaign(c) }, '出征攻打'),
-        h('button', { class: 'btn-ghost', onClick: () => this.uiStratagem(c) }, '施计'),
+        h('button', { class: 'btn-danger', onClick: () => this.uiCampaign(c) }, '出征攻打', costTag(cmdCostOf('campaign'))),
+        h('button', { class: 'btn-ghost', onClick: () => this.uiStratagem(c) }, '施计', costTag(cmdCostOf('stratagem'))),
       ),
     );
     this.openModal({ title: `敌情 · ${c.name}`, body, foot: [h('button', { class: 'btn-ghost grow', onClick: () => this.closeModal() }, '关闭')] });
@@ -405,18 +532,29 @@ export class GameUI {
     return { ok: true, msg: '' };
   }
 
-  // —— 任命太守 ——
-  uiAppoint(c) {
+  // —— 任命城市职官（太守 / 将军 / 军师）——
+  uiAppointOffice(c, officeKey) {
     const s = this.state;
+    const office = CITY_OFFICES.find((o) => o.key === officeKey) || CITY_OFFICES[0];
     const roster = heroesInCity(s, c.id, s.playerFactionId);
     if (!roster.length) { this.toast('城中无可任命之武将'); return; }
-    const sel = h('select', null, roster.map((h2) => h('option', { value: h2.id }, `${h2.name}（统${h2.stats.l}）`)));
-    sel.value = c.governorHeroId || roster[0].id;
-    const body = h('div', null, h('p', { class: 'hint' }, '太守政治影响本城人口增长。'), sel);
-    this.openForm('任命太守', body, () => {
-      const r = A.appointGovernor(s, c.id, sel.value);
+    // 按该职官主属性降序，便于挑选最合适者
+    const sorted = roster.slice().sort((a, b) => (b.stats[office.stat] || 0) - (a.stats[office.stat] || 0));
+    const current = officeHolder(s, c, officeKey);
+    const sel = h('select', null, sorted.map((h2) => {
+      const busy = CITY_OFFICES.filter((o) => c[o.field] === h2.id).map((o) => o.name);
+      const tag = busy.length ? `（现任${busy.join('/')}）` : '';
+      return h('option', { value: h2.id }, `${h2.name}（${office.statName}${h2.stats[office.stat]}）${tag}`);
+    }));
+    sel.value = current ? current.id : sorted[0].id;
+    const body = h('div', null,
+      h('p', { class: 'hint' }, `${office.icon} ${office.name}：${office.effect}。免费任命，离城自动卸任。`),
+      sel);
+    this.openForm(`任命${office.name}`, body, () => {
+      const r = A.appointOffice(s, c.id, sel.value, officeKey);
       this.toast(r.msg); this.closeModal(); this.afterAction();
-    }, '任命');
+      if (r.ok) this.openOwnedCity(c);
+    }, current ? '更换' : '任命');
   }
 
   // —— 调遣武将（本城 → 邻接己城）——
@@ -579,23 +717,36 @@ export class GameUI {
       && citiesOf(s, fid).some((c) => c.id === h.cityId)); // 仅己方城市中已发现的
     const prisoners = prisonersOfFaction(s, fid);
 
-    const heroCard = (h2, foot) => h('div', { class: 'hero-card' },
-      h('div', { class: 'hero-card__head' },
-        h('span', { class: 'hero-card__name' }, h2.name),
-        h('span', { class: 'hero-card__sub' }, h2.skill ? h2.skill.name : '无技能'),
-        h2.loyalty != null ? h('span', { class: 'hero-card__sub' }, `忠 ${h2.loyalty}`) : null,
-      ),
-      h('div', { class: 'hero-card__stats' }, STAT_KEYS.map(([k, l]) => h('span', null, `${l}`, h('b', null, h2.stats[k])))),
-      h2.skill ? h('div', { class: 'hero-card__skill' }, `【${h2.skill.name}】`) : null,
-      h('div', { class: 'hint' }, `所在：${cityById(s, h2.cityId)?.name || '在野'}`),
-      foot ? h('div', { class: 'hero-card__foot' }, foot) : null,
-    );
+    // 该武将当前所任职官（扫全图城市）
+    const officeOf = (heroId) => {
+      for (const c of s.cities) {
+        for (const o of CITY_OFFICES) {
+          if (c[o.field] === heroId) return o;
+        }
+      }
+      return null;
+    };
+    const heroCard = (h2, foot) => {
+      const off = officeOf(h2.id);
+      return h('div', { class: 'hero-card' },
+        h('div', { class: 'hero-card__head' },
+          h('span', { class: 'hero-card__name' }, h2.name),
+          off ? h('span', { class: 'hero-card__office' }, `${off.icon}${off.name}`) : null,
+          h('span', { class: 'hero-card__sub' }, h2.skill ? h2.skill.name : '无技能'),
+          h2.loyalty != null ? h('span', { class: 'hero-card__sub' }, `忠 ${h2.loyalty}`) : null,
+        ),
+        h('div', { class: 'hero-card__stats' }, STAT_KEYS.map(([k, l]) => h('span', null, `${l}`, h('b', null, h2.stats[k])))),
+        h2.skill ? h('div', { class: 'hero-card__skill' }, `【${h2.skill.name}】`) : null,
+        h('div', { class: 'hint' }, `所在：${cityById(s, h2.cityId)?.name || '在野'}`),
+        foot ? h('div', { class: 'hero-card__foot' }, foot) : null,
+      );
+    };
 
     this.content.appendChild(h('div', null,
       h('h3', null, '麾下武将'),
       h('div', { class: 'card-list' }, mine.length ? mine.map((h2) => heroCard(h2, [
-        h('button', { class: 'btn-ghost', onClick: () => { const r = A.reward(s, h2.id); this.toast(r.msg); this.afterAction(); } }, '赏赐'),
-        h('button', { class: 'btn-ghost', onClick: () => { this.selectedCityId = h2.cityId; this.uiAppoint(cityById(s, h2.cityId)); } }, '任太守'),
+        h('button', { class: 'btn-ghost', onClick: () => { const r = A.reward(s, h2.id); this.toast(r.msg); this.afterAction(); } }, '赏赐', costTag(cmdCostOf('reward'))),
+        h('button', { class: 'btn-ghost', onClick: () => { this.selectedCityId = h2.cityId; this.uiAppointOffice(cityById(s, h2.cityId), 'governor'); } }, '任太守'),
       ])) : h('p', { class: 'hint' }, '尚无武将，去「探索」招揽在野名将吧。')),
 
       h('h3', { style: { marginTop: '0.8rem' } }, '在野名将（己方城市）'),

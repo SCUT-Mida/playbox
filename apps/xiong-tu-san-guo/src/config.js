@@ -10,9 +10,35 @@ export const BUILD_MAX = 5; // 城市建筑等级上限（农田 / 市集 / 城�
 export const TRAINING_BASE = 50; // 士兵默认训练度
 export const TRAINING_MAX = 100;
 
+// —— 城市职官 ——
+// 每城可设太守 / 将军 / 军师各一，免费任命，须在城内就任；
+// 离城（调遣 / 被俘 / 城陷）自动卸任，保证「职官必在本城」不变量。
+// stat 为该职官发挥加成的主属性，statName 为中文名。
+export const CITY_OFFICES = [
+  { key: 'governor', field: 'governorHeroId', name: '太守', stat: 'p', statName: '政治',
+    effect: '政治加成人口增长与农、商收入', icon: '📜' },
+  { key: 'general', field: 'generalHeroId', name: '将军', stat: 'l', statName: '统率',
+    effect: '统率加成城防与操练效率', icon: '⚔️' },
+  { key: 'strategist', field: 'strategistHeroId', name: '军师', stat: 'i', statName: '智力',
+    effect: '智力加成探索发现与计略成功', icon: '🪶' },
+];
+export const OFFICE_MAP = Object.fromEntries(CITY_OFFICES.map((o) => [o.key, o]));
+export const officeField = (key) => (OFFICE_MAP[key] || {}).field;
+
 // —— 指令点数 ——
 export const CMD_BASE = 5;
 export const CMD_PER_CITY = 2;
+
+// 各动作消耗的指令点（0 = 免费）。用于 UI 标注与一致展示。
+// 注意：探索在「无人在野 / 已全发现」时不耗指令（见 actions.explore）。
+export const CMD_COST = {
+  developFarm: 1, developMarket: 1, buildWall: 1,
+  recruit: 1, train: 1, explore: 1,
+  recruitHero: 1, reward: 1, recruitPrisoner: 1,
+  appointOffice: 0, moveHero: 0,
+  campaign: 1, transport: 1, stratagem: 1, research: 1,
+};
+export const cmdCostOf = (key) => (CMD_COST[key] != null ? CMD_COST[key] : 1);
 
 // —— 经济（每回合结算）——
 export const GOLD_PER_MARKET = 100; // 市集等级 × 100

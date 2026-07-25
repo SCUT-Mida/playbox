@@ -89,6 +89,18 @@ ok(!!farmBtn, '城务含「开发农田」指令');
 farmBtn.click();
 await sleep(5);
 
+// ---------- 4b) 商贸 · 城建面板（升级城池 / 资源对换 / 通商贸易）----------
+ok(document.querySelector('.commerce-block') !== null, '城务含「商贸·城建」面板');
+ok(Array.from(document.querySelectorAll('.cmd-btn')).some((b) => b.textContent.includes('升级城池')), '商贸面板含「升级城池」入口');
+ok(Array.from(document.querySelectorAll('.cmd-btn')).some((b) => b.textContent.includes('资源对换')), '商贸面板含「资源对换」入口');
+// 打开资源对换表单，验证不崩溃
+const exchangeBtn = Array.from(document.querySelectorAll('.cmd-btn')).find((b) => b.textContent.includes('资源对换'));
+exchangeBtn.click();
+await sleep(5);
+ok(document.querySelector('.modal__body select') !== null, '资源对换弹窗含方向选择');
+document.querySelector('.modal__foot button').click(); // 取消
+await sleep(3);
+
 // ---------- 5) 结束回合 ----------
 ui.tab = 'system'; ui.renderContent(); await sleep(3);
 // 直接驱动结算（跳过确认弹窗）

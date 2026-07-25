@@ -6,7 +6,24 @@
 export const SAVE_KEY = 'xtsg_save_v1';
 export const GAME_VERSION = 1;
 
-export const BUILD_MAX = 5; // 城市建筑等级上限（农田 / 市集 / 城墙）
+// —— 城池等级 / 资源（建筑）等级上限 ——
+// 资源（农田 / 市集 / 城墙）等级上限随城池等级解锁：城池每升一级，三项资源上限 +5。
+// 城池等级 1→5 时，资源上限依次为 5/10/15/20/25，告别「资源等级太低、早早封顶」的单调。
+export const BUILD_MAX = 5; // 资源等级基础上限（城池等级 1 时的上限；亦即旧版的固定上限）
+export const BUILD_CAP_STEP = 5; // 城池每升一级，资源等级上限提升的步长
+export const CITY_MAX_LEVEL = 5; // 城池等级上限
+
+// 取某城当前资源（农田/市集/城墙）等级上限：基础 BUILD_MAX，每级城池 +BUILD_CAP_STEP。
+export function buildCapForCity(city) {
+  const lvl = city && city.level ? Math.max(1, Math.min(CITY_MAX_LEVEL, city.level)) : 1;
+  return BUILD_MAX + (lvl - 1) * BUILD_CAP_STEP;
+}
+
+// 升级城池所需金钱（从当前 level 升至下一级）
+export function cityUpgradeGoldCost(level) {
+  return 1500 + level * 1500;
+}
+
 export const TRAINING_BASE = 50; // 士兵默认训练度
 export const TRAINING_MAX = 100;
 
@@ -37,8 +54,52 @@ export const CMD_COST = {
   recruitHero: 1, reward: 1, recruitPrisoner: 1,
   appointOffice: 0, moveHero: 0,
   campaign: 1, transport: 1, stratagem: 1, research: 1,
+  upgradeCity: 1, exchange: 1, trade: 1,
 };
 export const cmdCostOf = (key) => (CMD_COST[key] != null ? CMD_COST[key] : 1);
+
+// —— 资源对换（商铺）：金 ↔ 粮 ——
+// 兑换汇率随本城市集等级与商贸科技提升；卖出比买入略亏（30% 手续费），杜绝无脑套利。
+export const EXCHANGE_RATE_BASE = 2; // 基础汇率：1 金 → 2 粮（买入粮食时）
+export const EXCHANGE_FEE = 0.7; // 卖出折价：卖出所得 = 市价 × 0.7
+// 本城兑换汇率（每金可换粮数）：市集等级 / 商贸科技越高越划算。
+export function exchangeRate(state, city) {
+  if (!city) return EXCHANGE_RATE_BASE;
+  const marketMult = 1 + Math.max(0, (city.marketLevel || 1) - 1) * 0.1;
+  const techMultVal = state && city.ownerFactionId != null
+    ? techMultOfCommerce(state, city.ownerFactionId) : 1;
+  return EXCHANGE_RATE_BASE * marketMult * techMultVal;
+}
+
+// —— 相邻城池贸易 ——
+// 向相邻非己方城市（中立 / 他国）派出商队，按本城市集等级与目标城规模结算金钱收益；
+// 目标为他国城市时，商队有一定概率被劫掠（人财两空），中立城市则稳赚。
+export const TRADE_GRAIN_COST = 200; // 每次贸易消耗军粮（商队辎重）
+export const TRADE_SEIZED_CHANCE = 0.35; // 与他国贸易被劫掠的概率
+export function tradeGoldYield(state, fromCity, toCity) {
+  // cityTierRaw 内部已兼容 popMax 与 maxPopulation；原 guard 误取 toCity.popMax
+  // （运行时城市对象仅有 maxPopulation），导致 tier 恒为 2、规模加成形同死代码，故移除。
+  const tier = cityTierRaw(toCity);
+  const base = 80 + (fromCity.marketLevel || 1) * 50 + tier * 100;
+  const techMultVal = state && fromCity.ownerFactionId != null
+    ? techMultOfCommerce(state, fromCity.ownerFactionId) : 1;
+  return Math.round(base * techMultVal);
+}
+
+// 城池规模数值（1/2/3）——供贸易结算用，避免与 data/cities 的 cityTier 循环引用。
+function cityTierRaw(city) {
+  const p = city.popMax || city.maxPopulation || 0;
+  if (p >= 85000) return 3;
+  if (p >= 72000) return 2;
+  return 1;
+}
+
+// 商贸科技乘子（供 exchange / trade 复用），就地轻量实现，避免与 tech.js 循环依赖。
+function techMultOfCommerce(state, fid) {
+  const tbl = state && state.techLevelsByFaction && state.techLevelsByFaction[fid];
+  const lv = (tbl && tbl.commerce) || 0;
+  return 1 + lv * 0.05;
+}
 
 // —— 经济（每回合结算）——
 export const GOLD_PER_MARKET = 100; // 市集等级 × 100
@@ -58,7 +119,10 @@ export function buildCost(level) {
 }
 
 // —— 科技 ——
-export const TECH_MAX_LEVEL = 3;
+// 科技等级上限随城池等级解锁：势力最高城池每升一级，科技上限 +TECH_CAP_STEP。
+// 城池等级 1→5 时，科技上限依次为 3/4/5/6/7（详见 tech.js 的 techMaxLevel）。
+export const TECH_MAX_LEVEL = 3; // 科技基础上限（城池等级 1 时；亦即旧版的固定上限）
+export const TECH_CAP_STEP = 1; // 势力最高城池每升一级，科技等级上限提升的步长
 export const TECHS = {
   agri: { name: '农艺', desc: '粮食产量 +10% / 级', icon: '🌾' },
   commerce: { name: '商贸', desc: '金钱收入 +10% / 级', icon: '💰' },

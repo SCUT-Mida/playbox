@@ -4,6 +4,7 @@
 //   cap:0.10 / train:0.20 / p_grow:0.10 / c_recruit:0.20
 // 科技等级按势力独立存储（state.techLevelsByFaction[fid][key]），互不共享、互不阻塞。
 // ============================================================================
+import { TECH_MAX_LEVEL, TECH_CAP_STEP } from '../config.js';
 
 const KEYS = ['lead', 'war', 'trick', 'def', 'cap', 'train', 'p_grow', 'c_recruit'];
 
@@ -54,6 +55,23 @@ export function techMult(state, fid, techKey, perLevel) {
 export function techLevel(state, fid, techKey) {
   const tbl = state && state.techLevelsByFaction && state.techLevelsByFaction[fid];
   return (tbl && tbl[techKey]) || 0;
+}
+
+// 势力所辖城池中的最高城池等级（无城则 1）。用于推导科技 / 资源上限。
+export function maxCityLevelOfFaction(state, fid) {
+  if (!state || !Array.isArray(state.cities)) return 1;
+  let m = 1;
+  for (const c of state.cities) {
+    if (c.ownerFactionId === fid && (c.level || 1) > m) m = c.level;
+  }
+  return m;
+}
+
+// 科技等级上限：基础 TECH_MAX_LEVEL，随势力最高城池等级每升一级 +TECH_CAP_STEP。
+// 例：城池等级 1→5，科技上限 3/4/5/6/7。鼓励玩家升级城池以突破科技天花板。
+export function techMaxLevel(state, fid) {
+  const m = maxCityLevelOfFaction(state, fid);
+  return TECH_MAX_LEVEL + (Math.max(1, m) - 1) * TECH_CAP_STEP;
 }
 
 // 当前正在研究的科技（按势力独立槽）

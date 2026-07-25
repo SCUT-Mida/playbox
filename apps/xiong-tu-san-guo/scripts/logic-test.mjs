@@ -2,16 +2,20 @@
 import { CITIES, CITY_MAP, adjacencyValid, cityTier } from '../src/data/cities.js';
 import { HEROES, FACTION_SEEDS, makeGenericGeneral, makeWildGeneral } from '../src/data/heroes.js';
 import { makeRng } from '../src/core/rng.js';
-import { parseSkill, techMult } from '../src/core/tech.js';
-import { cityGoldIncome, cityGrainIncome, factionGoldIncome, factionGrainNet, cityDefenseValue, governorEconMult, generalDefMult } from '../src/core/economy.js';
+import { parseSkill, techMult, techMaxLevel, maxCityLevelOfFaction } from '../src/core/tech.js';
+import { cityGoldIncome, cityGrainIncome, factionGoldIncome, factionGrainNet, cityDefenseValue, governorEconMult, generalDefMult, cityLevelMult, citiesOf } from '../src/core/economy.js';
 import { createBattle, runBattle, effWar, attackValue } from '../src/core/combat.js';
+import {
+  buildCapForCity, cityUpgradeGoldCost, CITY_MAX_LEVEL, BUILD_CAP_STEP,
+  exchangeRate, tradeGoldYield, TRADE_GRAIN_COST,
+} from '../src/config.js';
 import {
   newGame, cityById, heroesOfFaction, cmdPoints, cmdRemaining,
   troopCap, resolveTurn, checkGameOver, neighbors, wildHeroesInCity,
   officeHolder, clearHeroOffices,
 } from '../src/core/state.js';
 import * as A from '../src/core/actions.js';
-import { aiTurnAll } from '../src/core/ai.js';
+import { aiTurnAll, aiTurn } from '../src/core/ai.js';
 
 let pass = 0, fail = 0;
 function ok(cond, msg) { if (cond) { pass++; } else { fail++; console.error('  ✗ ' + msg); } }
@@ -324,6 +328,151 @@ if (campD.won) {
   ok(depA.cityId === 'wan' || depA.status === 'prisoner', '副将 A 胜利后入驻新城或被俘');
   ok(depB.cityId === 'wan' || depB.status === 'prisoner', '副将 B 胜利后入驻新城或被俘');
 }
+
+console.log('—— 城池等级 / 资源上限 ——');
+const sc = newGame({ lordName: '城建', startCity: 'luoyang', stats, rng: makeRng(61) });
+const lyC = cityById(sc, 'luoyang');
+eq(lyC.level, 1, '新城城池等级 = 1');
+eq(buildCapForCity(lyC), 5, '城池等级 1 时资源上限 = 5');
+// 城池未满级时，农田升满 5 级后应被上限挡住
+for (let i = 0; i < 10; i++) A.developFarm(sc, 'luoyang', 0);
+eq(lyC.farmLevel, 5, '城池等级 1 时农田最高只能升到 5');
+eq(A.developFarm(sc, 'luoyang', 0).ok, false, '农田触顶后不可继续升级');
+// 未满三项资源时不能升城
+lyC.farmLevel = 5; lyC.marketLevel = 5; lyC.wallLevel = 4;
+eq(A.upgradeCity(sc, 'luoyang', 0).ok, false, '城墙未满级时不可升级城池');
+// 满三项资源后升级城池 → 资源上限 +5
+lyC.wallLevel = 5;
+sc.factions[0].money = 99999;
+const upR = A.upgradeCity(sc, 'luoyang', 0);
+ok(upR.ok, '三项满级 + 金钱充足时升级城池成功');
+eq(lyC.level, 2, '城池等级升至 2');
+eq(buildCapForCity(lyC), 10, '城池等级 2 时资源上限 = 10');
+ok(cityUpgradeGoldCost(1) > 0, '城池升级金钱花费为正');
+// 资源上限解锁后可继续升级农田
+eq(A.developFarm(sc, 'luoyang', 0).ok, true, '城池升级后农田可突破 5 级');
+eq(lyC.farmLevel, 6, '农田成功升至 6 级');
+
+console.log('—— 科技上限随城池等级解锁 ——');
+eq(techMaxLevel(sc, 0), 4, '势力最高城池等级 2 → 科技上限 = 4');
+lyC.level = 5;
+eq(maxCityLevelOfFaction(sc, 0), 5, '势力最高城池等级 = 5');
+eq(techMaxLevel(sc, 0), 3 + (5 - 1) * 1, '势力最高城池等级 5 → 科技上限 = 7');
+// 城池等级 1（无升级）时科技上限为基础 3
+eq(techMaxLevel(newGame({ lordName: '基线', startCity: 'luoyang', stats, rng: makeRng(62) }), 0), 3, '无城池升级时科技上限 = 3');
+
+console.log('—— 城池等级收入 / 城防加成 ——');
+const sEco = newGame({ lordName: '经济', startCity: 'luoyang', stats, rng: makeRng(63) });
+const lyE = cityById(sEco, 'luoyang');
+const goldL1 = cityGoldIncome(sEco, lyE);
+lyE.level = 3;
+const goldL3 = cityGoldIncome(sEco, lyE);
+ok(goldL3 > goldL1, `城池升级提升金钱收入 (${goldL1.toFixed(0)} → ${goldL3.toFixed(0)})`);
+ok(cityLevelMult({ level: 1 }) === 1 && cityLevelMult({ level: 3 }) > 1, 'cityLevelMult 等级越高乘数越大');
+
+console.log('—— 资源对换（金↔粮）——');
+const sx = newGame({ lordName: '商铺', startCity: 'luoyang', stats, rng: makeRng(64) });
+const fac0 = sx.factions[0];
+fac0.money = 2000; fac0.grain = 0;
+const rate0 = exchangeRate(sx, cityById(sx, 'luoyang'));
+ok(rate0 >= 2, `基础兑换汇率 >= 2 (实际 ${rate0.toFixed(2)})`);
+// 买入：金→粮
+const buyR = A.exchange(sx, 'luoyang', 'buy', 500, 0);
+ok(buyR.ok && fac0.grain > 0, '买入粮食成功获得军粮');
+ok(fac0.money === 1500, '买入扣除金钱');
+// 卖出：粮→金（七折，不可套利）
+fac0.grain = 2000;
+const sellR = A.exchange(sx, 'luoyang', 'sell', 1000, 0);
+ok(sellR.ok && fac0.money > 1500, '卖出粮食获得金钱');
+// 套利检查：买入再卖出应亏损
+fac0.money = 10000; fac0.grain = 0;
+const before = fac0.money;
+A.exchange(sx, 'luoyang', 'buy', 1000, 0);
+A.exchange(sx, 'luoyang', 'sell', fac0.grain, 0);
+ok(fac0.money < before, '买入再卖出整体亏损（无套利）');
+// 金钱不足 / 粮食不足校验
+eq(A.exchange(sx, 'luoyang', 'buy', 999999, 0).ok, false, '金钱不足买入失败');
+
+console.log('—— 相邻城池贸易 ——');
+const st = newGame({ lordName: '商队', startCity: 'luoyang', stats, rng: makeRng(65) });
+const facT = st.factions[0];
+facT.grain = 99999;
+// 洛阳邻接宛城（初始中立）
+eq(cityById(st, 'wan').ownerFactionId, null, '宛城为中立，可通商');
+const goldBefore = facT.money;
+const trR = A.trade(st, 'luoyang', 'wan', 0, makeRng(1));
+ok(trR.ok && trR.success && facT.money > goldBefore, '与中立城市贸易获利');
+ok(facT.grain < 99999, '贸易消耗军粮');
+// 不可与己方城市通商
+cityById(st, 'wan').ownerFactionId = 0;
+eq(A.trade(st, 'luoyang', 'wan', 0, makeRng(1)).ok, false, '不可与己方城市通商');
+// 不相邻不可通商
+eq(A.trade(st, 'luoyang', 'kuaiji', 0, makeRng(1)).ok, false, '不相邻城市不可通商');
+// 与他国通商：劫掠分支（rng 返回小值 < 0.35）与成功分支（rng 返回大值）
+cityById(st, 'wan').ownerFactionId = 1;
+st.cmdUsedByFaction = {}; facT.grain = 99999; facT.money = 1000;
+const seizedR = A.trade(st, 'luoyang', 'wan', 0, () => 0.1);
+ok(seizedR.ok && seizedR.success === false, '他国通商可被劫掠（success=false）');
+st.cmdUsedByFaction = {}; facT.grain = 99999; facT.money = 1000;
+const profitR = A.trade(st, 'luoyang', 'wan', 0, () => 0.9);
+ok(profitR.ok && profitR.success === true && profitR.gold > 0, '他国通商成功获利（success=true）');
+
+console.log('—— 在野武将回合补充 ——');
+const sw2 = newGame({ lordName: '人才', startCity: 'luoyang', stats, rng: makeRng(71) });
+// 初始每城散布的随机在野人物数量翻倍（>= 2）
+const genericWilds2 = sw2.heroes.filter((h) => h.generic && h.wild);
+ok(genericWilds2.length >= 36, `开局随机在野人物翻倍 (实际 ${genericWilds2.length})`);
+// 多回合结算后，应出现动态补充的在野人物（id 前缀 genwild_dyn_）
+let dynSeen = false;
+for (let seed = 1; seed <= 200 && !dynSeen; seed++) {
+  const s5 = newGame({ lordName: '流动', startCity: 'luoyang', stats, rng: makeRng(80 + seed) });
+  resolveTurn(s5, { aiTurnAll }, makeRng(seed * 13));
+  if (s5.heroes.some((h) => h.wild && typeof h.id === 'string' && h.id.startsWith('genwild_dyn_'))) dynSeen = true;
+}
+ok(dynSeen, '回合结算会动态补充新的在野人物');
+
+console.log('—— 贸易收益随目标城规模增长（tier 不再恒为 2）——');
+const stT = newGame({ lordName: '通商', startCity: 'luoyang', stats, rng: makeRng(65) });
+const fromT = cityById(stT, 'luoyang');
+fromT.marketLevel = 1;
+// 运行时城市用 maxPopulation（非 popMax）；取一个大城（tier 3）与一个小城（tier 1）比较
+const bigT = stT.cities.find((c) => cityTier(c) === 3 && c.id !== 'luoyang');
+const smallT = stT.cities.find((c) => cityTier(c) === 1);
+ok(bigT && smallT, '存在大城与小城作为贸易目标');
+const yBig = tradeGoldYield(stT, fromT, bigT);
+const ySmall = tradeGoldYield(stT, fromT, smallT);
+ok(yBig > ySmall, `大城贸易收益 > 小城 (${yBig} > ${ySmall})：目标城规模加成已生效`);
+// tier 差 2 → base 差 200；修正前两者恒相等（均按 tier 2 结算）
+ok(yBig - ySmall >= 200, `大城比小城至少多 2×100 金（tier 差 2，实际差 ${yBig - ySmall}）`);
+
+console.log('—— 科技等级不倒退（城池易手致上限回落）——');
+const sr = newGame({ lordName: '科技', startCity: 'luoyang', stats, rng: makeRng(91) });
+sr.techLevelsByFaction = { 0: { agri: 4, commerce: 0, forge: 0, wall: 0, trick: 0, leadership: 0 } };
+cityById(sr, 'luoyang').level = 5;
+eq(techMaxLevel(sr, 0), 7, '城池 Lv5 时科技上限 = 7');
+sr.researchByFaction = { 0: { key: 'agri', turnsLeft: 1 } };
+// 城池易手 / 等级回落 → 科技上限降到 3
+cityById(sr, 'luoyang').level = 1;
+eq(techMaxLevel(sr, 0), 3, '城池回落 Lv1 时科技上限 = 3');
+resolveTurn(sr, null, makeRng(1)); // 纯结算（无 AI），本回合研究完成
+eq(sr.techLevelsByFaction[0].agri, 4, '上限回落时研究完成不会把已得 agri 从 4 倒退为 3');
+
+console.log('—— AI 内政轮动升农田 / 城墙（解锁城池升级，不再只升市场）——');
+const sa = newGame({ lordName: '观战', startCity: 'luoyang', stats, rng: makeRng(77) });
+const aiFid = 1;
+const aiCity = citiesOf(sa, aiFid)[0];
+ok(aiCity, 'AI 势力拥有城市');
+sa.factions.find((f) => f.id === aiFid).money = 999999; // 排除预算不足干扰
+let nonMarketUpgraded = false;
+let cityUpgraded = false;
+for (let i = 0; i < 400; i++) {
+  sa.cmdUsedByFaction = {}; // 每轮重置指令点，模拟逐回合
+  aiTurn(sa, aiFid, makeRng(200 + i));
+  if (aiCity.farmLevel > 1 || aiCity.wallLevel > 1) nonMarketUpgraded = true;
+  if ((aiCity.level || 1) > 1) cityUpgraded = true;
+}
+ok(nonMarketUpgraded, 'AI 会升级农田 / 城墙（farmLevel/wallLevel 不再长期停在 1）');
+ok(cityUpgraded, 'AI 三项资源触顶后会升级城池（upgradeCity 不再是死代码）');
 
 console.log(`\n结果：${pass} 通过，${fail} 失败`);
 process.exit(fail ? 1 : 0);

@@ -11,7 +11,7 @@ import {
 import { citiesOf } from './economy.js';
 import { effLead } from './combat.js';
 import { chance } from './rng.js';
-import { TECH_COST_GOLD } from '../config.js';
+import { TECH_COST_GOLD, buildCapForCity, cityUpgradeGoldCost, CITY_MAX_LEVEL } from '../config.js';
 
 // 单个 AI 势力行动
 export function aiTurn(state, fid, rng) {
@@ -24,19 +24,45 @@ export function aiTurn(state, fid, rng) {
   while (cmdRemaining(state, fid) > 0 && guard++ < 30) {
     let acted = false;
 
-    // 1) 内政：国库充盈（金钱 > 600）才升市场——有钱才投资，优于设计文档初稿"金币低于 500 升市场"的被动策略；兵不足人口 20% 则征兵
+    // 1) 内政：国库充盈（金钱 > 600）才投资开发。市场 / 农田 / 城墙三项资源须均衡轮动升级——
+    //    只升市场会让 farmLevel / wallLevel 长期停在 1，而 upgradeCity 的前置要求三项资源
+    //    均满当前上限（cap 至少 5），ready 永远为 false，于是 AI 既无法升级城池，也无法借
+    //    城池等级抬高科技上限（本次新增的「城池等级解锁科技上限 / 城池升级加成」对 AI 完全
+    //    失效，玩家获得非预期优势）。故每轮优先补齐三项中等级最低者，尽快同时触顶解锁升城。
+    const fac = state.factions.find((f) => f.id === fid);
+    const developOpts = [
+      { fn: (cid) => A.developMarket(state, cid, fid), lv: 'marketLevel' },
+      { fn: (cid) => A.developFarm(state, cid, fid), lv: 'farmLevel' },
+      { fn: (cid) => A.buildWall(state, cid, fid), lv: 'wallLevel' },
+    ];
     for (const c of cities) {
-      if (cmdRemaining(state, fid) <= 0) break;
-      const fac = state.factions.find((f) => f.id === fid);
-      if (fac.money > 600 && c.marketLevel < 5 && chance(r, 0.5)) {
-        if (A.developMarket(state, c.id, fid).ok) { acted = true; break; }
-      }
+      if (cmdRemaining(state, fid) <= 0 || fac.money <= 600) break;
+      if (!chance(r, 0.5)) continue; // 与原逻辑一致：约半数概率投资
+      const cap = buildCapForCity(c);
+      const lowest = developOpts
+        .filter((o) => c[o.lv] < cap)
+        .sort((a, b) => c[a.lv] - c[b.lv])[0];
+      if (lowest && lowest.fn(c.id).ok) { acted = true; break; }
     }
     for (const c of cities) {
       if (cmdRemaining(state, fid) <= 0) break;
       if (c.soldiers < c.population * 0.2) {
         const recruitN = Math.min(800, Math.floor(c.population * 0.05));
         if (recruitN > 50 && A.recruit(state, c.id, recruitN, fid).ok) { acted = true; break; }
+      }
+    }
+    // 城池升级：富余金钱 + 三项资源已满当前上限 + 未到顶 → 升城（解锁更高上限 / 收益）
+    if (!acted) {
+      const fac = state.factions.find((f) => f.id === fid);
+      for (const c of cities) {
+        if (cmdRemaining(state, fid) <= 0) break;
+        c.level = c.level || 1;
+        if (c.level >= CITY_MAX_LEVEL) continue;
+        const cap = buildCapForCity(c);
+        const ready = c.farmLevel >= cap && c.marketLevel >= cap && c.wallLevel >= cap;
+        if (ready && fac.money >= cityUpgradeGoldCost(c.level) + 500 && chance(r, 0.6)) {
+          if (A.upgradeCity(state, c.id, fid).ok) { acted = true; break; }
+        }
       }
     }
 

@@ -21,6 +21,13 @@ function traitMult(city, type) {
   return city.trait && city.trait.type === type ? 1 + city.trait.value : 1;
 }
 
+// 城池等级加成：每升一级（自 1 起）使本城金钱 / 粮食收入 +5%、城防 +5%。
+// 让「升级城池」不仅是解锁上限，也带来即时收益，避免升城成为纯开销。
+export function cityLevelMult(city) {
+  const lvl = (city && city.level) || 1;
+  return 1 + Math.max(0, lvl - 1) * 0.05;
+}
+
 // 取本城某职官武将（须在城、非俘虏），用于结算职官加成。
 // 此处不 import state.js（避免与 state↔economy 循环依赖），就地查表。
 function officeHero(state, city, field) {
@@ -47,13 +54,13 @@ export function generalDefMult(state, city) {
 // 商业收入（每回合，单城）
 export function cityGoldIncome(state, city) {
   const base = city.marketLevel * GOLD_PER_MARKET + city.population * GOLD_PER_POP;
-  return base * traitMult(city, 'commerce') * techMult(state, city.ownerFactionId, 'commerce', 0.1) * governorEconMult(state, city);
+  return base * traitMult(city, 'commerce') * techMult(state, city.ownerFactionId, 'commerce', 0.1) * governorEconMult(state, city) * cityLevelMult(city);
 }
 
 // 粮食产量（每回合，单城）
 export function cityGrainIncome(state, city) {
   const base = city.farmLevel * GRAIN_PER_FARM;
-  return base * traitMult(city, 'grain') * techMult(state, city.ownerFactionId, 'agri', 0.1) * governorEconMult(state, city);
+  return base * traitMult(city, 'grain') * techMult(state, city.ownerFactionId, 'agri', 0.1) * governorEconMult(state, city) * cityLevelMult(city);
 }
 
 // 势力每回合金钱总收入（含特性 / 科技）
@@ -75,11 +82,11 @@ export function factionGrainNet(state, factionId) {
   return { prod, upkeep, net: prod - upkeep };
 }
 
-// 城防值（基础 × 城防特性 × 筑城科技 × 城墙等级加成 × 将军统率加成）
+// 城防值（基础 × 城防特性 × 筑城科技 × 城墙等级加成 × 将军统率加成 × 城池等级加成）
 export function cityDefenseValue(state, city) {
   const base = city.defenseBase || 0;
   const wallBoost = 1 + (city.wallLevel - 1) * 0.15;
-  return base * traitMult(city, 'defense') * techMult(state, city.ownerFactionId, 'wall', 0.2) * wallBoost * generalDefMult(state, city);
+  return base * traitMult(city, 'defense') * techMult(state, city.ownerFactionId, 'wall', 0.2) * wallBoost * generalDefMult(state, city) * cityLevelMult(city);
 }
 
 // 单城人口增长（依赖太守或君主政治）

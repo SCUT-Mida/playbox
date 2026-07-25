@@ -69,6 +69,19 @@ export function troopCap(state, hero) {
   if (!hero) return 0;
   return Math.round(hero.stats.l * 100 * (1 + skillBonus(hero).cap) * techMult(state, hero.factionId, 'leadership', 0.1));
 }
+// 出征部队带兵上限：主帅 + 副将各自统兵上限相加。
+// 副将协统时，一军可带兵力即各将所能统领之兵的总和（主将偕副将出征的优势之一）。
+export function troopCapForce(state, general, deputies = []) {
+  const ids = new Set();
+  let total = general ? troopCap(state, general) : 0;
+  if (general) ids.add(general.id);
+  for (const d of (Array.isArray(deputies) ? deputies : [])) {
+    if (!d || ids.has(d.id)) continue;
+    ids.add(d.id);
+    total += troopCap(state, d);
+  }
+  return total;
+}
 
 // 指令点数：基础 + 每多一城 + 君主政治加成（政治 / 20，使高政治君主确有更多指令）
 export function cmdPoints(state, fid) {
@@ -225,6 +238,8 @@ export function newGame({ lordName, startCity, stats, rng } = {}) {
   }
 
   // —— 为兵微将寡的 AI 势力补充部将（每势力至少 3 名）——
+  // usedNames 收集已用名字，供生成器撞名时追加区分后缀，杜绝同名武将混淆。
+  const usedNames = new Set(state.heroes.map((h) => h.name));
   let genIdx = 0;
   for (const seed of FACTION_SEEDS) {
     const f = facIdByKey[seed.key];
@@ -232,7 +247,7 @@ export function newGame({ lordName, startCity, stats, rng } = {}) {
     const roster = heroesOfFaction(state, f);
     const need = Math.max(0, 3 - roster.length);
     for (let i = 0; i < need; i++) {
-      const g = makeGenericGeneral(r, ++genIdx);
+      const g = makeGenericGeneral(r, ++genIdx, usedNames);
       g.id = `gen_${seed.key}_${i}`;
       g.factionId = f;
       g.cityId = seed.capital;
@@ -248,7 +263,7 @@ export function newGame({ lordName, startCity, stats, rng } = {}) {
   for (const c of state.cities) {
     const n = 2 + (chance(r, 0.6) ? 1 : 0);
     for (let i = 0; i < n; i++) {
-      const g = makeWildGeneral(r, ++wildIdx);
+      const g = makeWildGeneral(r, ++wildIdx, usedNames);
       g.id = `genwild_${c.id}_${i}`; // 城内唯一
       g.wild = true;
       g.factionId = null;
@@ -362,7 +377,8 @@ export function resolveTurn(state, aiModule, rng) {
     if (candidates.length) {
       const home = candidates[Math.floor(r() * candidates.length)];
       state.wildSeq += 1;
-      const g = makeWildGeneral(r, state.wildSeq);
+      const usedDyn = new Set(state.heroes.map((h) => h.name));
+      const g = makeWildGeneral(r, state.wildSeq, usedDyn);
       g.id = `genwild_dyn_${state.wildSeq}`; // 动态补充：全局唯一
       g.wild = true;
       g.factionId = null;

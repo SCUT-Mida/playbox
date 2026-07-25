@@ -4,7 +4,7 @@
 // ============================================================================
 import {
   cityById, heroById, factionById, neighbors, heroesInCity,
-  wildHeroesInCity, heroesOfFaction, bestDefender, troopCap, cmdRemaining, maxDefense, lordOf,
+  wildHeroesInCity, heroesOfFaction, bestDefender, troopCapForce, cmdRemaining, maxDefense, lordOf,
   checkGameOver, clearHeroOffices, officeHolder,
 } from './state.js';
 import { citiesOf, recruitCost } from './economy.js';
@@ -332,7 +332,9 @@ export function campaign(state, fromCityId, toCityId, generalId, troops, formati
   troops = Math.max(0, Math.floor(troops));
   if (troops <= 0) return { ok: false, msg: '出兵数量无效' };
   if (troops > from.soldiers) return { ok: false, msg: '城中兵力不足' };
-  if (troops > troopCap(state, g)) return { ok: false, msg: `超出 ${g.name} 带兵上限（${troopCap(state, g)}）` };
+  // 带兵上限 = 主帅 + 副将各自统兵上限相加（副将协统可统领更多兵力）
+  const cap = troopCapForce(state, g, deputies);
+  if (troops > cap) return { ok: false, msg: `超出统兵上限（${cap}：主帅与副将相加）` };
   if (!spendCmd(state, fid)) return { ok: false, msg: '指令点不足' };
   const grainCost = Math.round(troops * 0.05);
   if (facGrain(state, fid) < grainCost) { refundCmd(state, fid); return { ok: false, msg: '军粮不足以出征' }; }
@@ -404,6 +406,9 @@ function applyCampaignResult(state, battle, from, to, attackerGen, fid, rng, dep
     factionById(state, fid).grain += lootGrain;
     to.gold = 0; to.grain = 0;
     state.turnLog.push(`🏰 攻陷 ${to.name}！缴获 ${lootGold} 金、${lootGrain} 粮，余兵 ${survivors} 驻守。`);
+    // 营救：本城若关押有俘虏（被俘武将存身于此城），城陷即解救，归还其原属势力。
+    // 否则被俘武将将「莫名其妙消失」——既无处可寻，也无从夺回。
+    freeCaptivesInCity(state, to.id, fid);
   } else {
     // 失利：出征兵力覆灭（已从 from 扣除）；守军实际伤亡如实回写到真实城市
     // （createBattle 做了浅拷贝，runBattle 只削减 battle.defender，需手动落账）
@@ -439,7 +444,9 @@ function applyCampaignResult(state, battle, from, to, attackerGen, fid, rng, dep
     const stragglers = state.heroes.filter((h) =>
       h.factionId === oldOwnerFid && h.cityId === to.id
       && h.status !== 'prisoner' && h.id !== prisonerId);
-    const dest = stragglers.length ? nearestFriendlyCity(state, to.id, oldOwnerFid) : null;
+    // 该势力是否仍有城可守（城陷后），决定散兵去向与是否释放其俘虏
+    const enemyHasCity = state.cities.some((c) => c.ownerFactionId === oldOwnerFid);
+    const dest = enemyHasCity ? nearestFriendlyCity(state, to.id, oldOwnerFid) : null;
     for (const sh of stragglers) {
       clearHeroOffices(state, sh.id);
       if (dest) {
@@ -451,6 +458,11 @@ function applyCampaignResult(state, battle, from, to, attackerGen, fid, rng, dep
         sh.discovered = true; // 名义上原驻此城，可见
       }
     }
+    // 势力覆灭：释放其关押的全部俘虏，归还各自原属势力。
+    // 否则俘虏将随关押势力一起「永久消失」，再无夺回可能。
+    if (!enemyHasCity) {
+      freeCaptivesOfFaction(state, oldOwnerFid);
+    }
   }
 
   // 副将随主帅入驻新占之城（被俘者除外）；失利则副将留驻出发城，无需迁移。
@@ -459,6 +471,48 @@ function applyCampaignResult(state, battle, from, to, attackerGen, fid, rng, dep
       if (d.status === 'prisoner') continue;
       clearHeroOffices(state, d.id); // 离开发起城，卸除其在出发城可能担任的职官
       d.cityId = to.id;
+    }
+  }
+}
+
+// 解救关押在指定城池的俘虏（攻陷该城时调用）：归还其原属势力；
+// liberatorFid 为破城方势力，若解救的是其本方武将则记入战报。
+function freeCaptivesInCity(state, cityId, liberatorFid) {
+  const captives = state.heroes.filter((h) => h.status === 'prisoner' && h.cityId === cityId);
+  for (const cap of captives) {
+    const homeFid = cap.factionId;
+    const homeCities = homeFid != null ? citiesOf(state, homeFid) : [];
+    cap.status = 'free';
+    cap.prisonerOf = null;
+    clearHeroOffices(state, cap.id);
+    if (homeCities.length) {
+      cap.cityId = homeCities[0].id;
+    } else {
+      // 原属势力已无城 → 就地转为在野，可被他方重新登用
+      cap.wild = true;
+      cap.factionId = null;
+      cap.discovered = true;
+      cap.cityId = cityId;
+    }
+    if (homeFid === liberatorFid) state.turnLog.push(`🎉 营救出被俘的 ${cap.name}！`);
+  }
+}
+
+// 释放某势力关押的全部俘虏（该势力覆灭时调用），归还各自原属势力。
+function freeCaptivesOfFaction(state, ownerFid) {
+  const captives = state.heroes.filter((h) => h.status === 'prisoner' && h.prisonerOf === ownerFid);
+  for (const cap of captives) {
+    const homeFid = cap.factionId;
+    const homeCities = homeFid != null ? citiesOf(state, homeFid) : [];
+    cap.status = 'free';
+    cap.prisonerOf = null;
+    clearHeroOffices(state, cap.id);
+    if (homeCities.length) {
+      cap.cityId = homeCities[0].id;
+    } else {
+      cap.wild = true;
+      cap.factionId = null;
+      cap.discovered = true;
     }
   }
 }
@@ -538,14 +592,15 @@ export function stratagem(state, fromCityId, toCityId, type, fid = PLAYER(state)
   return { ok: true, msg: '计略执行完毕', success: true };
 }
 
-// 武将调任：在己方相邻城市间移动一名武将（免费）
+// 武将调任：在己方任意城市间快速调动一名武将（免费）。
+// 同一势力的疆域内可「急行军」直达任意己方城池，无需逐城相邻跋涉——
+// 既符合「领土内调动畅通」的直觉，也免去多步中转的繁琐操作。
 export function moveHero(state, heroId, toCityId, fid = PLAYER(state)) {
   const h = heroById(state, heroId);
   const to = cityById(state, toCityId);
   if (!h || h.factionId !== fid || h.status === 'prisoner') return { ok: false, msg: '武将不可用' };
   if (!to || to.ownerFactionId !== fid) return { ok: false, msg: '目标非己方城市' };
-  const from = cityById(state, h.cityId);
-  if (!from || !from.adjacent.includes(toCityId)) return { ok: false, msg: '两城不相邻' };
+  if (h.cityId === toCityId) return { ok: false, msg: '武将已在本城' };
   h.cityId = toCityId;
   // 武将调离后卸除其在出发城的一切职官（太守 / 将军 / 军师），
   // 否则职官引用会指向已不在本城的武将（违反「职官必在本城」不变量）

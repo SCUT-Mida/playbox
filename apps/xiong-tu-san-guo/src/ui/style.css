@@ -140,35 +140,36 @@
   letter-spacing: 4px; pointer-events: none;
 }
 .xtsg .map-river { fill: none; stroke: #3b6f8f; stroke-width: 7; opacity: 0.34; stroke-linecap: round; }
-.xtsg .map-line { stroke: #6b5430; stroke-width: 1.8; opacity: 0.65; stroke-dasharray: 1 4; stroke-linecap: round; }
-/* —— 城池图标：城堡造型（城体 + 顶部雉堞），按规模大/中/小三等 —— */
+/* 道路（邻接连线）：加粗提亮、改实线，让相邻城池一目了然，不被城池图标遮蔽 */
+.xtsg .map-line { stroke: #c79a4a; stroke-width: 2.4; opacity: 0.8; stroke-linecap: round; }
+/* —— 城池图标：城堡造型（城体 + 顶部雉堞），统一弱小，仅大/中/小略有差异 —— */
 .xtsg .map-dot {
   position: absolute; transform: translate(-50%, -50%);
-  width: 34px; height: 27px; border: none; padding: 0;
+  width: 30px; height: 23px; border: none; padding: 0;
   border-radius: 4px 4px 6px 6px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.7rem; font-weight: 700; color: #fff;
+  font-size: 0.64rem; font-weight: 700; color: #fff;
   box-shadow: 0 2px 6px rgba(0,0,0,0.5), inset 0 0 0 2px rgba(255,255,255,0.22);
   transition: transform 0.08s ease, box-shadow 0.12s ease;
 }
-/* 规模分级：大城图标最大，小城最小 */
-.xtsg .map-dot--lg { width: 46px; height: 36px; font-size: 0.78rem; border-radius: 5px 5px 8px 8px; }
-.xtsg .map-dot--md { width: 37px; height: 29px; font-size: 0.72rem; }
-.xtsg .map-dot--sm { width: 30px; height: 24px; font-size: 0.62rem; border-radius: 3px 3px 5px 5px; }
+/* 规模分级：整体缩小、差距收窄，避免大城图标压住道路 */
+.xtsg .map-dot--lg { width: 34px; height: 26px; font-size: 0.68rem; border-radius: 5px 5px 8px 8px; }
+.xtsg .map-dot--md { width: 30px; height: 23px; font-size: 0.64rem; }
+.xtsg .map-dot--sm { width: 26px; height: 20px; font-size: 0.58rem; border-radius: 3px 3px 5px 5px; }
 /* 顶部雉堞（城垛），用 mask 切出齿状——颜色随势力 */
 .xtsg .map-dot__battlement {
-  position: absolute; top: -5px; left: 1px; right: 1px; height: 6px;
-  -webkit-mask: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 7px);
-          mask: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 7px);
+  position: absolute; top: -4px; left: 1px; right: 1px; height: 5px;
+  -webkit-mask: repeating-linear-gradient(90deg, #000 0 3px, transparent 3px 6px);
+          mask: repeating-linear-gradient(90deg, #000 0 3px, transparent 3px 6px);
   filter: drop-shadow(0 1px 1px rgba(0,0,0,0.4));
 }
-.xtsg .map-dot--lg .map-dot__battlement { height: 7px; top: -6px; -webkit-mask: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 8px); mask: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 8px); }
-.xtsg .map-dot--sm .map-dot__battlement { height: 5px; top: -4px; -webkit-mask: repeating-linear-gradient(90deg, #000 0 3px, transparent 3px 6px); mask: repeating-linear-gradient(90deg, #000 0 3px, transparent 3px 6px); }
+.xtsg .map-dot--lg .map-dot__battlement { height: 6px; top: -5px; -webkit-mask: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 7px); mask: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 7px); }
+.xtsg .map-dot--sm .map-dot__battlement { height: 4px; top: -3px; -webkit-mask: repeating-linear-gradient(90deg, #000 0 3px, transparent 3px 5px); mask: repeating-linear-gradient(90deg, #000 0 3px, transparent 3px 5px); }
 .xtsg .map-dot__txt { line-height: 1; text-shadow: 0 1px 2px rgba(0,0,0,0.6); position: relative; z-index: 1; }
-.xtsg .map-dot__txt--badge { font-size: 0.6rem; letter-spacing: -0.5px; }
+.xtsg .map-dot__txt--badge { font-size: 0.52rem; letter-spacing: -0.6px; }
 .xtsg .map-dot__crown {
-  position: absolute; top: -16px; left: 50%; transform: translateX(-50%);
-  font-size: 0.82rem; z-index: 2; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.7));
+  position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+  font-size: 0.78rem; z-index: 2; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.7));
 }
 .xtsg .map-dot--capital { box-shadow: 0 2px 8px rgba(0,0,0,0.55), inset 0 0 0 2px rgba(255,255,255,0.45); }
 .xtsg .map-dot--dim { opacity: 0.5; }

@@ -133,12 +133,14 @@ export const FACTION_SEEDS = [
 
 // 生成器：为兵力薄弱的 AI 势力补充随机「部将」（无技能，属性中等）。
 // index 用于生成唯一 id，调用方负责保证其单调递增。
+// usedNames（可选 Set）：已用名字集合，传入则在撞名时追加区分后缀，
+// 杜绝「在野同名武将」混淆（两名属性不同的同名武将登用后难以分辨）。
 const GENERIC_SURNAMES = ['李', '王', '张', '刘', '陈', '杨', '赵', '黄', '周', '吴', '徐', '孙', '胡', '朱', '高', '林', '何', '郭', '马', '罗'];
 const GENERIC_GIVENS = ['成', '武', '义', '忠', '安', '定', '远', '彪', '虎', '达', '凯', '平', '宁', '胜', '广'];
-export function makeGenericGeneral(rng, index) {
+export function makeGenericGeneral(rng, index, usedNames) {
   const r = rng || Math.random;
-  const name = GENERIC_SURNAMES[Math.floor(r() * GENERIC_SURNAMES.length)]
-    + GENERIC_GIVENS[Math.floor(r() * GENERIC_GIVENS.length)];
+  const name = uniqueName(GENERIC_SURNAMES[Math.floor(r() * GENERIC_SURNAMES.length)]
+    + GENERIC_GIVENS[Math.floor(r() * GENERIC_GIVENS.length)], usedNames);
   const ri = (lo, hi) => Math.floor(lo + r() * (hi - lo));
   return {
     id: `gen_${index}`,
@@ -161,10 +163,11 @@ const GENERIC_WILD_SKILLS = [
 ];
 // 生成在野随机人物：能力波动更大（既可能平庸，也可能藏龙卧虎），约三成携带一项弱技能。
 // 用于开局散布各城，与名将并列，增加探索与登用的可玩度。
-export function makeWildGeneral(rng, index) {
+// usedNames（可选 Set）：撞名时追加区分后缀，避免多名在野武将同名混淆。
+export function makeWildGeneral(rng, index, usedNames) {
   const r = rng || Math.random;
-  const name = GENERIC_SURNAMES[Math.floor(r() * GENERIC_SURNAMES.length)]
-    + GENERIC_GIVENS[Math.floor(r() * GENERIC_GIVENS.length)];
+  const name = uniqueName(GENERIC_SURNAMES[Math.floor(r() * GENERIC_SURNAMES.length)]
+    + GENERIC_GIVENS[Math.floor(r() * GENERIC_GIVENS.length)], usedNames);
   const ri = (lo, hi) => Math.floor(lo + r() * (hi - lo));
   const skill = r() < 0.3 ? GENERIC_WILD_SKILLS[Math.floor(r() * GENERIC_WILD_SKILLS.length)] : null;
   return {
@@ -175,4 +178,21 @@ export function makeWildGeneral(rng, index) {
     stats: { l: ri(38, 90), w: ri(38, 92), i: ri(32, 88), p: ri(32, 84), c: ri(35, 86) },
     skill: skill ? { ...skill } : null,
   };
+}
+
+// 名字去重：撞名时追加中文序号后缀（二、三…），保证全册武将名字两两不同。
+// usedNames 为空（如单测直接调用）时原样返回，不影响 id 生成。
+const NAME_ORDINALS = ['', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+function uniqueName(base, usedNames) {
+  if (!usedNames) return base;
+  if (!usedNames.has(base)) { usedNames.add(base); return base; }
+  for (let i = 1; i < NAME_ORDINALS.length; i++) {
+    const cand = base + NAME_ORDINALS[i];
+    if (!usedNames.has(cand)) { usedNames.add(cand); return cand; }
+  }
+  let n = 11;
+  while (usedNames.has(base + n)) n += 1;
+  const cand = base + n;
+  usedNames.add(cand);
+  return cand;
 }

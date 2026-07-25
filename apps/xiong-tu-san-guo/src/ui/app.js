@@ -17,7 +17,7 @@ import { CITIES, CITY_MAP, MAP_RIVERS, MAP_REGIONS, CAPITAL_IDS, cityTier, TIER_
 import { HEROES, HERO_MAP, FACTION_SEEDS } from '../data/heroes.js';
 import { newGame, resolveTurn, cityById, heroById, factionById, playerFaction,
   neighbors, heroesOfFaction, heroesInCity, wildHeroesInCity, prisonersOfFaction,
-  troopCap, cmdPoints, cmdRemaining, bestDefender, lordOf, maxDefense, officeHolder } from '../core/state.js';
+  troopCap, troopCapForce, cmdPoints, cmdRemaining, bestDefender, lordOf, maxDefense, officeHolder } from '../core/state.js';
 import { citiesOf, factionGoldIncome, factionGrainNet, governorEconMult, generalDefMult } from '../core/economy.js';
 import { effLead, effWar } from '../core/combat.js';
 import { techLevel, techMaxLevel } from '../core/tech.js';
@@ -642,15 +642,16 @@ export class GameUI {
     }, current ? '更换' : '任命');
   }
 
-  // —— 调遣武将（本城 → 邻接己城）——
+  // —— 调遣武将（本城 → 任意己方城，疆域内急行军直达）——
   uiMoveHero(c) {
     const s = this.state;
     const roster = heroesInCity(s, c.id, s.playerFactionId);
-    const targets = neighbors(s, c.id).filter((n) => n.ownerFactionId === s.playerFactionId);
-    if (!roster.length || !targets.length) { this.toast('无可调遣武将或无邻接己城'); return; }
+    // 同一势力疆域内可直达任意己方城池，无需逐城相邻中转。
+    const targets = citiesOf(s, s.playerFactionId).filter((n) => n.id !== c.id);
+    if (!roster.length || !targets.length) { this.toast('无可调遣武将或无其他己城'); return; }
     const hSel = h('select', null, roster.map((h2) => h('option', { value: h2.id }, h2.name)));
     const tSel = h('select', null, targets.map((n) => h('option', { value: n.id }, n.name)));
-    const body = h('div', null, h('p', { class: 'hint' }, '将本城武将调往相邻己方城市。'), hSel, h('div', { style: { height: '0.4rem' } }), tSel);
+    const body = h('div', null, h('p', { class: 'hint' }, '将本城武将调往己方任意城市（疆域内急行军直达，免费）。'), hSel, h('div', { style: { height: '0.4rem' } }), tSel);
     this.openForm('调遣武将', body, () => {
       const r = A.moveHero(s, hSel.value, tSel.value);
       this.toast(r.msg); this.closeModal(); this.afterAction();
@@ -688,12 +689,28 @@ export class GameUI {
     const formSel = h('select', null, Object.entries(FORMATIONS).map(([k, f]) => h('option', { value: k }, `${f.name}（${f.desc}）`)));
     const genSel = h('select');
     const troopsIn = h('input', { type: 'number', value: 1000, min: 100, step: 100, style: { width: '5rem' } });
+    const capHint = h('div', { class: 'hint', style: { marginTop: '0.2rem' } }, '');
     // 副将勾选区：随出发城 / 主将变化而刷新；最多 2 名。
     const depWrap = h('div', { class: 'dep-list' });
+    // 带兵上限 = 主帅 + 已勾选副将各自统兵上限相加；随主将 / 副将勾选实时刷新。
+    const updateCap = () => {
+      const src = cityById(s, srcSel.value);
+      const g = heroById(s, genSel.value);
+      if (!src || !g) { capHint.textContent = ''; return; }
+      const depIds = Array.from(depWrap.querySelectorAll('input[type=checkbox]:checked')).map((c2) => c2.value);
+      const deps = depIds.map((id) => heroById(s, id)).filter(Boolean);
+      const mainCap = troopCap(s, g);
+      const cap = troopCapForce(s, g, deps);
+      troopsIn.max = Math.min(src.soldiers, cap);
+      troopsIn.value = Math.min(parseInt(troopsIn.value, 10) || 1000, parseInt(troopsIn.max, 10));
+      capHint.textContent = deps.length
+        ? `统兵上限 ${cap}（主帅 ${mainCap} + 副将 ${cap - mainCap}）`
+        : `统兵上限 ${mainCap}（点选副将可叠加统兵）`;
+    };
     const renderDeputies = (srcId, mainId) => {
       clear(depWrap);
       const gens = heroesInCity(s, srcId, s.playerFactionId).filter((g2) => g2.id !== mainId);
-      if (!gens.length) { depWrap.appendChild(h('span', { class: 'muted' }, '城中无其他武将可任副将')); return; }
+      if (!gens.length) { depWrap.appendChild(h('span', { class: 'muted' }, '城中无其他武将可任副将')); updateCap(); return; }
       for (const g2 of gens) {
         const cb = h('input', { type: 'checkbox', value: g2.id });
         cb.addEventListener('change', () => {
@@ -701,20 +718,19 @@ export class GameUI {
           const checked = boxes.filter((c2) => c2.checked).length;
           boxes.forEach((c2) => { c2.disabled = false; });
           if (checked >= 2) boxes.filter((c2) => !c2.checked).forEach((c2) => { c2.disabled = true; });
+          updateCap();
         });
         depWrap.appendChild(h('label', { class: 'dep-item' }, cb,
           h('span', null, `${g2.name}（武${g2.stats.w}·统${g2.stats.l}）`)));
       }
+      updateCap();
     };
     const refreshGenerals = () => {
       const src = cityById(s, srcSel.value);
       const gens = heroesInCity(s, src.id, s.playerFactionId);
       clear(genSel);
       if (!gens.length) { genSel.appendChild(h('option', null, '无可用武将')); renderDeputies(src.id, null); return; }
-      for (const g of gens) genSel.appendChild(h('option', { value: g.id }, `${g.name}（统${g.stats.l} · 上限${troopCap(s, g)}）`));
-      const g = gens[0];
-      troopsIn.max = Math.min(src.soldiers, troopCap(s, g));
-      troopsIn.value = Math.min(parseInt(troopsIn.value, 10) || 1000, parseInt(troopsIn.max, 10));
+      for (const g of gens) genSel.appendChild(h('option', { value: g.id }, `${g.name}（统${g.stats.l}）`));
       renderDeputies(src.id, genSel.value);
     };
     srcSel.addEventListener('change', refreshGenerals);
@@ -723,8 +739,8 @@ export class GameUI {
       h('p', { class: 'hint' }, `攻打 ${target.name}（守军 ${Math.round(target.soldiers)} · 城防 ${Math.round(target.defense)}）`),
       h('div', { class: 'create__field' }, h('label', null, '出发城市'), srcSel),
       h('div', { class: 'create__field' }, h('label', null, '主帅'), genSel),
-      h('div', { class: 'create__field' }, h('label', null, '副将（最多 2 名 · 提升攻击、可替战）'), depWrap),
-      h('div', { class: 'create__field' }, h('label', null, '出兵数量（按路程耗粮）'), troopsIn),
+      h('div', { class: 'create__field' }, h('label', null, '副将（最多 2 名 · 提升攻击、加统兵、可替战）'), depWrap),
+      h('div', { class: 'create__field' }, h('label', null, '出兵数量（按路程耗粮）'), troopsIn, capHint),
       h('div', { class: 'create__field' }, h('label', null, '阵型'), formSel),
     );
     this.openForm('出征', body, () => {
@@ -830,6 +846,8 @@ export class GameUI {
     const wilds = s.heroes.filter((h) => h.wild && h.discovered && h.status !== 'gone'
       && citiesOf(s, fid).some((c) => c.id === h.cityId)); // 仅己方城市中已发现的
     const prisoners = prisonersOfFaction(s, fid);
+    // 被敌方关押的本方武将：出征失利被俘后会「消失」于名录，此处集中展示其下落。
+    const captured = s.heroes.filter((h) => h.factionId === fid && h.status === 'prisoner');
 
     // 该武将当前所任职官（扫全图城市）
     const officeOf = (heroId) => {
@@ -875,6 +893,18 @@ export class GameUI {
           h('button', { class: 'btn-ghost', onClick: () => { const r = A.releasePrisoner(s, h2.id); this.toast(r.msg); this.afterAction(); } }, '释放'),
           h('button', { class: 'btn-danger', onClick: () => { const r = A.executePrisoner(s, h2.id); this.toast(r.msg); this.afterAction(); } }, '处决'),
         ]))),
+      ) : null,
+
+      captured.length ? h('div', null,
+        h('h3', { style: { marginTop: '0.8rem' } }, '被俘在外'),
+        h('p', { class: 'hint' }, '以下武将出征失利被俘，正被敌方关押。攻陷其关押之城或灭其势力即可营救归队。'),
+        h('div', { class: 'card-list' }, captured.map((h2) => {
+          const holder = h2.prisonerOf != null ? factionById(s, h2.prisonerOf) : null;
+          const jailCity = cityById(s, h2.cityId);
+          return heroCard(h2, [
+            h('span', { class: 'hero-card__sub' }, `⛓️ 被关押于${jailCity ? jailCity.name : '敌方'}${holder ? `（${holder.name}）` : ''}`),
+          ]);
+        })),
       ) : null,
     ));
   }

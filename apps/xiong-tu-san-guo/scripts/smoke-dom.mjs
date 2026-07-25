@@ -144,6 +144,32 @@ ok(Array.from(document.querySelectorAll('label')).some((l) => l.textContent.incl
 ok(Array.from(document.querySelectorAll('label')).some((l) => l.textContent.includes('副将')), '出征弹窗含副将选择');
 if (document.querySelector('.modal__foot button')) { document.querySelector('.modal__foot button').click(); await sleep(3); }
 
+// ---------- 6c) 出征统兵上限提示 + 调遣武将弹窗（确定性前置状态）----------
+// 前置：君主归洛阳、玩家另占宛城，使默认出发城有将、且有第二座己城可调遣。
+const s6c = ui.state;
+const lord6c = s6c.heroes.find((h) => h.isPlayerLord);
+lord6c.cityId = 'luoyang'; lord6c.status = 'free';
+const ly6c = s6c.cities.find((c) => c.id === 'luoyang');
+ly6c.ownerFactionId = 0; ly6c.governorHeroId = lord6c.id;
+s6c.cities.find((c) => c.id === 'wan').ownerFactionId = 0;
+ui.tab = 'map'; ui.renderContent(); await sleep(3);
+// 出征弹窗（许昌为敌城，邻接洛阳/宛城）：应展示统兵上限提示
+const xcDot2 = (Array.from(document.querySelectorAll('.map-label')).find((b) => b.textContent.includes('许昌')) || {}).previousElementSibling;
+if (xcDot2) { xcDot2.click(); await sleep(5); }
+const campBtn2 = Array.from(document.querySelectorAll('button')).find((b) => b.textContent.includes('出征攻打'));
+if (campBtn2) { campBtn2.click(); await sleep(5); }
+ok(Array.from(document.querySelectorAll('.hint')).some((t) => t.textContent.includes('统兵上限')), '出征弹窗展示统兵上限提示（主帅+副将相加）');
+if (document.querySelector('.modal__foot button')) { document.querySelector('.modal__foot button').click(); await sleep(3); }
+// 调遣武将弹窗：应提示疆域内任意己城直达
+const lyDotM = (Array.from(document.querySelectorAll('.map-label')).find((b) => b.textContent.includes('洛阳')) || {}).previousElementSibling;
+if (lyDotM) { lyDotM.click(); await sleep(5); }
+const moveBtn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent.includes('调遣武将'));
+if (moveBtn) {
+  moveBtn.click(); await sleep(5);
+  ok(Array.from(document.querySelectorAll('.hint')).some((t) => t.textContent.includes('急行军')), '调遣弹窗提示疆域内直达（不限邻接）');
+  if (document.querySelector('.modal__foot button')) { document.querySelector('.modal__foot button').click(); await sleep(3); }
+}
+
 // ---------- 7) 存档可往返 ----------
 localStorage.setItem('__probe__', '1');
 ok(localStorage.getItem('xtsg_save_v1') != null, '对局已自动存档到 localStorage');

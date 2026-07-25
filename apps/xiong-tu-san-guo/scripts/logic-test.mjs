@@ -3,7 +3,7 @@ import { CITIES, CITY_MAP, adjacencyValid, cityTier } from '../src/data/cities.j
 import { HEROES, FACTION_SEEDS, makeGenericGeneral, makeWildGeneral } from '../src/data/heroes.js';
 import { makeRng } from '../src/core/rng.js';
 import { parseSkill, techMult, techMaxLevel, maxCityLevelOfFaction } from '../src/core/tech.js';
-import { cityGoldIncome, cityGrainIncome, factionGoldIncome, factionGrainNet, cityDefenseValue, governorEconMult, generalDefMult, cityLevelMult } from '../src/core/economy.js';
+import { cityGoldIncome, cityGrainIncome, factionGoldIncome, factionGrainNet, cityDefenseValue, governorEconMult, generalDefMult, cityLevelMult, citiesOf } from '../src/core/economy.js';
 import { createBattle, runBattle, effWar, attackValue } from '../src/core/combat.js';
 import {
   buildCapForCity, cityUpgradeGoldCost, CITY_MAX_LEVEL, BUILD_CAP_STEP,
@@ -15,7 +15,7 @@ import {
   officeHolder, clearHeroOffices,
 } from '../src/core/state.js';
 import * as A from '../src/core/actions.js';
-import { aiTurnAll } from '../src/core/ai.js';
+import { aiTurnAll, aiTurn } from '../src/core/ai.js';
 
 let pass = 0, fail = 0;
 function ok(cond, msg) { if (cond) { pass++; } else { fail++; console.error('  ✗ ' + msg); } }
@@ -430,6 +430,49 @@ for (let seed = 1; seed <= 200 && !dynSeen; seed++) {
   if (s5.heroes.some((h) => h.wild && typeof h.id === 'string' && h.id.startsWith('genwild_dyn_'))) dynSeen = true;
 }
 ok(dynSeen, '回合结算会动态补充新的在野人物');
+
+console.log('—— 贸易收益随目标城规模增长（tier 不再恒为 2）——');
+const stT = newGame({ lordName: '通商', startCity: 'luoyang', stats, rng: makeRng(65) });
+const fromT = cityById(stT, 'luoyang');
+fromT.marketLevel = 1;
+// 运行时城市用 maxPopulation（非 popMax）；取一个大城（tier 3）与一个小城（tier 1）比较
+const bigT = stT.cities.find((c) => cityTier(c) === 3 && c.id !== 'luoyang');
+const smallT = stT.cities.find((c) => cityTier(c) === 1);
+ok(bigT && smallT, '存在大城与小城作为贸易目标');
+const yBig = tradeGoldYield(stT, fromT, bigT);
+const ySmall = tradeGoldYield(stT, fromT, smallT);
+ok(yBig > ySmall, `大城贸易收益 > 小城 (${yBig} > ${ySmall})：目标城规模加成已生效`);
+// tier 差 2 → base 差 200；修正前两者恒相等（均按 tier 2 结算）
+ok(yBig - ySmall >= 200, `大城比小城至少多 2×100 金（tier 差 2，实际差 ${yBig - ySmall}）`);
+
+console.log('—— 科技等级不倒退（城池易手致上限回落）——');
+const sr = newGame({ lordName: '科技', startCity: 'luoyang', stats, rng: makeRng(91) });
+sr.techLevelsByFaction = { 0: { agri: 4, commerce: 0, forge: 0, wall: 0, trick: 0, leadership: 0 } };
+cityById(sr, 'luoyang').level = 5;
+eq(techMaxLevel(sr, 0), 7, '城池 Lv5 时科技上限 = 7');
+sr.researchByFaction = { 0: { key: 'agri', turnsLeft: 1 } };
+// 城池易手 / 等级回落 → 科技上限降到 3
+cityById(sr, 'luoyang').level = 1;
+eq(techMaxLevel(sr, 0), 3, '城池回落 Lv1 时科技上限 = 3');
+resolveTurn(sr, null, makeRng(1)); // 纯结算（无 AI），本回合研究完成
+eq(sr.techLevelsByFaction[0].agri, 4, '上限回落时研究完成不会把已得 agri 从 4 倒退为 3');
+
+console.log('—— AI 内政轮动升农田 / 城墙（解锁城池升级，不再只升市场）——');
+const sa = newGame({ lordName: '观战', startCity: 'luoyang', stats, rng: makeRng(77) });
+const aiFid = 1;
+const aiCity = citiesOf(sa, aiFid)[0];
+ok(aiCity, 'AI 势力拥有城市');
+sa.factions.find((f) => f.id === aiFid).money = 999999; // 排除预算不足干扰
+let nonMarketUpgraded = false;
+let cityUpgraded = false;
+for (let i = 0; i < 400; i++) {
+  sa.cmdUsedByFaction = {}; // 每轮重置指令点，模拟逐回合
+  aiTurn(sa, aiFid, makeRng(200 + i));
+  if (aiCity.farmLevel > 1 || aiCity.wallLevel > 1) nonMarketUpgraded = true;
+  if ((aiCity.level || 1) > 1) cityUpgraded = true;
+}
+ok(nonMarketUpgraded, 'AI 会升级农田 / 城墙（farmLevel/wallLevel 不再长期停在 1）');
+ok(cityUpgraded, 'AI 三项资源触顶后会升级城池（upgradeCity 不再是死代码）');
 
 console.log(`\n结果：${pass} 通过，${fail} 失败`);
 process.exit(fail ? 1 : 0);

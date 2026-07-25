@@ -24,14 +24,25 @@ export function aiTurn(state, fid, rng) {
   while (cmdRemaining(state, fid) > 0 && guard++ < 30) {
     let acted = false;
 
-    // 1) 内政：国库充盈（金钱 > 600）才升市场——有钱才投资；市场达到当前城池上限后，若三项资源满级则升级城池以解锁更高上限；兵不足人口 20% 则征兵
+    // 1) 内政：国库充盈（金钱 > 600）才投资开发。市场 / 农田 / 城墙三项资源须均衡轮动升级——
+    //    只升市场会让 farmLevel / wallLevel 长期停在 1，而 upgradeCity 的前置要求三项资源
+    //    均满当前上限（cap 至少 5），ready 永远为 false，于是 AI 既无法升级城池，也无法借
+    //    城池等级抬高科技上限（本次新增的「城池等级解锁科技上限 / 城池升级加成」对 AI 完全
+    //    失效，玩家获得非预期优势）。故每轮优先补齐三项中等级最低者，尽快同时触顶解锁升城。
+    const fac = state.factions.find((f) => f.id === fid);
+    const developOpts = [
+      { fn: (cid) => A.developMarket(state, cid, fid), lv: 'marketLevel' },
+      { fn: (cid) => A.developFarm(state, cid, fid), lv: 'farmLevel' },
+      { fn: (cid) => A.buildWall(state, cid, fid), lv: 'wallLevel' },
+    ];
     for (const c of cities) {
-      if (cmdRemaining(state, fid) <= 0) break;
-      const fac = state.factions.find((f) => f.id === fid);
+      if (cmdRemaining(state, fid) <= 0 || fac.money <= 600) break;
+      if (!chance(r, 0.5)) continue; // 与原逻辑一致：约半数概率投资
       const cap = buildCapForCity(c);
-      if (fac.money > 600 && c.marketLevel < cap && chance(r, 0.5)) {
-        if (A.developMarket(state, c.id, fid).ok) { acted = true; break; }
-      }
+      const lowest = developOpts
+        .filter((o) => c[o.lv] < cap)
+        .sort((a, b) => c[a.lv] - c[b.lv])[0];
+      if (lowest && lowest.fn(c.id).ok) { acted = true; break; }
     }
     for (const c of cities) {
       if (cmdRemaining(state, fid) <= 0) break;

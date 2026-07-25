@@ -77,7 +77,9 @@ export function exchangeRate(state, city) {
 export const TRADE_GRAIN_COST = 200; // 每次贸易消耗军粮（商队辎重）
 export const TRADE_SEIZED_CHANCE = 0.35; // 与他国贸易被劫掠的概率
 export function tradeGoldYield(state, fromCity, toCity) {
-  const tier = toCity && toCity.popMax ? cityTierRaw(toCity) : 2;
+  // cityTierRaw 内部已兼容 popMax 与 maxPopulation；原 guard 误取 toCity.popMax
+  // （运行时城市对象仅有 maxPopulation），导致 tier 恒为 2、规模加成形同死代码，故移除。
+  const tier = cityTierRaw(toCity);
   const base = 80 + (fromCity.marketLevel || 1) * 50 + tier * 100;
   const techMultVal = state && fromCity.ownerFactionId != null
     ? techMultOfCommerce(state, fromCity.ownerFactionId) : 1;

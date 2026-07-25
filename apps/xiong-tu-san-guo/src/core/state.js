@@ -336,7 +336,10 @@ export function resolveTurn(state, aiModule, rng) {
     if (res.turnsLeft <= 0) {
       // 仅对本势力加级；其他势力（含同时研究同项科技者）的等级不受影响
       const tbl = ensureTechLevels(state, fac.id);
-      tbl[res.key] = Math.min(techMaxLevel(state, fac.id), (tbl[res.key] || 0) + 1);
+      const cur = tbl[res.key] || 0;
+      // 取「当前等级」与「上限内 +1」的较大者：研究完成只会加级，绝不因上限回落
+      // （如该势力最高城池易手、techMaxLevel 下降）而把已取得的科技等级反向降低。
+      tbl[res.key] = Math.max(cur, Math.min(techMaxLevel(state, fac.id), cur + 1));
       if (fac.id === state.playerFactionId) {
         state.turnLog.push(`🔬 科技突破：研究完成（${res.key} 升至 ${tbl[res.key]} 级）。`);
       }

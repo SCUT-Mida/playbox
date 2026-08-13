@@ -77,6 +77,14 @@ const APPS = {
     desc: '自择一城起兵，开发内政、推进科技树、招揽四十余位名将，在十八城中国地图上回合制征战，俘将夺城，一统九州。',
     loader: () => import('../apps/xiong-tu-san-guo/src/main.js'),
   },
+  lxwjl: {
+    key: 'lxwjl',
+    title: '灵墟·问剑录',
+    subtitle: '仙侠 · 卡牌修仙',
+    emblem: '剑',
+    desc: '问道抽卡集齐十五张五行卡牌，修炼突破升星、布阵站位，在五行克制的回合制战场上征战十二卷主线、攀爬九重天秘境；洞府挂机收菜，伪云存档随取随玩。',
+    loader: () => import('../apps/ling-xu-wen-jian-lu/src/main.js'),
+  },
 }
 
 // 大类：先呈现「学习」，再呈现「游戏」。点击大类进入后，才展开其中的具体应用。
@@ -95,7 +103,7 @@ const CATEGORIES = [
     subtitle: '休闲 · 互动娱乐',
     emblem: '玩',
     desc: '消磨时光的互动小品：修仙、人生、三国战场、星骸浮岛、诸侯争霸，挑一个开始吧。',
-    appKeys: ['dzf', 'frxx', 'mnrs', 'xhlz', 'xtsg'],
+    appKeys: ['dzf', 'frxx', 'mnrs', 'xhlz', 'xtsg', 'lxwjl'],
   },
 ]
 

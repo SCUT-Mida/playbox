@@ -102,9 +102,14 @@ export function createBattle(playerSpecs, enemySpecs, rng) {
   }
   // 重置受开场影响后的当前气血
   for (const c of [...players, ...enemies]) c.hp = c.maxHp;
+  const events = [];
+  // 初始化事件：把所有参战单位及其初始面板喂给动画回放器。
+  for (const c of [...players, ...enemies]) {
+    events.push({ t: 'init', side: c.side, pos: c.pos, name: c.name, element: c.element, role: c.role, hp: c.hp, maxHp: c.maxHp, isBoss: !!c.isBoss });
+  }
   return {
     players, enemies,
-    round: 0, log: [], over: false, result: null,
+    round: 0, log: [], events, over: false, result: null,
     _rng: rng || Math.random,
   };
 }
@@ -152,18 +157,24 @@ function pickLowestAlly(battle, c) {
 
 // ── 伤害 / 治疗 / 死亡 ─────────────────────────────────────────────────────────
 function pushLog(battle, text) { battle.log.push(text); }
+// 结构化事件（供 2.5D 战斗场景回放动画）：与文本 log 并行，不改战斗结果。
+function ev(battle, obj) { battle.events.push(obj); }
+function ref(c) { return { side: c.side, pos: c.pos, name: c.name }; }
 
 function directHpDamage(battle, target, amount, source) {
   target.hp -= amount;
   if (target.hp <= 0) handleDeath(battle, target, source);
+  // 持续伤害 / 反伤：同步血量到动画回放（src 可能为 null）
+  ev(battle, { t: 'hit', src: source ? ref(source) : null, side: target.side, pos: target.pos, name: target.name, dmg: amount, crit: false, counterMult: 1, hp: target.hp, maxHp: target.maxHp });
 }
 
 function dealDamage(battle, target, source, mult, fixed, rng) {
   if (!target.alive || target.invuln > 0) {
-    if (target.invuln > 0) pushLog(battle, `${target.name} 身泛金光，免疫了伤害！`);
+    if (target.invuln > 0) { pushLog(battle, `${target.name} 身泛金光，免疫了伤害！`); ev(battle, { t: 'immune', side: target.side, pos: target.pos, name: target.name }); }
     return 0;
   }
   const crit = chance(rng, curCrit(source));
+  const counter = counterMult(source.element, target.element);
   const dmg = computeDamage({
     atk: curAtk(source), def: curDef(target), mult, fixed,
     atkEl: source.element, defEl: target.element, crit, rng,
@@ -187,6 +198,8 @@ function dealDamage(battle, target, source, mult, fixed, rng) {
     if (hl > 0) healUnit(battle, source, hl, source, true);
   }
   if (target.hp <= 0) handleDeath(battle, target, source);
+  // 命中事件：携带暴击 / 五行系数 / 命后血量，供飞溅与震屏动画消费。
+  ev(battle, { t: 'hit', src: ref(source), side: target.side, pos: target.pos, name: target.name, dmg: remaining, crit, counterMult: counter, el: target.element, hp: target.hp, maxHp: target.maxHp });
   return remaining;
 }
 
@@ -198,6 +211,8 @@ function healUnit(battle, target, amount, source, suppressAura) {
   target.hp = Math.min(target.maxHp, target.hp + eff);
   const real = target.hp - before;
   if (real > 0) pushLog(battle, `${source.name} 治疗 ${target.name} ${real} 点。`);
+  // 治疗事件：绿色涟漪扩散
+  ev(battle, { t: 'heal', src: ref(source), side: target.side, pos: target.pos, name: target.name, amt: real, hp: target.hp, maxHp: target.maxHp });
 }
 
 function handleDeath(battle, target, source) {
@@ -207,6 +222,7 @@ function handleDeath(battle, target, source) {
     target.deathsaveUsed = true;
     target.hp = Math.round(target.maxHp * (target.deathsave.hpPct || 0.30));
     pushLog(battle, `${target.name} 水月镜花！免疫致命一击并回复气血。`);
+    ev(battle, { t: 'save', kind: 'deathsave', side: target.side, pos: target.pos, name: target.name, hp: target.hp, maxHp: target.maxHp });
     return;
   }
   // 濒死复活（不屈战魂）
@@ -214,6 +230,7 @@ function handleDeath(battle, target, source) {
     target.reviveUsed = true;
     target.hp = Math.round(target.maxHp * (target.revive.hpPct || 0.30));
     pushLog(battle, `${target.name} 不屈战魂，浴火复活！`);
+    ev(battle, { t: 'save', kind: 'revive', side: target.side, pos: target.pos, name: target.name, hp: target.hp, maxHp: target.maxHp });
     return;
   }
   // 全队复活（天泽万物）
@@ -227,10 +244,13 @@ function handleDeath(battle, target, source) {
     }
     target.hp = Math.round(target.maxHp * (target.teamRevive.hpPct || 0.50));
     pushLog(battle, `${target.name} 天泽万物！全队死而复生！`);
+    ev(battle, { t: 'save', kind: 'team_revive', side: target.side, pos: target.pos, name: target.name, hp: target.hp, maxHp: target.maxHp });
     return;
   }
   target.hp = 0; target.alive = false;
   pushLog(battle, `${target.name} 倒下了。`);
+  // 阵亡退场：墨迹消散特效
+  ev(battle, { t: 'death', side: target.side, pos: target.pos, name: target.name });
 }
 
 // ── 技能效果施加 ──────────────────────────────────────────────────────────────
@@ -306,7 +326,11 @@ function act(battle, c, rng) {
     c.buffs.push({ stat: 'def', amount: c.enrage.amount, dur: c.enrage.dur });
     c._enrageDur = c.enrage.dur;
     pushLog(battle, `${c.name} 怒意爆发，全属性暴增！`);
+    ev(battle, { t: 'enrage', side: c.side, pos: c.pos, name: c.name });
   }
+
+  // 当前出手单位高亮（金色描边 + 上浮）
+  ev(battle, { t: 'act', side: c.side, pos: c.pos, name: c.name, skill: skill.name || '' });
 
   const mult = skill.mult || 0;
   const fixed = skill.fixed || 0;
@@ -402,8 +426,8 @@ function endRound(battle, rng) {
 function checkOver(battle) {
   const pAlive = aliveOf(battle.players).length;
   const eAlive = aliveOf(battle.enemies).length;
-  if (eAlive === 0) { battle.over = true; battle.result = 'win'; pushLog(battle, '★ 敌方全军覆没，你获胜了！'); return true; }
-  if (pAlive === 0) { battle.over = true; battle.result = 'lose'; pushLog(battle, '★ 我方全军覆没，败北……'); return true; }
+  if (eAlive === 0) { battle.over = true; battle.result = 'win'; pushLog(battle, '★ 敌方全军覆没，你获胜了！'); ev(battle, { t: 'over', result: 'win' }); return true; }
+  if (pAlive === 0) { battle.over = true; battle.result = 'lose'; pushLog(battle, '★ 我方全军覆没，败北……'); ev(battle, { t: 'over', result: 'lose' }); return true; }
   return false;
 }
 
@@ -412,6 +436,8 @@ export function stepRound(battle, rng) {
   const r = rng || battle._rng || Math.random;
   if (battle.over) return { logs: [], over: true, result: battle.result };
   battle.round += 1;
+  // 回合开始：屏幕底部浮现水墨「第 X 回合」字样
+  ev(battle, { t: 'round', n: battle.round });
   // 出手顺序：速度 × ±5% 浮动
   // 先一次性 map 出每个单位的 initiative 定值，再按值排序——
   // 避免在比较器内反复重抽随机数导致违反传递性/一致性。
@@ -442,6 +468,7 @@ export function runBattle(playerSpecs, enemySpecs, rng, maxRounds = 60) {
     battle.result = pHp >= eHp ? 'win' : 'lose';
     battle.over = true;
     pushLog(battle, battle.result === 'win' ? '★ 限时已到，你以微弱优势取胜！' : '★ 限时已到，遗憾落败……');
+    ev(battle, { t: 'over', result: battle.result });
   }
   return {
     result: battle.result,

@@ -10,25 +10,31 @@ import { h, clear, bar } from './dom.js';
 import {
   RARITIES, rarityDef, ELEMENTS, elDef, elName, elEmoji,
   RESOURCES, resName, resEmoji, PILL_EXP, BREAK_STONE, THEME,
-  dayKey, cardCap,
+  dayKey, cardCap, starUnlock, STAR_UNLOCKS, affinityLevel, affinityBonusPct, AFFINITY_MAX,
+  EVOLUTION, STAMINA_MAX, STAMINA_PER_SWEEP, SWEEP_BATCH,
 } from '../config.js';
-import { CARDS, cardDef } from '../data/cards.js';
+import { CARDS, cardDef, cardEvolutionPath } from '../data/cards.js';
 import { BOSSES } from '../data/enemies.js';
 import {
   newPlayer, recompute, addRes, countRes, canAfford, spendRes,
   ownCard, addFrag, countFrag, hasCard, setFormation, activeFormation, formationPower,
   collectionCount, collectionTotal, collectionProgress, totalStars, CODEX_TIERS,
+  stageStarOf, stageStars,
 } from '../core/player.js';
-import { instanceStats, instancePower, skillMult, isMaxLevel, expToNext } from '../core/card.js';
+import { instanceStats, instancePower, skillMult, isMaxLevel, expToNext, effectiveRarity } from '../core/card.js';
 import {
   canLevelUp, levelCeiling, feedPill, breakCost, canBreakThrough, doBreakThrough,
   starUpCost, canStarUp, doStarUp, canSkillUp, doSkillUp, skillUpCost, MAX_SKILL_LEVEL,
+  evoCost, canEvolve, doEvolve, canGift, doGift,
 } from '../core/cultivate.js';
 import { drawOne, drawTen, dailyFreeAvailable, pitySSRRemaining, pitySRRemaining } from '../core/gacha.js';
-import { playerSpecsFrom } from '../core/battle.js';
+import { playerSpecsFrom, runBattle } from '../core/battle.js';
 import {
-  CHAPTERS, stagesForChapter, stageDef, canEnterStage, isStageCleared, enterStage,
+  CHAPTERS, stagesForChapter, stageDef, canEnterStage, isStageCleared,
+  prepareStageBattle, settleStage, computeStageStars,
 } from '../core/stage.js';
+import { canSweep, sweepBatch, sweepReason, sweepUnlocked } from '../core/sweep.js';
+import { staminaValue, staminaPreview, regenStamina } from '../core/stamina.js';
 import { enterFloor, tianOf, floorPower, TOTAL_FLOORS, resetSecret } from '../core/secret.js';
 import { collectCave, previewCave, caveTotalLevel, caveSSRCount } from '../core/cave.js';
 import { ACHIEVEMENTS, ACH_CATS, checkAchievements, achProgress, rewardDesc } from '../core/achievements.js';
@@ -37,6 +43,7 @@ import {
   listSlots, loadSlot, saveSlot, deleteSlot, getActiveSlot, setActiveSlot,
 } from '../core/save.js';
 import { makeRng } from '../core/rng.js';
+import { BattleScene } from './battle-scene.js';
 
 const TABS = [
   { key: 'lineup', icon: '⚔️', label: '阵容' },
@@ -59,6 +66,8 @@ export class GameUI {
     this.cultivateId = null;
     this.viewChapter = 1;
     this.lastBattle = null;
+    this.detailTab = 'cultivate'; // 灵犀阁子页签：cultivate / star / skill / affinity
+    this._battleScene = null;
     this._timers = [];
     this._rngSeed = 0;
     this._onVis = this._onVis.bind(this);
@@ -78,6 +87,7 @@ export class GameUI {
   }
 
   destroy() {
+    if (this._battleScene) { this._battleScene.destroy(); this._battleScene = null; }
     this.stopLoop();
     if (this._detachKeyboard) this._detachKeyboard();
     try { document.removeEventListener('visibilitychange', this._onVis); } catch (_) {}
@@ -103,7 +113,9 @@ export class GameUI {
       h('div', { class: 'sheet__body' }, body),
       foot,
     );
-    const mask = h('div', { class: 'modal-mask', onClick: () => { if (opts.dismissable !== false) this.closeModal(); } }, sheet);
+    const mask = h('div', { class: 'modal-mask' }, sheet);
+    // 仅在点击遮罩空白处（e.target === mask）时关闭；点击弹窗内部不关闭，
+    // 避免内部按钮先 closeModal+再开新弹窗时，冒泡到旧遮罩把新弹窗一并关掉。
     mask.addEventListener('click', (e) => { if (e.target === mask && opts.dismissable !== false) this.closeModal(); });
     this.modalRoot.appendChild(mask);
   }
@@ -126,6 +138,7 @@ export class GameUI {
   // ============ 存档选择 ============
   showSlots() {
     try { if (this.player) saveGame(this.player); } catch (_) {}
+    if (this._battleScene) { this._battleScene.destroy(); this._battleScene = null; }
     this.stopLoop();
     this.player = null;
     this.screen = 'slots';
@@ -242,6 +255,8 @@ export class GameUI {
       h('div', { class: 'topbar__res' },
         resChip('🪙', countRes(p, 'lingshi'), '灵石'),
         resChip('🎏', countRes(p, 'wendao'), '问道令'),
+        resChip('💨', staminaValue(p), '灵气'),
+        resChip('🏃', countRes(p, 'sweep_ticket'), '神行符'),
         resChip('⚔️', formationPower(p), '战力'),
         resChip('📖', `${collectionCount(p)}/${collectionTotal()}`, '图鉴'),
       ),
@@ -370,7 +385,7 @@ export class GameUI {
     this.openModal(head, body);
   }
 
-  // ============ 修炼 ============
+  // ============ 灵犀阁·卡牌详情（设计稿增量 第一节） ============
   renderCultivate() {
     const p = this.player;
     const owned = Object.keys(p.cards).sort(byRarityThenPower(p));
@@ -379,52 +394,116 @@ export class GameUI {
     const def = cardDef(id);
     const picker = h('div', { class: 'card-picker' }, ...owned.map((cid) => {
       const d = cardDef(cid);
+      const er = effectiveRarity(p.cards[cid]);
       return h('button', {
-        class: `picker-chip rarity-${d.rarity} ${cid === id ? 'active' : ''}`,
-        style: { borderColor: rarityDef(d.rarity).color },
+        class: `picker-chip rarity-${er} ${cid === id ? 'active' : ''}`,
+        style: { borderColor: rarityDef(er).color },
         onClick: () => { this.cultivateId = cid; this.refresh(); },
       }, `${d.name} ${elEmoji(d.element)}`);
     }));
     if (!def) { this.contentEl.append(picker, h('p', { class: 'muted' }, '暂无卡牌')); return; }
     const inst = p.cards[id];
-    const r = rarityDef(def.rarity);
+    const er = effectiveRarity(inst);
+    const r = rarityDef(er);
     const st = instanceStats(inst);
-    this.contentEl.append(
-      picker,
-      h('div', { class: 'cult-card' },
-        h('div', { class: 'cult-card__head' },
-          h('div', { class: `rarity-badge rarity-${def.rarity}`, style: { background: r.color } }, `${def.rarity} ${'★'.repeat(inst.star)}`),
-          h('div', null,
-            h('div', { class: 'cult-card__name' }, `${def.name} ${elEmoji(def.element)}`),
-            h('div', { class: 'muted' }, `${elName(def.element)}系 · ${def.cls} · ${def.role}`),
-          ),
+
+    // 左：2.5D 卡牌展示；右：基础属性面板
+    const stage = this.buildCardStage(def, inst, r);
+    const statsPanel = h('div', { class: 'cult-card' },
+      h('div', { class: 'cult-card__head' },
+        h('div', { class: `rarity-badge rarity-${er}`, style: { background: r.color } },
+          `${er} ${'★'.repeat(inst.star)}${inst.evo ? ' ✦' : ''}`),
+        h('div', null,
+          h('div', { class: 'cult-card__name' }, `${def.name} ${elEmoji(def.element)}`),
+          h('div', { class: 'muted' }, `${elName(def.element)}系 · ${def.cls} · ${def.role}${inst.evo ? ' · 已化凡入圣' : ''}`),
         ),
-        h('div', { class: 'cult-stats' },
-          statLine('攻击', st.atk), statLine('防御', st.def),
-          statLine('气血', st.hp), statLine('速度', st.spd),
-          statLine('等级', `${inst.level}/${cardCap(r, inst.star)}`, '灵'),
-          statLine('突破', `第${inst.br}重`, '灵'),
-          statLine('技能', `Lv.${inst.skillLv}（×${skillMult(inst).toFixed(2)}）`, '灵'),
-        ),
-        h('div', { class: 'cult-exp' },
-          h('span', { class: 'muted' }, '修为'),
-          bar(inst.exp, expToNext(inst), { label: `${Math.floor(inst.exp)}/${expToNext(inst)}` }),
-        ),
-        h('p', { class: 'quote' }, `「${def.quote}」`),
-        h('p', { class: 'story' }, def.story),
       ),
-      // 升级
+      h('div', { class: 'cult-stats' },
+        statLine('攻击', st.atk), statLine('防御', st.def),
+        statLine('气血', st.hp), statLine('速度', st.spd),
+        statLine('等级', `${inst.level}/${cardCap(r, inst.star)}`, '灵'),
+        statLine('道果', `${inst.star}/9 重`, '灵'),
+        statLine('技能', `Lv.${inst.skillLv}（×${skillMult(inst).toFixed(2)}）`, '灵'),
+        statLine('知音', `${affinityLevel(inst.affinity).name}`, '灵'),
+      ),
+      h('div', { class: 'cult-exp' },
+        h('span', { class: 'muted' }, '修为'),
+        bar(inst.exp, expToNext(inst), { label: `${Math.floor(inst.exp)}/${expToNext(inst)}` }),
+      ),
+      h('p', { class: 'quote' }, `「${def.quote}」`),
+      h('p', { class: 'story' }, def.story),
+    );
+
+    // 底部页签
+    const tabs = ['cultivate', 'star', 'skill', 'affinity'].map((k) => h('button', {
+      class: `cult-tab ${this.detailTab === k ? 'active' : ''}`,
+      onClick: () => { this.detailTab = k; this.refresh(); },
+    }, { cultivate: '修炼', star: '升星·道果', skill: '功法', affinity: '知音' }[k]));
+    const tabBar = h('div', { class: 'cult-tabs' }, ...tabs);
+
+    let detail;
+    if (this.detailTab === 'star') detail = this.detailStar(def, inst, r);
+    else if (this.detailTab === 'skill') detail = this.detailSkill(def, inst);
+    else if (this.detailTab === 'affinity') detail = this.detailAffinity(def, inst);
+    else detail = this.detailCultivate(def, inst);
+
+    this.contentEl.append(picker, h('div', { class: 'cult-3d-wrap' }, stage, statsPanel), tabBar, detail);
+  }
+
+  // 2.5D 卡牌展示区：perspective 立体卡 + 拖拽旋转 + 点击水墨涟漪（设计稿增量 1.3）
+  buildCardStage(def, inst, r) {
+    const wrap = h('div', { class: 'cult-3d' });
+    const card = h('div', {
+      class: `cult-3d__card ${r.short === 'SSR' || inst.evo ? 'glow' : ''}`,
+      style: {
+        background: `linear-gradient(160deg, ${r.color}, ${shade(r.color, -0.25)})`,
+        border: `2px solid ${r.short === 'SSR' ? '#D4A04A' : 'rgba(255,255,255,0.4)'}`,
+      },
+    },
+      h('div', { class: 'cult-3d__art' }, elEmoji(def.element)),
+      h('div', { class: 'cult-3d__name' }, def.name),
+      h('div', { class: 'cult-3d__sub' }, `${r.short} · ${elName(def.element)}${def.cls}`),
+      h('div', { class: 'cult-3d__sub' }, `${'★'.repeat(inst.star)}${'☆'.repeat(Math.max(0, 9 - inst.star))}`),
+    );
+    wrap.appendChild(card);
+    // 拖拽旋转：pointerdown 时捕获指针，后续 move/up 均派发到 wrap 本身，
+    // 避免向 window 注册监听造成跨刷新累积泄漏。
+    let dragging = false; let startX = 0; let rotY = 18;
+    const clientX = (e) => (e.touches ? e.touches[0].clientX : e.clientX);
+    wrap.addEventListener('pointerdown', (e) => {
+      dragging = true; startX = clientX(e);
+      try { if (wrap.setPointerCapture && e.pointerId != null) wrap.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    wrap.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      rotY = 18 + Math.max(-50, Math.min(50, (clientX(e) - startX) * 0.4));
+      card.style.transform = `rotateX(12deg) rotateY(${rotY}deg)`;
+    });
+    wrap.addEventListener('pointerup', () => { dragging = false; });
+    wrap.addEventListener('pointercancel', () => { dragging = false; });
+    // 点击水墨涟漪
+    wrap.addEventListener('click', () => {
+      const rip = h('span', { class: 'cult-3d__ripple' });
+      rip.style.left = '50%'; rip.style.top = '50%'; rip.style.transform = 'translate(-50%, -50%)';
+      wrap.appendChild(rip);
+      setTimeout(() => { if (rip.parentNode) rip.parentNode.removeChild(rip); }, 720);
+    });
+    return wrap;
+  }
+
+  // 修炼子页：升级 + 突破
+  detailCultivate(def, inst) {
+    const p = this.player;
+    return h('div', { class: 'cult-detail' },
       h('div', { class: 'panel' },
         h('div', { class: 'panel__head' }, '修炼升级（喂修为丹）'),
         h('div', { class: 'panel__body row' },
           pillBtn(p, this, inst, 'exp_s', '小丹(+50)'),
           pillBtn(p, this, inst, 'exp_m', '中丹(+200)'),
           pillBtn(p, this, inst, 'exp_l', '大丹(+1000)'),
-          h('span', { class: 'muted' }, isMaxLevel(inst) ? '已达等级上限（升星可提升）' : (canLevelUp(inst) ? `瓶颈 ${levelCeiling(inst)} 级` : '需突破'),
-          ),
+          h('span', { class: 'muted' }, isMaxLevel(inst) ? '已达等级上限（升星 / 进化可提升）' : (canLevelUp(inst) ? `瓶颈 ${levelCeiling(inst)} 级` : '需突破')),
         ),
       ),
-      // 突破
       h('div', { class: 'panel' },
         h('div', { class: 'panel__head' }, '突破（每 10 级一次，+8% 全属性）'),
         h('div', { class: 'panel__body row' },
@@ -437,35 +516,145 @@ export class GameUI {
           })(),
         ),
       ),
-      // 升星
-      h('div', { class: 'panel' },
-        h('div', { class: 'panel__head' }, `升星（${inst.star}/${r.maxStar}★，+12% 全属性 / 星）`),
-        h('div', { class: 'panel__body row' },
-          (() => {
-            if (inst.star >= r.maxStar) return h('span', { class: 'muted' }, '已达星级上限');
-            const c = starUpCost(inst);
-            const tf = c.tiandao_f ? ` · 天道碎片×${c.tiandao_f}` : '';
-            const ok2 = canStarUp(p, inst);
-            return h('button', { class: 'btn btn-gold', disabled: !ok2, onClick: () => this.doStar(inst) },
-              `升至 ${inst.star + 1}★（灵契碎片×${c.frag}${tf} · 已有${countFrag(p, id)}）`);
-          })(),
-        ),
+    );
+  }
+
+  // 升星·道果子页：九重升星 + 道果解锁 + 化凡入圣进化
+  detailStar(def, inst, r) {
+    const p = this.player;
+    const id = def.id;
+    const curR = rarityDef(effectiveRarity(inst));
+    // 九重解锁列表
+    const unlockList = h('div', { class: 'panel' },
+      h('div', { class: 'panel__head' }, '道果九重·境界解锁'),
+      h('div', { class: 'panel__body' },
+        h('div', { class: 'row' }, Array.from({ length: 9 }, (_, i) => {
+          const star = i + 1;
+          const reached = inst.star >= star;
+          const unlock = starUnlock(star);
+          return h('div', {
+            class: `evo-path__step ${reached ? 'cur' : ''}`,
+            title: unlock || '',
+            style: { opacity: reached ? 1 : 0.5 },
+          }, `${star}★${unlock ? '·' + unlock : ''}`);
+        })),
       ),
-      // 技能
+    );
+    // 升星面板
+    const starPanel = h('div', { class: 'panel' },
+      h('div', { class: 'panel__head' }, `升星（${inst.star}/9 重，分档累计全属性加成）`),
+      h('div', { class: 'panel__body row' },
+        (() => {
+          if (inst.star >= 9) return h('span', { class: 'muted' }, '已达九重满星');
+          const c = starUpCost(inst);
+          const ok2 = canStarUp(p, inst);
+          return h('button', { class: 'btn btn-gold', disabled: !ok2, onClick: () => this.doStar(inst) },
+            `升至 ${inst.star + 1} 重（本源碎片×${c.tiandao_f} · 灵契碎片×${c.frag} · 已有碎片${countFrag(p, id)}）`);
+        })(),
+      ),
+    );
+    // 化凡入圣进化
+    const evoCfg = EVOLUTION[effectiveRarity(inst)];
+    const path = cardEvolutionPath(def);
+    const evoStep = Math.min(path.length - 1, (def.rarity === 'R' ? inst.evo : def.rarity === 'SR' ? inst.evo : 0));
+    const evoPanel = h('div', { class: 'panel' },
+      h('div', { class: 'panel__head' }, '化凡入圣·品质进化'),
+      h('div', { class: 'panel__body' },
+        h('div', { class: 'evo-path' }, ...path.flatMap((name, i) => {
+          const seg = [h('span', { class: `evo-path__step ${i === evoStep ? 'cur' : ''}` }, name)];
+          if (i < path.length - 1) seg.push(h('span', { class: 'evo-path__sep' }, '→'));
+          return seg;
+        })),
+        (() => {
+          if (!evoCfg) return h('p', { class: 'muted' }, '已达至品·彩凰，无可再进化之境。');
+          const e = evoCost(inst);
+          const parts = [`天道本源×${e.cost.tiandao}`];
+          for (const [k, v] of Object.entries(e.cost)) if (k !== 'tiandao') parts.push(`${resName(k)}×${v}`);
+          const ok2 = canEvolve(p, inst);
+          let lockMsg = null;
+          if (inst.star < 9) lockMsg = '需先升至九重满星';
+          else if (!isMaxLevel(inst)) lockMsg = `需等级达上限（${cardCap(curR, inst.star)} 级）`;
+          else if (!canAfford(p, e.cost)) lockMsg = '材料不足';
+          return h('div', { class: 'row' },
+            h('button', { class: 'btn btn-gold', disabled: !ok2, onClick: () => this.doEvolve(inst) },
+              `化凡入圣（${parts.join(' · ')}）`),
+            h('span', { class: 'muted' }, ok2 ? `进化为 ${e.target}` : (lockMsg || '尚不可进化')),
+          );
+        })(),
+      ),
+    );
+    return h('div', { class: 'cult-detail' }, starPanel, unlockList, evoPanel);
+  }
+
+  // 功法子页：技能列表 + 四阶进度 + 技能升级
+  detailSkill(def, inst) {
+    const p = this.player;
+    const tiers = ['初窥', '小成', '大成', '圆满'];
+    const tierIdx = Math.min(3, Math.floor((inst.skillLv - 1) / Math.ceil(MAX_SKILL_LEVEL / 4)));
+    const list = (def.actives || []).map((sk) => {
+      const mult = (sk.mult || 0) * skillMult(inst);
+      return h('div', { class: 'skill-row' },
+        h('div', { class: 'skill-row__head' },
+          h('span', { class: 'skill-row__name' }, sk.name),
+          h('span', { class: 'muted' }, skillTypeLabel(sk)),
+        ),
+        h('div', { class: 'muted' }, `目标：${targetLabel(sk.target)} · 倍率 ×${mult.toFixed(2)}`),
+        h('div', { class: 'skill-tier-track' },
+          tiers.map((tname, i) => h('div', { class: `skill-tier-dot ${i <= tierIdx ? 'on' : ''}`, title: tname })),
+        ),
+      );
+    });
+    return h('div', { class: 'cult-detail' },
       h('div', { class: 'panel' },
-        h('div', { class: 'panel__head' }, `技能升级（${inst.skillLv}/${MAX_SKILL_LEVEL}，+5% 倍率/级）`),
+        h('div', { class: 'panel__head' }, `功法（${tiers[tierIdx]}·技能 ${inst.skillLv}/${MAX_SKILL_LEVEL}）`),
+        h('div', { class: 'panel__body skill-list' }, ...list),
         h('div', { class: 'panel__body row' },
           (() => {
-            if (inst.skillLv >= MAX_SKILL_LEVEL) return h('span', { class: 'muted' }, '技能已满级');
+            if (inst.skillLv >= MAX_SKILL_LEVEL) return h('span', { class: 'muted' }, '技能已圆满');
             const c = skillUpCost(inst);
             const ok2 = canSkillUp(p, inst);
             return h('button', { class: 'btn', disabled: !ok2, onClick: () => this.doSkill(inst) },
-              `升级技能（功法残页×${c.gongfa} · 已有${countRes(p, 'gongfa')}）`);
+              `参悟功法（功法残页×${c.gongfa} · 已有${countRes(p, 'gongfa')}）`);
           })(),
         ),
       ),
     );
   }
+
+  // 知音子页：好感度 + 赠礼 + 煮茶论道
+  detailAffinity(def, inst) {
+    const p = this.player;
+    const al = affinityLevel(inst.affinity);
+    return h('div', { class: 'cult-detail' },
+      h('div', { class: 'panel' },
+        h('div', { class: 'panel__head' }, '知音·好感度'),
+        h('div', { class: 'panel__body' },
+          h('div', { class: 'affinity-box' },
+            h('div', { class: 'affinity-tier' }, `${al.name} · 当前全属性 +${Math.round(affinityBonusPct(inst.affinity) * 100)}%（满知己 +10%）`),
+            bar(inst.affinity, AFFINITY_MAX, { label: `${inst.affinity}/${AFFINITY_MAX}`, color: '#9B6BCC' }),
+            h('div', { class: 'row', style: { marginTop: '8px' } },
+              h('button', { class: 'btn', disabled: !canGift(p, inst), onClick: () => this.doGift(inst) },
+                `赠送灵犀佩（已有 ${countRes(p, 'gift')}）`),
+              h('button', { class: 'btn btn-ghost', onClick: () => this.doTea(def, inst) }, '煮茶论道'),
+            ),
+          ),
+          h('div', { class: 'dialog-line', id: 'affinity-dialog' }, this.affinityDialog(def, inst, al)),
+        ),
+      ),
+    );
+  }
+
+  affinityDialog(def, inst, al) {
+    const lines = {
+      1: `${def.name}对你尚觉陌生：「道友请自便。」`,
+      2: `${def.name}微微颔首：「原来你也修${elName(def.element)}道。」`,
+      3: `${def.name}已视你为契友：「来日方长，再论剑道。」`,
+      4: `${def.name}与你推心置腹：「得遇知音，幸何如之。」`,
+      5: `${def.name}执手相看：「此生得一知己，足矣。」`,
+    };
+    return lines[al.tier] || lines[1];
+  }
+
   doFeedPill(inst, pillId) {
     const r = feedPill(this.player, inst, pillId, 1);
     if (!r.ok) { this.toast(r.reason); return; }
@@ -475,6 +664,13 @@ export class GameUI {
   doBreak(inst) { const r = doBreakThrough(this.player, inst); if (!r.ok) this.toast(r.reason); else this.toast(r.text); this.afterAction(); }
   doStar(inst) { const r = doStarUp(this.player, inst); if (!r.ok) this.toast(r.reason); else this.toast(r.text); this.afterAction(); }
   doSkill(inst) { const r = doSkillUp(this.player, inst); if (!r.ok) this.toast(r.reason); else this.toast(r.text); this.afterAction(); }
+  doEvolve(inst) { const r = doEvolve(this.player, inst); if (!r.ok) this.toast(r.reason); else { this.toast(r.text); } this.afterAction(); }
+  doGift(inst) { const r = doGift(this.player, inst); if (!r.ok) this.toast(r.reason); else this.toast(r.text); this.afterAction(); }
+  doTea(def, inst) {
+    const al = affinityLevel(inst.affinity);
+    this.toast(`与 ${def.name} 煮茶论道：${al.name}`);
+    this.refresh();
+  }
 
   // ============ 主线 ============
   renderStage() {
@@ -482,6 +678,8 @@ export class GameUI {
     const ch = CHAPTERS[Math.max(0, Math.min(CHAPTERS.length - 1, this.viewChapter - 1))];
     const unlocked = p.story.highestChapter >= ch.chapter;
     const stages = stagesForChapter(ch.chapter - 1);
+    const sweepOn = sweepUnlocked(p);
+    const stam = staminaValue(p);
     this.contentEl.append(
       h('div', { class: 'chapter-bar' },
         h('button', { class: 'icon-btn', disabled: this.viewChapter <= 1, onClick: () => { this.viewChapter--; this.refresh(); } }, '‹'),
@@ -491,15 +689,22 @@ export class GameUI {
         ),
         h('button', { class: 'icon-btn', disabled: this.viewChapter >= CHAPTERS.length, onClick: () => { this.viewChapter++; this.refresh(); } }, '›'),
       ),
+      // 一键扫荡·云游挂机状态条（设计稿增量 第四节）
+      h('div', { class: 'sweep-bar' },
+        h('span', { class: 'stamina-chip' }, `💨 灵气 ${stam}/${STAMINA_MAX}`),
+        h('span', { class: 'sweep-chip' }, `🏃 神行符 ${countRes(p, 'sweep_ticket')}`),
+        h('span', { class: 'muted' }, sweepOn ? `已解锁扫荡（累计 ${stageStars(p)} ★）` : `未解锁：累计 3 ★ 解锁扫荡`),
+      ),
       unlocked ? null : h('p', { class: 'muted center' }, '本章尚未解锁，通关上一章首领即可开启。'),
       h('div', { class: 'stage-list' }, ...stages.map((st) => {
         const can = unlocked && canEnterStage(p, st.id);
         const cleared = isStageCleared(p, st.id);
+        const stars = stageStarOf(p, st.id);
+        const sweepable = sweepOn && stars >= 3;
         const typeTag = st.type === 'boss' ? '首领' : st.type === 'elite' ? '精英' : '普通';
-        return h('button', {
+        return h('div', {
           class: `stage-row stage-${st.type} ${can ? '' : 'locked'} ${cleared ? 'cleared' : ''}`,
-          disabled: !can,
-          onClick: () => this.doStage(st.id),
+          onClick: () => { if (can) this.doStage(st.id); },
         },
           h('div', { class: 'stage-row__main' },
             h('span', { class: 'stage-row__id' }, st.id),
@@ -507,16 +712,75 @@ export class GameUI {
           ),
           h('div', { class: 'stage-row__meta' },
             h('span', { class: `tag tag-${st.type}` }, typeTag),
-            cleared ? h('span', { class: 'tag tag-done' }, '已通关') : h('span', { class: 'muted' }, `战力≈${Math.round(st.power * (st.type === 'boss' ? 1.5 : 1))}`),
+            sweepable
+              ? h('button', { class: 'btn btn-ghost sweep-btn', onClick: (e) => { e.stopPropagation(); this.openSweep(st); } }, `📜 扫荡 ${'★'.repeat(stars)}`)
+              : cleared
+                ? h('span', { class: 'sweep-stars', title: `${stars} 星通关` }, `${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}`)
+                : h('span', { class: 'muted' }, `战力≈${Math.round(st.power * (st.type === 'boss' ? 1.5 : 1))}`),
           ),
         );
       })),
     );
   }
+  // 扫荡档位选择弹窗（1 / 5 / 10 次）
+  openSweep(st) {
+    const p = this.player;
+    const stam = staminaValue(p);
+    const tickets = countRes(p, 'sweep_ticket');
+    const reason = sweepReason(p, st.id);
+    const body = h('div', { class: 'pad' },
+      h('p', { class: 'muted' }, `${st.name} · 3 星通关，可一键扫荡获取 100% 掉落。`),
+      h('p', { class: 'muted' }, `每次消耗 神行符×1 + 灵气×${STAMINA_PER_SWEEP}（当前 灵气 ${stam}/${STAMINA_MAX} · 神行符 ${tickets}）`),
+      reason ? h('p', { class: 'muted', style: { color: 'var(--red)' } }, `提示：${reason}`) : null,
+      h('div', { class: 'sweep-batch-btns' }, ...SWEEP_BATCH.map((n) => h('button', {
+        class: 'btn', disabled: !!reason,
+        onClick: () => { this.closeModal(); this.doSweep(st, n); },
+      }, `扫荡 ×${n}`))),
+    );
+    this.openModal(`云游扫荡 · ${st.name}`, body);
+  }
+  doSweep(st, times) {
+    const res = sweepBatch(this.player, st.id, times, this.rng());
+    this.afterAction();
+    this.showSweepResult(st, res);
+  }
+  showSweepResult(st, res) {
+    const rw = res.rewards.res || {};
+    const fr = res.rewards.frags || {};
+    const gain = h('div', { class: 'sweep-roll' });
+    const rows = [];
+    for (const id of Object.keys(rw)) rows.push(`${resEmoji(id)}${resName(id)} ×${rw[id]}`);
+    for (const cid of Object.keys(fr)) { const d = cardDef(cid); rows.push(`${d ? d.name : cid} 碎片 ×${fr[cid]}`); }
+    if (!rows.length) rows.push('（本次无掉落）');
+    gain.append(...rows.map((t) => h('div', { class: 'gain-chip' }, t)));
+    const body = h('div', { class: 'pad' },
+      h('p', null, `完成 ${res.done} 次扫荡${res.stopped ? `（${res.stopped}）` : '，材料已尽收囊中'}`),
+      gain,
+    );
+    this.openModal(`扫荡结算 · ${st.name}`, body);
+  }
   doStage(stageId) {
-    const res = enterStage(this.player, stageId, this.rng());
-    if (!res.ok) { this.toast(res.reason); return; }
-    this.showBattle(res, () => { this.afterAction(); });
+    const rng = this.rng();
+    const prep = prepareStageBattle(this.player, stageId, rng);
+    if (!prep.ok) { this.toast(prep.reason); return; }
+    const run = runBattle(prep.specs, prep.enemies, rng);
+    const settled = settleStage(this.player, stageId, run, rng);
+    this.showBattleScene({
+      battle: run.battle, result: run.result,
+      rewards: settled.rewards, stars: settled.stars,
+      title: prep.stage.name,
+    }, () => { this.afterAction(); });
+  }
+
+  // 2.5D 战斗场景（设计稿增量 第三节）：全屏回放，结束后回调结算
+  showBattleScene(opts, after) {
+    if (this._battleScene) { this._battleScene.destroy(); this._battleScene = null; }
+    this.closeModal();
+    this._battleScene = new BattleScene({
+      ...opts,
+      onDone: () => { this._battleScene = null; if (after) after(); },
+    });
+    this._battleScene.mount(this.root);
   }
 
   // ============ 秘境 ============
@@ -746,6 +1010,24 @@ function byRarityThenPower(p) {
 function fmtNum(n) {
   if (typeof n === 'number' && n < 1 && n > 0) return `${Math.round(n * 100)}%`;
   return String(Math.floor(n));
+}
+// 技能类型 / 目标中文标签
+function skillTypeLabel(sk) {
+  const map = { dmg: '伤害', heal: '治疗', buff: '增益', shield: '护盾', cleanse: '净化', ctrl: '控制' };
+  return map[sk.type] || sk.type;
+}
+function targetLabel(t) {
+  const map = { enemy_one: '敌方单体', enemy_all: '敌方全体', ally_lowest: '最低血盟友', ally_all: '我方全体', self: '自身' };
+  return map[t] || t;
+}
+// 颜色加深 / 变亮（amt 负数加深，正数变亮）——用于 2.5D 卡牌渐变底色
+function shade(hex, amt) {
+  if (!hex || hex[0] !== '#') return hex || '#333';
+  const n = hex.length === 4
+    ? hex.slice(1).split('').map((c) => parseInt(c + c, 16))
+    : [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+  const f = (v) => Math.max(0, Math.min(255, Math.round(v + 255 * amt)));
+  return `rgb(${f(n[0])}, ${f(n[1])}, ${f(n[2])})`;
 }
 function cn(n) { return ['零', '壹', '贰', '叁', '肆', '伍', '陆', '柒', '捌', '玖', '拾', '拾壹', '拾贰'][n] || String(n); }
 function copyText(text) {

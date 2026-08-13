@@ -44,11 +44,13 @@ export function counterMult(atkEl, defEl) {
 }
 
 // ── 稀有度 ──────────────────────────────────────────────────────────────────
-// name：品阶名；color：主题色（设计稿 7.1）；rate：问道基础概率；star：升星上限。
+// name：品阶名；color：主题色（设计稿 7.1）；rate：问道基础概率；star：升星上限（道果九重天）。
+// 增量设计后所有稀有度统一可升至 9 重（设计稿增量 2.1），R/SR 满星后还可「化凡入圣」进化。
+export const STAR_TIERS = 9;
 export const RARITIES = [
-  { id: 'R',   name: '逸品·青玉', short: 'R',   color: '#6A9EC7', rate: 0.70, maxStar: 5, baseCap: 30 },
-  { id: 'SR',  name: '绝品·紫金', short: 'SR',  color: '#9B6BCC', rate: 0.25, maxStar: 5, baseCap: 40 },
-  { id: 'SSR', name: '至品·彩凰', short: 'SSR', color: '#E8636B', rate: 0.05, maxStar: 6, baseCap: 50 },
+  { id: 'R',   name: '逸品·青玉', short: 'R',   color: '#6A9EC7', rate: 0.70, maxStar: STAR_TIERS, baseCap: 30 },
+  { id: 'SR',  name: '绝品·紫金', short: 'SR',  color: '#9B6BCC', rate: 0.25, maxStar: STAR_TIERS, baseCap: 40 },
+  { id: 'SSR', name: '至品·彩凰', short: 'SSR', color: '#E8636B', rate: 0.05, maxStar: STAR_TIERS, baseCap: 50 },
 ];
 const RARITY_MAP = Object.fromEntries(RARITIES.map((r) => [r.id, r]));
 export function rarityDef(id) { return RARITY_MAP[id] || RARITIES[0]; }
@@ -70,19 +72,33 @@ export const GACHA = {
   dailyFree: true,    // 每日首次单抽免费
 };
 
-// ── 升星消耗（灵契碎片，索引 = 目标星级，1..maxStar）────────────────────────────
-export function starCost(rarity, targetStar) {
-  const r = rarityDef(rarity);
-  const base = { R: 3, SR: 5, SSR: 8 }[rarity] || 3;
-  // 每级递增，SSR 更贵
-  const grow = rarity === 'SSR' ? 8 : rarity === 'SR' ? 5 : 3;
-  return base + grow * (targetStar - 1);
-}
-// 升星额外消耗天道本源（高星才需，对应设计稿升星=道果重数）
-export function starTiandao(rarity, targetStar) {
-  if (targetStar <= 2) return 0;
-  return rarity === 'SSR' ? (targetStar - 2) : 0;
-}
+// ── 升星·道果九重天（设计稿增量 2.1）──────────────────────────────────────────
+// 所有稀有度统一 1~9 重；每重消耗「天道本源·碎片」+ 同名「灵契碎片」。
+// 数值表（目标星级 → 消耗）严格对应设计稿增量 2.1：
+//   ★1→2 需本源 2、★2→3 需 4、… ★8→9 需 30；同名碎片 0/0/1/2/3/4/6/8/10。
+const STAR_TIANDAO_F = [0, 1, 2, 4, 6, 8, 10, 15, 20, 30]; // 索引 = 目标星级（1..9）
+const STAR_FRAG       = [0, 0, 0, 1, 2, 3, 4, 6, 8, 10];
+export function starTiandaoFCost(targetStar) { return STAR_TIANDAO_F[Math.max(0, Math.min(STAR_TIERS, targetStar))] || 0; }
+export function starFragCost(targetStar) { return STAR_FRAG[Math.max(0, Math.min(STAR_TIERS, targetStar))] || 0; }
+// 该星级解锁的特殊内容（设计稿增量 2.1「特殊解锁」列）
+export const STAR_UNLOCKS = {
+  3: '解锁被动技·壹',
+  6: '解锁被动技·贰 / 觉醒技（SSR 专属）',
+  7: '立绘流光特效',
+  9: '化凡入圣·进化资格',
+};
+export function starUnlock(star) { return STAR_UNLOCKS[star] || null; }
+
+// ── 化凡入圣·品质进化（设计稿增量 2.2）────────────────────────────────────────
+// R→SR、SR→SSR：9 重满星且等级达上限后可进化，提升稀有度面板 / 等级上限 / 立绘边框。
+// SSR 已是至品，不可再进化。
+export const EVOLUTION = {
+  R:  { to: 'SR',  tiandao: 50,  essence: 30, scroll: 0, label: '逸品 → 绝品（紫金边框）' },
+  SR: { to: 'SSR', tiandao: 100, essence: 0,  scroll: 1, label: '绝品 → 至品（彩凰流光）' },
+};
+// 进化阶段（相对原稀有度的进化步数）→ 基础属性放大倍率，使面板贴近目标稀有度。
+export const EVO_STAT_MULT = { 0: 1, 1: 1.35, 2: 1.80 };
+export function evoTargetRarity(rarity) { return (EVOLUTION[rarity] && EVOLUTION[rarity].to) || null; }
 
 // ── 卡牌经验曲线（升级所需经验）─────────────────────────────────────────────────
 export function expForLevel(lv) {
@@ -95,14 +111,23 @@ export function lingshiForLevel(lv) {
 }
 
 // ── 衍生属性（由基础值 + 等级/突破/星级派生）───────────────────────────────────
-// 三种加成：等级（每级 +5%）、突破（每次 +8%）、星级（每星 +12%）。
+// 三种加成：等级（每级 +5%）、突破（每次 +8%）、星级（道果九重天分档累计）。
 export const LEVEL_MULT = 0.05;
 export const BREAK_MULT = 0.08;
-export const STAR_MULT = 0.12;
+export const STAR_MULT = 0.12; // 旧版每星固定加成（保留作参考；道果九重天后改用分档累计）
+// 道果九重天·每星分档边际加成（设计稿增量 2.1：8/8/10/10/12/12/12/15/15%）
+const STAR_BONUS_STEP = [0, 0.08, 0.08, 0.10, 0.10, 0.12, 0.12, 0.12, 0.15, 0.15];
+// 累计星级全属性加成（0..1）：star=0 返回 0，star=9 返回约 1.02。
+export function starBonusPct(star) {
+  let s = 0;
+  const n = Math.max(0, Math.min(STAR_TIERS, star));
+  for (let i = 1; i <= n; i++) s += STAR_BONUS_STEP[i] || 0;
+  return s;
+}
 export function effectiveStat(base, level, br, star) {
   const m = (1 + LEVEL_MULT * Math.max(0, level - 1))
           * (1 + BREAK_MULT * Math.max(0, br))
-          * (1 + STAR_MULT * Math.max(0, star));
+          * (1 + starBonusPct(Math.max(0, star)));
   return base * m;
 }
 
@@ -161,6 +186,34 @@ export function initiative(spd, rng) {
 export const CAVE_CAP_HOURS = 12;
 export const CAVE_STONE_PER_HOUR_DIV = 10; // 灵石/小时 = 挂入卡牌总等级 / 10
 export const CAVE_PILL_SSR_PER_HOUR = 1;   // 修为丹·小/小时 = SSR 数量
+export const CAVE_TICKET_PER_HOUR_MIN = 2; // 神行符/小时下限（设计稿增量 4.4：2~4 张/小时）
+export const CAVE_TICKET_PER_HOUR_MAX = 4;
+
+// ── 一键扫荡·云游挂机（设计稿增量 第四节）──────────────────────────────────────
+export const STAMINA_MAX = 120;        // 灵气上限（设计稿 4.2）
+export const STAMINA_REGEN_SEC = 300;  // 每 5 分钟恢复 1 点灵气
+export const STAMINA_PER_SWEEP = 10;   // 每次扫荡消耗 10 点灵气
+export const SWEEP_BATCH = [1, 5, 10]; // 批量扫荡档位（设计稿 4.3）
+// 3 星通关判定（设计稿增量 4.1：胜利 + 我方无阵亡 + 剩余血量 > 70%）
+export const SWEEP_3STAR_HP_RATIO = 0.70;
+export const SWEEP_UNLOCK_STARS = 3;   // 累计获得 3 颗关卡星数即解锁扫荡（替代「玩家 20 级」软门槛）
+
+// ── 知音·好感度（设计稿增量 1.2 知音页签）──────────────────────────────────────
+export const AFFINITY_MAX = 100;
+export const AFFINITY_GIFT_VALUE = 10;   // 每件「灵犀佩」+10 好感
+export function affinityLevel(affinity) {
+  // 知音境界：泛泛 / 相识 / 契友 / 莫逆 / 知己
+  const a = Math.max(0, Math.min(AFFINITY_MAX, affinity));
+  if (a >= 80) return { tier: 5, name: '知己' };
+  if (a >= 60) return { tier: 4, name: '莫逆之交' };
+  if (a >= 40) return { tier: 3, name: '契友' };
+  if (a >= 20) return { tier: 2, name: '相识' };
+  return { tier: 1, name: '泛泛之交' };
+}
+// 好感度带来的全属性加成（每 20 点 +2%，满好感 +10%）
+export function affinityBonusPct(affinity) {
+  return Math.floor(Math.max(0, Math.min(AFFINITY_MAX, affinity)) / 20) * 0.02;
+}
 
 // ── 资源定义（货币 / 材料，见设计稿 5.1）────────────────────────────────────────
 export const RESOURCES = [
@@ -174,9 +227,17 @@ export const RESOURCES = [
   { id: 'break_fire',  name: '火·突破石', emoji: '🔥', desc: '火系卡牌每 10 级突破所需。' },
   { id: 'break_earth', name: '土·突破石', emoji: '🪨', desc: '土系卡牌每 10 级突破所需。' },
   { id: 'gongfa',      name: '功法残页',   emoji: '📜', desc: '提升卡牌技能等级。' },
-  { id: 'tiandao_f',   name: '天道本源·碎片', emoji: '🌌', desc: '高阶升星（道果重数）消耗。' },
-  { id: 'tiandao',     name: '天道本源',   emoji: '✨', desc: 'SSR 顶级升星消耗。' },
+  { id: 'tiandao_f',   name: '天道本源·碎片', emoji: '🌌', desc: '道果九重天升星消耗（设计稿增量 2.1）。' },
+  { id: 'tiandao',     name: '天道本源',   emoji: '✨', desc: '化凡入圣·品质进化消耗（设计稿增量 2.2）。' },
   { id: 'wendao',      name: '问道令',     emoji: '🎏', desc: '问道（抽卡）消耗，1 令 = 1 抽。' },
+  { id: 'sweep_ticket', name: '神行符',    emoji: '🏃', desc: '一键扫荡消耗；洞府挂机 / 日常产出（设计稿增量 4.x）。' },
+  { id: 'essence_metal', name: '金·五行精华', emoji: '💎', desc: 'R→SR 化凡入圣进化所需（金系）。' },
+  { id: 'essence_wood',  name: '木·五行精华', emoji: '💎', desc: 'R→SR 化凡入圣进化所需（木系）。' },
+  { id: 'essence_water', name: '水·五行精华', emoji: '💎', desc: 'R→SR 化凡入圣进化所需（水系）。' },
+  { id: 'essence_fire',  name: '火·五行精华', emoji: '💎', desc: 'R→SR 化凡入圣进化所需（火系）。' },
+  { id: 'essence_earth', name: '土·五行精华', emoji: '💎', desc: 'R→SR 化凡入圣进化所需（土系）。' },
+  { id: 'dao_scroll',  name: '天道卷轴',   emoji: '🔖', desc: 'SR→SSR 化凡入圣进化所需（主线卷拾获取）。' },
+  { id: 'gift',        name: '灵犀佩',     emoji: '💝', desc: '赠予卡牌提升知音好感度（设计稿增量 1.2）。' },
 ];
 export const RES_MAP = Object.fromEntries(RESOURCES.map((r) => [r.id, r]));
 export function resName(id) { return (RES_MAP[id] && RES_MAP[id].name) || id; }
@@ -186,6 +247,8 @@ export function resEmoji(id) { return (RES_MAP[id] && RES_MAP[id].emoji) || ''; 
 export const PILL_EXP = { exp_s: 50, exp_m: 200, exp_l: 1000 };
 // 五行 → 突破石 id
 export const BREAK_STONE = { metal: 'break_metal', wood: 'break_wood', water: 'break_water', fire: 'break_fire', earth: 'break_earth' };
+// 五行 → 五行精华 id（化凡入圣用）
+export const ESSENCE_STONE = { metal: 'essence_metal', wood: 'essence_wood', water: 'essence_water', fire: 'essence_fire', earth: 'essence_earth' };
 
 // ── 起始资源（新档）─────────────────────────────────────────────────────────────
 export const START_RESOURCES = {
@@ -195,4 +258,8 @@ export const START_RESOURCES = {
   gongfa: 5,
   tiandao_f: 0, tiandao: 0,
   wendao: 10,
+  sweep_ticket: 5,
+  essence_metal: 0, essence_wood: 0, essence_water: 0, essence_fire: 0, essence_earth: 0,
+  dao_scroll: 0,
+  gift: 3,
 };

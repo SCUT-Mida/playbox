@@ -101,6 +101,14 @@ ok(Object.keys(ui.player.cards).length === 4, `初始 4 张卡（实际 ${Object
   const lv0 = ui.player.cards[ui.cultivateId].level;
   bigBtn.click(); await sleep(5);
   ok(ui.player.cards[ui.cultivateId].level > lv0, `喂大丹后等级提升（${lv0} → ${ui.player.cards[ui.cultivateId].level}）`);
+  // 灵犀阁四个子页签（修炼/升星/功法/知音）都能渲染
+  ok(document.querySelector('.cult-3d') !== null, '2.5D 卡牌展示区渲染');
+  let detailErr = null;
+  try {
+    for (const sub of ['star', 'skill', 'affinity', 'cultivate']) { ui.detailTab = sub; ui.refresh(); await sleep(5); }
+  } catch (e) { detailErr = e; }
+  ok(!detailErr, `灵犀阁子页签渲染无异常（${detailErr ? detailErr.message : 'ok'}）`);
+  ui.detailTab = 'cultivate'; ui.refresh();
 }
 
 // ---------- 7) 主线：进入 1-1 战斗 → 弹窗结算 ----------
@@ -122,11 +130,39 @@ ok(Object.keys(ui.player.cards).length === 4, `初始 4 张卡（实际 ${Object
   const stageBtn = [...document.querySelectorAll('.stage-row')].find((b) => /1-1/.test(b.textContent));
   ok(!!stageBtn, '1-1 关卡可点');
   stageBtn.click(); await sleep(10);
-  ok(document.querySelector('.sheet') !== null, '战斗后弹出结算弹窗');
-  ok(/胜/.test(document.querySelector('.battle__result')?.textContent || '') || /败/.test(document.querySelector('.battle__result')?.textContent || ''), '结算弹窗有胜负结果');
-  const confirmBtn = [...document.querySelectorAll('.sheet__foot button')].find((b) => /确定/.test(b.textContent));
+  // 2.5D 战斗场景（设计稿增量 第三节）
+  ok(document.querySelector('.bs') !== null, '战斗后弹出 2.5D 战斗场景');
+  const skipBtn = document.querySelector('.bs__skip');
+  ok(!!skipBtn, '战斗场景有跳过按钮');
+  skipBtn.click(); await sleep(5); // 跳过动画直达结算
+  const titleEl = document.querySelector('.bs__result-title');
+  ok(titleEl && /胜|败/.test(titleEl.textContent || ''), `战斗结算有胜负结果（${titleEl ? titleEl.textContent : '无'}）`);
+  const confirmBtn = [...document.querySelectorAll('.bs__result-foot button')].find((b) => /确定/.test(b.textContent));
+  ok(!!confirmBtn, '结算层有确定按钮');
   confirmBtn.click(); await sleep(5);
-  ok(document.querySelector('.sheet') === null, '确定后关闭结算弹窗');
+  ok(document.querySelector('.bs') === null, '确定后关闭战斗场景');
+}
+
+// ---------- 7b) 一键扫荡：1-1 应已 3 星 → 扫荡×1 ----------
+{
+  const p = ui.player;
+  const { sweepUnlocked } = await import(new URL('../src/core/sweep.js', import.meta.url).href);
+  ok(sweepUnlocked(p) === true, '累计 3 星解锁扫荡');
+  ok((p.story.stars['1-1'] || 0) === 3, `1-1 为 3 星通关（实际 ${p.story.stars['1-1'] || 0}）`);
+  p.res.sweep_ticket = 50; // 保证神行符充足
+  ui.refresh(); await sleep(5);
+  const row11 = [...document.querySelectorAll('.stage-row')].find((r) => /1-1/.test(r.textContent));
+  const sweepBtn = row11 && row11.querySelector('.sweep-btn');
+  ok(!!sweepBtn, '3 星通关的 1-1 出现扫荡按钮');
+  sweepBtn.click(); await sleep(5); // 打开扫荡档位弹窗
+  const x1 = [...document.querySelectorAll('.sweep-batch-btns button')].find((b) => /×1/.test(b.textContent));
+  ok(!!x1, '扫荡弹窗提供 ×1 / ×5 / ×10 档位');
+  const stam0 = p.stamina.value;
+  x1.click(); await sleep(10); // 执行扫荡 → 结算弹窗
+  ok(document.querySelector('.sheet') !== null, '扫荡后弹出结算弹窗');
+  ok(/完成 1 次扫荡/.test(document.querySelector('.sheet')?.textContent || ''), '扫荡结算展示完成次数');
+  ok(p.stamina.value === stam0 - 10, `扫荡消耗 10 灵气（${stam0} → ${p.stamina.value}）`);
+  ui.closeModal(); await sleep(5);
 }
 
 // ---------- 8) 设置：导出存档码 ----------

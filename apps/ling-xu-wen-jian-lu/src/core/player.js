@@ -1,7 +1,7 @@
 // ============================================================================
 // 玩家状态：资源 / 卡牌收藏 / 阵容 / 统计。纯函数（除 localStorage 由 save.js 处理）。
 // ============================================================================
-import { START_RESOURCES, RESOURCES, clamp } from '../config.js';
+import { START_RESOURCES, RESOURCES, clamp, STAR_TIERS, AFFINITY_MAX, STAMINA_MAX, SWEEP_UNLOCK_STARS } from '../config.js';
 import { CARDS, CARD_MAP } from '../data/cards.js';
 import { newInstance, instancePower } from './card.js';
 
@@ -57,8 +57,12 @@ export function recompute(player) {
     if (!Number.isFinite(inst.level) || inst.level < 1) inst.level = 1;
     if (!Number.isFinite(inst.br) || inst.br < 0) inst.br = 0;
     if (!Number.isFinite(inst.star) || inst.star < 0) inst.star = 0;
+    if (inst.star > STAR_TIERS) inst.star = STAR_TIERS;
     if (!Number.isFinite(inst.skillLv) || inst.skillLv < 1) inst.skillLv = 1;
     if (!Number.isFinite(inst.exp) || inst.exp < 0) inst.exp = 0;
+    if (!Number.isFinite(inst.evo) || inst.evo < 0) inst.evo = 0;
+    if (!Number.isFinite(inst.affinity) || inst.affinity < 0) inst.affinity = 0;
+    if (inst.affinity > AFFINITY_MAX) inst.affinity = AFFINITY_MAX;
   }
   if (!Array.isArray(player.formation) || player.formation.length !== 5) {
     player.formation = ['R001', 'R003', 'R006', 'R007', null];
@@ -69,14 +73,24 @@ export function recompute(player) {
   if (!player.dailyFreeDate) player.dailyFreeDate = '';
   if (!player.story || typeof player.story !== 'object') player.story = { clearedStages: {}, highestChapter: 1 };
   if (!player.story.clearedStages) player.story.clearedStages = {};
+  if (!player.story.stars || typeof player.story.stars !== 'object') player.story.stars = {};
   if (!Number.isFinite(player.story.highestChapter) || player.story.highestChapter < 1) player.story.highestChapter = 1;
   if (!player.secret || typeof player.secret !== 'object') player.secret = { floor: 1, bestFloor: 1, saveFloor: 1 };
   for (const k of ['floor', 'bestFloor', 'saveFloor']) {
     if (!Number.isFinite(player.secret[k]) || player.secret[k] < 1) player.secret[k] = 1;
   }
   if (!player.cave || typeof player.cave !== 'object') player.cave = { lastSeen: 0 };
+  // 灵气（体力）：上限 STAMINA_MAX，缺失则按满值初始化
+  if (!player.stamina || typeof player.stamina !== 'object') player.stamina = { value: STAMINA_MAX, lastSeen: 0 };
+  if (!Number.isFinite(player.stamina.value) || player.stamina.value < 0) player.stamina.value = STAMINA_MAX;
+  if (player.stamina.value > STAMINA_MAX) player.stamina.value = STAMINA_MAX;
+  if (!Number.isFinite(player.stamina.lastSeen)) player.stamina.lastSeen = 0;
+  // 功能解锁：累计关卡星数达 SWEEP_UNLOCK_STARS 即解锁一键扫荡（替代设计稿「玩家 20 级」软门槛）
+  if (!player.unlocks || typeof player.unlocks !== 'object') player.unlocks = { sweep: false };
+  const _starSum = Object.values(player.story.stars || {}).reduce((s, n) => s + (Number.isFinite(n) ? n : 0), 0);
+  if (_starSum >= SWEEP_UNLOCK_STARS) player.unlocks.sweep = true;
   if (!player.stats || typeof player.stats !== 'object') player.stats = {};
-  const dflt = { draws: 0, ssr: 0, sr: 0, r: 0, battlesWon: 0, battlesLost: 0, stagesCleared: 0, secretFloors: 0, starsTotal: 0 };
+  const dflt = { draws: 0, ssr: 0, sr: 0, r: 0, battlesWon: 0, battlesLost: 0, stagesCleared: 0, secretFloors: 0, starsTotal: 0, sweeps: 0 };
   for (const k of Object.keys(dflt)) if (!Number.isFinite(player.stats[k])) player.stats[k] = dflt[k];
   if (!Array.isArray(player.achievements)) player.achievements = [];
   if (!Number.isFinite(player.createdAt)) player.createdAt = 0;
@@ -164,6 +178,16 @@ export function totalStars(player) {
   let s = 0;
   for (const inst of Object.values(player.cards)) s += (inst.star || 0);
   return s;
+}
+// 关卡累计星数（用于扫荡解锁 / 星数统计）
+export function stageStars(player) {
+  const stars = (player.story && player.story.stars) || {};
+  return Object.values(stars).reduce((s, n) => s + (Number.isFinite(n) ? Math.max(0, n) : 0), 0);
+}
+// 某关当前星数（0..3）
+export function stageStarOf(player, stageId) {
+  const v = (player.story && player.story.stars && player.story.stars[stageId]) || 0;
+  return Math.max(0, Math.min(3, Math.floor(v)));
 }
 
 // 图鉴收集奖励档位（设计稿 6.3）

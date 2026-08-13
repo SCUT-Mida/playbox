@@ -195,3 +195,15 @@ export const CARDS = [
 
 export const CARD_MAP = Object.fromEntries(CARDS.map((c) => [c.id, c]));
 export function cardDef(id) { return CARD_MAP[id] || null; }
+
+// ── 化凡入圣·进化路径（设计稿增量 2.2）──────────────────────────────────────────
+// 按稀有度标注本卡可走的品质进化链（用于灵犀阁展示）。SSR 已至顶，无可进化路径。
+// 对应 config.EVOLUTION 的材料消耗；卡牌实例经 instance.evo 在同一条链上逐阶跃迁。
+export const EVOLUTION_PATH = {
+  R:   ['逸品·青玉', '绝品·紫金', '至品·彩凰'],
+  SR:  ['绝品·紫金', '至品·彩凰'],
+  SSR: ['至品·彩凰'],
+};
+export function cardEvolutionPath(card) {
+  return EVOLUTION_PATH[(card && card.rarity) || 'R'] || ['逸品·青玉'];
+}

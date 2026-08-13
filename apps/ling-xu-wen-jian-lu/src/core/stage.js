@@ -8,7 +8,7 @@ import { makeEnemyFormation } from '../data/enemies.js';
 import { playerSpecsFrom, runBattle } from './battle.js';
 import { addRes, addFrag } from './player.js';
 import { CARDS } from '../data/cards.js';
-import { BREAK_STONE } from '../config.js';
+import { BREAK_STONE, SWEEP_3STAR_HP_RATIO } from '../config.js';
 
 // 设计稿 3.1 章节表
 export const CHAPTERS = [
@@ -75,8 +75,8 @@ export function canEnterStage(player, stageId) {
 }
 export function isStageCleared(player, stageId) { return !!player.story.clearedStages[stageId]; }
 
-// 掉落表（设计稿 5.2）
-function rollDrops(st, rng) {
+// 掉落表（设计稿 5.2）。导出供「一键扫荡」复用——扫荡获得该关卡 100% 掉落。
+export function rollDrops(st, rng) {
   const ch = CHAPTERS[st.chapter - 1];
   const rewards = { res: {}, frags: {} }; // frags: {cardId: qty}
   const add = (id, q) => { rewards.res[id] = (rewards.res[id] || 0) + q; };
@@ -119,17 +119,37 @@ function rollDrops(st, rng) {
   return rewards;
 }
 
-// 进入关卡 → 自动战斗 → 结算。返回 { ok, result, rewards, log }
-export function enterStage(player, stageId, rng) {
+// 3 星评定（设计稿增量 4.1）：胜利 1 星 + 我方无阵亡 2 星 + 剩余血量 > 70% 3 星。
+export function computeStageStars(run) {
+  if (!run || run.result !== 'win') return 0;
+  const battle = run.battle;
+  if (!battle || !Array.isArray(battle.players) || !battle.players.length) return 1;
+  let stars = 1; // 胜利基础
+  const participants = battle.players.length;
+  const aliveCount = battle.players.filter((c) => c.alive).length;
+  if (aliveCount >= participants) stars = 2; // 我方无阵亡
+  let hpSum = 0, maxSum = 0;
+  for (const c of battle.players) { hpSum += Math.max(0, c.hp); maxSum += c.maxHp; }
+  if (maxSum > 0 && hpSum / maxSum > SWEEP_3STAR_HP_RATIO) stars = 3;
+  return stars;
+}
+
+// 构造关卡战斗（校验 + 生成敌我 spec），不结算。供 2.5D 战斗场景与扫荡复用。
+export function prepareStageBattle(player, stageId, rng) {
   const st = stageDef(stageId);
   if (!st) return { ok: false, reason: '无此关卡' };
   if (!canEnterStage(player, stageId)) return { ok: false, reason: '尚未解锁' };
   const specs = playerSpecsFrom(player);
   if (!specs.length) return { ok: false, reason: '阵容为空' };
   const enemies = makeEnemyFormation(st.power, st.element, st.type, rng);
-  const run = runBattle(specs, enemies, rng);
+  return { ok: true, stage: st, specs, enemies };
+}
+
+// 结算一场已跑完的战斗：发放掉落、记录通关 / 星数 / 解锁。返回 { rewards, stars }。
+export function settleStage(player, stageId, run, rng) {
+  const st = stageDef(stageId);
   const rewards = { res: {}, frags: {} };
-  const logs = run.log.slice();
+  if (!st) return { rewards, stars: 0 };
   if (run.result === 'win') {
     const drops = rollDrops(st, rng);
     rewards.res = drops.res;
@@ -140,13 +160,27 @@ export function enterStage(player, stageId, rng) {
     player.story.clearedStages[stageId] = true;
     player.stats.stagesCleared = (player.stats.stagesCleared || 0) + 1;
     player.stats.battlesWon = (player.stats.battlesWon || 0) + 1;
+    // 3 星记录（取历史最高）
+    const stars = computeStageStars(run);
+    const prev = (player.story.stars && player.story.stars[stageId]) || 0;
+    if (!player.story.stars) player.story.stars = {};
+    player.story.stars[stageId] = Math.max(prev, stars);
     if (st.idx === 7 && st.chapter === (player.story.highestChapter || 1) && st.chapter < CHAPTERS.length) {
       player.story.highestChapter = st.chapter + 1;
     }
     // 通关 12 章首领会额外奖励限定天道本源
     if (st.chapter === 12 && st.idx === 7) addRes(player, 'tiandao', 1);
-  } else {
-    player.stats.battlesLost = (player.stats.battlesLost || 0) + 1;
+    return { rewards, stars: player.story.stars[stageId] };
   }
-  return { ok: true, result: run.result, rewards, rounds: run.rounds, log: logs };
+  player.stats.battlesLost = (player.stats.battlesLost || 0) + 1;
+  return { rewards, stars: 0 };
+}
+
+// 进入关卡 → 自动战斗 → 结算。返回 { ok, result, rewards, stars, log }
+export function enterStage(player, stageId, rng) {
+  const prep = prepareStageBattle(player, stageId, rng);
+  if (!prep.ok) return { ok: false, reason: prep.reason };
+  const run = runBattle(prep.specs, prep.enemies, rng);
+  const settled = settleStage(player, stageId, run, rng);
+  return { ok: true, result: run.result, rewards: settled.rewards, stars: settled.stars, rounds: run.rounds, log: run.log };
 }

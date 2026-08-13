@@ -2,7 +2,8 @@
 import {
   counterMult, COUNTER_GAIN, COUNTER_LOSS, computeDamage, CRIT_MULT,
   effectiveStat, cardCap, expForLevel, rarityDef, RARITIES, cardPower,
-  starCost, starTiandao, GACHA, PILL_EXP, BREAK_STONE,
+  starBonusPct, starTiandaoFCost, starFragCost, STAR_TIERS, EVOLUTION,
+  GACHA, PILL_EXP, BREAK_STONE,
   clamp, dayKey, initiative, POS_AGGRO, CAVE_CAP_HOURS,
 } from '../src/config.js';
 import { CARDS, CARD_MAP, cardDef } from '../src/data/cards.js';
@@ -29,6 +30,13 @@ import { collectCave, previewCave, caveTotalLevel } from '../src/core/cave.js';
 import { ACHIEVEMENTS, ACH_CATS, checkAchievements, achProgress, rewardDesc } from '../src/core/achievements.js';
 import { hasSave, saveGame, loadGame, clearSave, exportSave, importSave, listSlots, _setStorage, _NUM_SLOTS } from '../src/core/save.js';
 import { makeRng, weighted, pick, chance } from '../src/core/rng.js';
+import { effectiveRarity } from '../src/core/card.js';
+import { evoCost, canEvolve, doEvolve, canGift, doGift } from '../src/core/cultivate.js';
+import { computeStageStars, prepareStageBattle, settleStage, rollDrops } from '../src/core/stage.js';
+import { stageStars, stageStarOf } from '../src/core/player.js';
+import { canSweep, sweepBatch, sweepUnlocked, sweepReason } from '../src/core/sweep.js';
+import { staminaValue, regenStamina, spendStamina } from '../src/core/stamina.js';
+import { affinityBonusPct, affinityLevel, AFFINITY_MAX, STAMINA_MAX, STAMINA_PER_SWEEP } from '../src/config.js';
 
 let pass = 0; let fail = 0;
 const ok = (cond, msg) => { if (cond) pass++; else { fail++; console.error('  ✗ FAIL:', msg); } };
@@ -64,8 +72,9 @@ ok(counterMult('none', 'fire') === 1, '无属性不克制');
 // 属性派生
 {
   const s = effectiveStat(100, 10, 2, 3); // lvl10,br2,star3
-  const expect = 100 * (1 + 0.05 * 9) * (1 + 0.08 * 2) * (1 + 0.12 * 3);
-  ok(near(s, expect), 'effectiveStat 公式');
+  // 道果 3 重累计加成 = 0.08+0.08+0.10 = 0.26
+  const expect = 100 * (1 + 0.05 * 9) * (1 + 0.08 * 2) * (1 + 0.26);
+  ok(near(s, expect), 'effectiveStat 公式（道果分档）');
   ok(cardCap(rarityDef('R'), 0) === 30 && cardCap(rarityDef('R'), 5) === 80, 'R 等级上限 30→80');
   ok(cardCap(rarityDef('SSR'), 0) === 50 && cardCap(rarityDef('SSR'), 6) === 110, 'SSR 等级上限 50→110');
   ok(expForLevel(1) < expForLevel(10) && expForLevel(10) < expForLevel(30), '经验单调递增');
@@ -418,6 +427,175 @@ ok(_NUM_SLOTS() === 3, '3 个存档槽');
 }
 function saveSlot2(n, player) { player.slot = n; saveGame(player); }
 clearSave();
+
+// ---------- 道果九重天·升星（增量 2.1）----------
+console.log('— star tiers / dao-fruit —');
+ok(STAR_TIERS === 9, '道果九重天 = 9 重');
+ok(starTiandaoFCost(2) === 2 && starTiandaoFCost(9) === 30, '本源碎片消耗表 2..30');
+ok(starFragCost(2) === 0 && starFragCost(9) === 10, '同名碎片消耗表 0..10');
+ok(starBonusPct(0) === 0, '0 星加成 0');
+ok(near(starBonusPct(3), 0.08 + 0.08 + 0.10), '3 重累计加成 26%');
+ok(starBonusPct(9) > 1, '9 重满星累计加成 > 100%');
+{
+  // 总计：1→9 消耗本源碎片 95、同名碎片 34（设计稿增量 2.1）
+  let sumF = 0, sumD = 0;
+  for (let t = 2; t <= 9; t++) { sumF += starFragCost(t); sumD += starTiandaoFCost(t); }
+  ok(sumF === 34 && sumD === 95, `1→9 满星消耗：碎片${sumF}/本源${sumD}（设计 34/95）`);
+  ok(RARITIES.every((r) => r.maxStar === 9), '所有稀有度上限均为 9 重');
+  const q = newPlayer();
+  addFrag(q, 'R001', 99); q.res.tiandao_f = 99;
+  const inst = q.cards.R001;
+  // 连升到 9 重
+  let ups = 0;
+  while (canStarUp(q, inst) && ups < 20) { doStarUp(q, inst); ups++; }
+  ok(inst.star === 9, `R 卡可升满 9 重（实际 ${inst.star}，升 ${ups} 次）`);
+  ok(canStarUp(q, inst) === false, '9 重满星不可再升');
+}
+
+// ---------- 化凡入圣·进化（增量 2.2）----------
+console.log('— evolution —');
+{
+  const q = newPlayer();
+  addRes(q, 'tiandao', 9999);
+  addRes(q, 'essence_wood', 9999);
+  addRes(q, 'dao_scroll', 9999);
+  const inst = q.cards.R006; // 柳叶医仙（木系 R）
+  ok(effectiveRarity(inst) === 'R', '初始有效稀有度 R');
+  ok(canEvolve(q, inst) === false, '未满星不可进化');
+  inst.star = 9;
+  ok(canEvolve(q, inst) === false, '满星但等级未达上限不可进化');
+  // 直接拉满等级上限（升级/突破链路已在 cultivate 用例覆盖）
+  inst.level = cardCap(rarityDef('R'), 9);
+  inst.br = 11;
+  ok(isMaxLevel(inst) === true, `R 卡满星后达等级上限（Lv.${inst.level}）`);
+  const ec = evoCost(inst);
+  ok(ec && ec.target === 'SR', 'R 进化目标为 SR');
+  ok(canEvolve(q, inst) === true, '满星满级 + 材料足 → 可进化');
+  const atkBefore = instanceStats(inst).atk;
+  const r = doEvolve(q, inst);
+  ok(r.ok === true, '进化成功');
+  ok(effectiveRarity(inst) === 'SR', '进化后有效稀有度 = SR');
+  ok(instanceStats(inst).atk > atkBefore, '进化后面板攻击提升');
+  ok(inst.evo === 1, '进化阶段 evo=1');
+  // SSR 不可再进化
+  const s = q.cards.R001; s.star = 9; s.evo = 2; // R 直接到 SSR（极端）
+  ok(effectiveRarity(s) === 'SSR', 'R evo=2 → SSR');
+  ok(evoCost(s) === null, 'SSR 无进化路径');
+}
+
+// ---------- 知音·好感度（增量 1.2）----------
+console.log('— affinity —');
+ok(affinityBonusPct(0) === 0 && affinityBonusPct(100) === 0.10, '好感加成 0..10%');
+ok(affinityLevel(0).tier === 1 && affinityLevel(100).tier === 5, '好感境界 1..5');
+{
+  const q = newPlayer();
+  addRes(q, 'gift', 20);
+  const inst = q.cards.R001;
+  ok((inst.affinity || 0) === 0, '初始好感 0');
+  ok(canGift(q, inst) === true, '可赠礼');
+  doGift(q, inst);
+  ok(inst.affinity === 10, '赠礼 +10 好感');
+  // 好感带来属性加成
+  const a0 = instanceStats({ ...inst, affinity: 0 }).atk;
+  const a100 = instanceStats({ ...inst, affinity: 100 }).atk;
+  ok(a100 > a0, '满好感攻击高于 0 好感');
+}
+
+// ---------- 灵气·体力（增量 4.2）----------
+console.log('— stamina —');
+ok(STAMINA_MAX === 120 && STAMINA_PER_SWEEP === 10, '灵气上限 120 / 每次扫荡 10');
+{
+  const q = newPlayer();
+  // 缺失 stamina 字段 → recompute 初始化为满
+  recompute(q);
+  ok(q.stamina.value === STAMINA_MAX, '新档灵气满 120');
+  // 离线恢复：lastSeen 设为 10 分钟前 → 应恢复 2 点（但已满，仍满）
+  q.stamina.value = 100; q.stamina.lastSeen = Math.floor(Date.now() / 1000) - 600;
+  const v = staminaValue(q);
+  ok(v === 102, `10 分钟恢复 2 点灵气（实际 ${v}）`);
+  // 上限钳制
+  q.stamina.value = STAMINA_MAX; q.stamina.lastSeen = Math.floor(Date.now() / 1000) - 99999;
+  ok(staminaValue(q) === STAMINA_MAX, '灵气不超上限');
+  // 消耗
+  q.stamina.lastSeen = Math.floor(Date.now() / 1000);
+  regenStamina(q);
+  spendStamina(q, 50);
+  ok(q.stamina.value === STAMINA_MAX - 50, '消耗 50 灵气');
+}
+
+// ---------- 关卡 3 星评定（增量 4.1）----------
+console.log('— stage 3-star —');
+{
+  const q = newPlayer();
+  ownCard(q, 'SSR001'); ownCard(q, 'SSR002'); ownCard(q, 'SR002');
+  for (const id of Object.keys(q.cards)) { const inst = q.cards[id]; inst.star = 9; inst.level = 110; inst.br = 11; inst.skillLv = 11; }
+  setFormation(q, ['SSR001', 'SR002', 'R003', 'SSR002', 'R006']);
+  const prep = prepareStageBattle(q, '1-1', makeRng(1));
+  ok(prep.ok === true && prep.specs.length === 5, 'prepareStageBattle 构造 5 人 spec');
+  const run = runBattle(prep.specs, prep.enemies, makeRng(2));
+  const settled = settleStage(q, '1-1', run, makeRng(3));
+  ok(run.result === 'win', '满级队胜 1-1');
+  const stars = computeStageStars(run);
+  ok(stars >= 1 && stars <= 3, `3 星评定在 1..3（实际 ${stars}）`);
+  ok(stageStarOf(q, '1-1') === stars, '关卡记录星数');
+  ok(stageStars(q) >= 3, '累计星数 >= 3');
+  // rollDrops 可独立调用（扫荡复用）
+  const drops = rollDrops(stageDef('1-7'), makeRng(4));
+  ok(drops && typeof drops.res === 'object', 'rollDrops 导出可复用');
+}
+
+// ---------- 一键扫荡（增量 第四节）----------
+console.log('— sweep —');
+{
+  const q = newPlayer();
+  recompute(q); // 确保 story.stars 字段存在
+  // 模拟 3 星通关 1-1
+  q.story.clearedStages['1-1'] = true; q.story.stars['1-1'] = 3; q.unlocks = { sweep: true };
+  q.res.sweep_ticket = 20;
+  ok(sweepUnlocked(q) === true, '扫荡已解锁');
+  ok(sweepReason(q, '1-1') === null, '1-1 三星可扫荡');
+  ok(canSweep(q, '1-1') === true, 'canSweep 通过');
+  // 非三星关卡不可扫
+  q.story.clearedStages['1-2'] = true; q.story.stars['1-2'] = 2;
+  ok(sweepReason(q, '1-2') !== null, '2 星关卡不可扫荡');
+  // 神行符不足
+  q.res.sweep_ticket = 0;
+  ok(sweepReason(q, '1-1') !== null, '神行符不足不可扫荡');
+  // 批量扫荡 ×5：消耗 5 张符 + 50 灵气
+  q.res.sweep_ticket = 5; q.stamina.value = STAMINA_MAX;
+  const stam0 = q.stamina.value;
+  const res = sweepBatch(q, '1-1', 5, makeRng(7));
+  ok(res.done === 5, `批量扫荡完成 5 次（实际 ${res.done}）`);
+  ok(q.res.sweep_ticket === 0, '批量扫荡消耗 5 张神行符');
+  ok(q.stamina.value === stam0 - 50, `批量扫荡消耗 50 灵气（${stam0} → ${q.stamina.value}）`);
+  // 中途灵气不足自动停止
+  q.res.sweep_ticket = 10; q.stamina.value = 25; // 仅够 2 次（20 点）
+  const res2 = sweepBatch(q, '1-1', 10, makeRng(8));
+  ok(res2.done === 2 && res2.stopped, `灵气不足自动停止于 2 次（实际 ${res2.done}）`);
+}
+
+// ---------- 战斗结构化事件（增量 第三节，供 2.5D 回放）----------
+console.log('— battle events —');
+{
+  const q = newPlayer();
+  ownCard(q, 'SSR001'); ownCard(q, 'SSR002'); ownCard(q, 'SR002');
+  setFormation(q, ['SSR001', 'SR002', 'R003', 'SSR002', 'R006']);
+  const specs = playerSpecsFrom(q);
+  const enemies = makeEnemyFormation(400, 'fire', 'normal', makeRng(1));
+  const battle = createBattle(specs, enemies, makeRng(1));
+  ok(Array.isArray(battle.events) && battle.events.length > 0, '战斗初始化生成 init 事件');
+  ok(battle.events.every((e) => e.t === 'init') || battle.events.some((e) => e.t === 'init'), '含 init 事件');
+  const beforeLen = battle.events.length;
+  runBattle(specs, enemies, makeRng(2));
+  // runBattle 内部新建了 battle，用其返回值校验事件类型覆盖
+  const run = runBattle(specs, enemies, makeRng(3));
+  const types = new Set(run.battle.events.map((e) => e.t));
+  ok(types.has('init') && types.has('round'), '事件含 init / round');
+  ok(types.has('act'), '事件含 act（出手）');
+  ok(types.has('over'), '事件含 over（结束）');
+  ok(run.battle.events.some((e) => e.t === 'init' && Number.isFinite(e.hp) && Number.isFinite(e.maxHp)), 'init 事件携带 hp/maxHp');
+  void beforeLen;
+}
 
 console.log(`\n结果: ${pass} 通过, ${fail} 失败`);
 process.exit(fail ? 1 : 0);

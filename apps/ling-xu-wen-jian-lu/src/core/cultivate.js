@@ -1,23 +1,28 @@
 // ============================================================================
-// 养成系统（设计稿 P2）：升级 / 突破 / 升星 / 技能升级。纯逻辑。
+// 养成系统（设计稿 P2 + 增量 2.x）：升级 / 突破 / 升星（道果九重天）/ 化凡入圣进化
+// / 技能升级 / 知音赠礼。纯逻辑。
 //   - 升级：喂修为丹获得经验，满经验后升 1 级并消耗灵石；每 10 级遇突破瓶颈。
 //   - 突破：消耗对应五行突破石 + 灵石，解锁更高等级上限（每次 +8% 全属性）。
-//   - 升星：消耗灵契碎片（同名卡）+ 天道本源，提升星级（+12% 全属性 / 星，扩等级上限）。
+//   - 升星：消耗天道本源·碎片 + 同名灵契碎片，提升道果星级（分档累计全属性加成）。
+//   - 化凡入圣：9 重满星 + 等级达上限时，消耗天道本源 / 五行精华 / 天道卷轴进化稀有度。
 //   - 技能：消耗功法残页提升技能等级（+5% 技能倍率 / 级）。
+//   - 知音：消耗灵犀佩提升好感度（微量全属性加成）。
 // ============================================================================
 import {
   rarityDef, cardCap, breakGateLevel, expForLevel, lingshiForLevel,
-  PILL_EXP, BREAK_STONE, starCost, starTiandao,
+  PILL_EXP, BREAK_STONE, ESSENCE_STONE,
+  STAR_TIERS, starTiandaoFCost, starFragCost,
+  EVOLUTION, AFFINITY_MAX, AFFINITY_GIFT_VALUE,
 } from '../config.js';
 import { cardDef } from '../data/cards.js';
-import { isMaxLevel, expToNext } from './card.js';
+import { isMaxLevel, expToNext, effectiveRarity } from './card.js';
 import { canAfford, spendRes, countRes, countFrag } from './player.js';
 
-// 当前可升到的等级上限 = min(星级上限, 突破瓶颈)
+// 当前可升到的等级上限 = min(进化稀有度星级上限, 突破瓶颈)
 export function levelCeiling(instance) {
   const def = cardDef(instance.id);
   if (!def) return 1;
-  const r = rarityDef(def.rarity);
+  const r = rarityDef(effectiveRarity(instance));
   return Math.min(cardCap(r, instance.star), breakGateLevel(instance.br));
 }
 
@@ -67,7 +72,7 @@ function def_name(instance) { const d = cardDef(instance.id); return d ? d.name 
 function reachedCap(instance) {
   const def = cardDef(instance.id);
   if (!def) return true;
-  const r = rarityDef(def.rarity);
+  const r = rarityDef(effectiveRarity(instance));
   return instance.level >= cardCap(r, instance.star);
 }
 
@@ -80,7 +85,7 @@ export function breakCost(instance) {
 export function canBreakThrough(player, instance) {
   const def = cardDef(instance.id);
   if (!def) return false;
-  const r = rarityDef(def.rarity);
+  const r = rarityDef(effectiveRarity(instance));
   if (instance.level < breakGateLevel(instance.br)) return false; // 未到瓶颈
   if (instance.level >= cardCap(r, instance.star)) return false;  // 已到星级上限
   return canAfford(player, breakCost(instance));
@@ -92,21 +97,19 @@ export function doBreakThrough(player, instance) {
   return { ok: true, text: `突破第 ${instance.br} 重，属性大增！` };
 }
 
-// ── 升星 ──────────────────────────────────────────────────────────────────────
+// ── 升星·道果九重天（设计稿增量 2.1）──────────────────────────────────────────
 export function starUpCost(instance) {
-  const def = cardDef(instance.id);
-  const r = rarityDef(def.rarity);
-  const target = instance.star + 1;
+  const target = (instance.star || 0) + 1;
   return {
-    frag: starCost(def.rarity, target),
-    tiandao_f: starTiandao(def.rarity, target),
+    frag: starFragCost(target),
+    tiandao_f: starTiandaoFCost(target),
   };
 }
 export function canStarUp(player, instance) {
   const def = cardDef(instance.id);
   if (!def) return false;
-  const r = rarityDef(def.rarity);
-  if (instance.star >= r.maxStar) return false;
+  const r = rarityDef(effectiveRarity(instance));
+  if (instance.star >= (r.maxStar || STAR_TIERS)) return false;
   const c = starUpCost(instance);
   if (countFrag(player, def.id) < c.frag) return false;
   if (countRes(player, 'tiandao_f') < c.tiandao_f) return false;
@@ -119,7 +122,57 @@ export function doStarUp(player, instance) {
   player.frags[def.id] -= c.frag;
   spendRes(player, { tiandao_f: c.tiandao_f });
   instance.star += 1;
-  return { ok: true, text: `${def.name} 升至 ${instance.star}★！` };
+  return { ok: true, text: `${def.name} 道果升至 ${instance.star} 重！` };
+}
+
+// ── 化凡入圣·品质进化（设计稿增量 2.2）────────────────────────────────────────
+// R→SR / SR→SSR：需 9 重满星 + 等级达（进化稀有度）上限。材料：天道本源 + 五行精华 / 天道卷轴。
+export function evoCost(instance) {
+  const def = cardDef(instance.id);
+  if (!def) return null;
+  const cur = effectiveRarity(instance); // 进化前的有效稀有度
+  const cfg = EVOLUTION[cur];
+  if (!cfg) return null;
+  const cost = { tiandao: cfg.tiandao };
+  if (cfg.essence > 0) {
+    const essId = ESSENCE_STONE[def.element] || 'essence_metal';
+    cost[essId] = cfg.essence;
+  }
+  if (cfg.scroll > 0) cost.dao_scroll = cfg.scroll;
+  return { cost, target: cfg.to, label: cfg.label };
+}
+export function canEvolve(player, instance) {
+  const def = cardDef(instance.id);
+  if (!def) return false;
+  const cur = effectiveRarity(instance);
+  if (!EVOLUTION[cur]) return false;          // SSR 已至顶
+  const r = rarityDef(cur);
+  if ((instance.star || 0) < (r.maxStar || STAR_TIERS)) return false; // 未满星
+  if (!isMaxLevel(instance)) return false;    // 未达等级上限
+  const e = evoCost(instance);
+  if (!e) return false;
+  return canAfford(player, e.cost);
+}
+export function doEvolve(player, instance) {
+  if (!canEvolve(player, instance)) return { ok: false, reason: '尚不可化凡入圣' };
+  const def = cardDef(instance.id);
+  const e = evoCost(instance);
+  spendRes(player, e.cost);
+  instance.evo = (instance.evo || 0) + 1;
+  // 进化后等级上限提升，保留当前等级 / 经验 / 星级。
+  return { ok: true, text: `${def.name} 化凡入圣，晋升为 ${e.target}！` };
+}
+
+// ── 知音·好感度（设计稿增量 1.2）──────────────────────────────────────────────
+export function canGift(player, instance) {
+  return (instance.affinity || 0) < AFFINITY_MAX && countRes(player, 'gift') > 0;
+}
+export function doGift(player, instance) {
+  if (!canGift(player, instance)) return { ok: false, reason: '无法赠礼' };
+  spendRes(player, { gift: 1 });
+  instance.affinity = Math.min(AFFINITY_MAX, (instance.affinity || 0) + AFFINITY_GIFT_VALUE);
+  const def = cardDef(instance.id);
+  return { ok: true, text: `${def.name} 好感度 +${AFFINITY_GIFT_VALUE}（${instance.affinity}/${AFFINITY_MAX}）` };
 }
 
 // ── 技能升级 ──────────────────────────────────────────────────────────────────

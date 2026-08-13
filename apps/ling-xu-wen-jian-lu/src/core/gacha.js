@@ -84,7 +84,9 @@ export function drawTen(player, rng) {
   player.res.wendao -= 10;
   const results = [];
   for (let i = 0; i < 10; i++) results.push(doDraw(player, rng));
-  // 十连保底：若无 SR/SSR，则将末张提升为 SR
+  // 十连保底：10 抽内无 SR/SSR 时，末张 R 额外补偿一张 SR（保留原 R 实例，
+  // 仅 stats.r 减 1、stats.sr 加 1）——属「额外补偿」而非「替换」，故统计口径
+  // 下 10 抽实际产出 11 张。设计取舍，符合「至少获得 1 张 SR」的保底语义。
   if (GACHA.tenGuaranteeSR && !results.some((r) => r.rarity === 'SR' || r.rarity === 'SSR')) {
     const last = results[results.length - 1];
     const card = pickCard('SR', rng);

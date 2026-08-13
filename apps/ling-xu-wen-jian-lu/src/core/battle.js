@@ -298,11 +298,12 @@ function act(battle, c, rng) {
   }
 
   // 低血狂暴触发（兵主降临 / Boss enrage）
+  // 通过临时 buff 通道乘算（atk/def），到期由 endRound 统一移除，
+  // 不再永久改写 base 属性——避免过期后不还原 / 低血线滞留时二次触发导致指数膨胀。
   if (c.enrage && !c.enrageActive && c.hp / c.maxHp < (c.enrage.threshold || 0.30)) {
     c.enrageActive = true;
-    c.baseAtk = Math.round(c.baseAtk * (1 + c.enrage.amount));
-    c.baseDef = Math.round(c.baseDef * (1 + c.enrage.amount));
-    c.buffs.push({ stat: 'atk', amount: 0, dur: c.enrage.dur }); // 占位记 dur（狂暴持续）
+    c.buffs.push({ stat: 'atk', amount: c.enrage.amount, dur: c.enrage.dur });
+    c.buffs.push({ stat: 'def', amount: c.enrage.amount, dur: c.enrage.dur });
     c._enrageDur = c.enrage.dur;
     pushLog(battle, `${c.name} 怒意爆发，全属性暴增！`);
   }
@@ -335,19 +336,19 @@ function act(battle, c, rng) {
     }
     case 'heal': {
       const amount = healPower(c) * mult;
+      // 先定值治疗目标：ally_all / self / ally_lowest（最低血盟友只取一次引用，
+      // 避免先治疗后血线变化导致增益落到另一位盟友身上）。
+      let targets;
       if (skill.target === 'ally_all') {
-        for (const t of aliveOf(allyTeam(battle, c.side))) healUnit(battle, t, amount, c);
+        targets = aliveOf(allyTeam(battle, c.side));
       } else if (skill.target === 'self') {
-        healUnit(battle, c, amount, c);
+        targets = [c];
       } else {
         const t = pickLowestAlly(battle, c);
-        if (t) healUnit(battle, t, amount, c);
+        targets = t ? [t] : [];
       }
+      for (const t of targets) healUnit(battle, t, amount, c);
       if (skill.effect) {
-        // 增益附在治疗目标上：全队 / 单体
-        const targets = skill.target === 'ally_all' ? aliveOf(allyTeam(battle, c.side))
-          : skill.target === 'self' ? [c]
-          : (pickLowestAlly(battle, c) ? [pickLowestAlly(battle, c)] : []);
         for (const t of targets) applyEffectTo(battle, t, skill.effect, c, rng);
       }
       break;
@@ -412,8 +413,13 @@ export function stepRound(battle, rng) {
   if (battle.over) return { logs: [], over: true, result: battle.result };
   battle.round += 1;
   // 出手顺序：速度 × ±5% 浮动
-  const all = [...battle.players, ...battle.enemies].filter((c) => c.alive);
-  all.sort((a, b) => initiative(curSpd(b), r) - initiative(curSpd(a), r));
+  // 先一次性 map 出每个单位的 initiative 定值，再按值排序——
+  // 避免在比较器内反复重抽随机数导致违反传递性/一致性。
+  const all = [...battle.players, ...battle.enemies]
+    .filter((c) => c.alive)
+    .map((c) => ({ c, init: initiative(curSpd(c), r) }))
+    .sort((a, b) => b.init - a.init)
+    .map((x) => x.c);
   for (const c of all) {
     if (!c.alive) continue;
     act(battle, c, r);

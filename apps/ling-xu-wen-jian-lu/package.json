@@ -1,0 +1,17 @@
+{
+  "name": "ling-xu-wen-jian-lu",
+  "version": "1.0.0",
+  "description": "《灵墟·问剑录》国风卡牌修仙 - Spirit Ruins: Record of Asking the Sword (card-collect gacha RPG)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "test": "node scripts/logic-test.mjs",
+    "test:dom": "node scripts/smoke-dom.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^29.1.1",
+    "vite": "^5.4.0"
+  }
+}

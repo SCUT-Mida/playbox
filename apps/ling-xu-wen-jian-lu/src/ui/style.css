@@ -310,6 +310,14 @@
 
 /* —— 绘卷（形象预设 + AI 绘图提示词）—— */
 .art-spec { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+/* 绘卷面板：左侧立绘预览 + 右侧设定文字 */
+.art-panel { display: flex; gap: 12px; align-items: stretch; }
+.art-figure { flex: 0 0 110px; min-height: 220px; display: flex; align-items: flex-end;
+  background: linear-gradient(180deg, rgba(60,50,40,.16), rgba(30,24,18,.28));
+  border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.art-figure .char-art { width: 100%; height: 100%; }
+.art-panel .art-spec { flex: 1; }
+@media (max-width: 560px) { .art-panel { flex-direction: column; } .art-figure { flex: none; height: 200px; } }
 .art-spec__row { display: flex; gap: 10px; align-items: baseline; }
 .art-spec__row .muted { flex: 0 0 3em; font-size: 12px; }
 .art-prompt { white-space: pre-wrap; word-break: break-word; font-size: 11px; line-height: 1.6; background: var(--paper-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 8px 0; max-height: 180px; overflow-y: auto; color: var(--ink); font-family: inherit; }
@@ -620,8 +628,8 @@
 .char-art .ca-skin-sh { fill: #e2c5a0; }
 .char-art .ca-eye { fill: #2c1810; }
 .char-art .ca-line { fill: none; stroke: #2c1810; stroke-width: 1.5; stroke-linecap: round; }
-.char-art .ca-hair, .char-art .ca-hair-b { fill: #3a2a20; }
-.char-art .ca-hair-l { fill: #52403a; }
+.char-art .ca-hair, .char-art .ca-hair-b { fill: var(--hair, #3a2a20); }
+.char-art .ca-hair-l { fill: var(--hair-l, #52403a); }
 .char-art .ca-hairpin { stroke: var(--gold, #D4A04A); stroke-width: 2.4; stroke-linecap: round; }
 .char-art .ca-shoe { fill: #2c1810; }
 .char-art .ca-robe, .char-art .ca-sleeve-d { fill: var(--sil); }
@@ -646,6 +654,56 @@
 .char-art .ca-rune-d { stroke-dasharray: 3 5; opacity: .55; }
 .char-art .ca-talisman rect { fill: #f7f0dc; stroke: #c9a24a; stroke-width: 1.2; }
 .char-art .ca-talisman-rune { fill: none; stroke: #c23b22; stroke-width: 1.4; stroke-linecap: round; }
+
+/* —— 角色专属部件（issue #97：15 人 15 面，见 charArt.js CHAR_SPECS）—— */
+/* 赤焰灵狐：狐耳 / 狐尾（耳窝浅粉，尾尖白）*/
+.char-art .ca-ear { fill: var(--hair, #3a2a20); }
+.char-art .ca-ear-in { fill: #e8c0aa; }
+.char-art .ca-tail { fill: var(--sil); }
+.char-art .ca-tail-tip { fill: #f2e7da; }
+/* 青竹剑侍：竹节青刃 + 竹叶 */
+.char-art .ca-blade-bamboo { fill: #8fbc7a; stroke: #5f8a4e; stroke-width: 1; }
+.char-art .ca-leaf { fill: #6f9e5a; }
+/* 金戈锐士：金刃 + 兽吞肩甲 */
+.char-art .ca-blade-gold { fill: #e8c765; stroke: #b8933d; stroke-width: 1; }
+.char-art .ca-pauldron { fill: var(--sil-l); stroke: var(--sil-d); stroke-width: 1.4; }
+/* 玄龟甲士：铁锤 + 龟甲纹胸甲 */
+.char-art .ca-hammer-head { fill: #8d9299; stroke: #5c6167; stroke-width: 1; }
+.char-art .ca-shell { fill: var(--sil-d); }
+.char-art .ca-shell-line { fill: none; stroke: var(--sil-l); stroke-width: 1.4; }
+/* 厚土力士：裸臂 + 石拳套 + 皮甲斜带 */
+.char-art .ca-fore-bare { fill: none; stroke: #e2c5a0; stroke-width: 9; stroke-linecap: round; }
+.char-art .ca-gauntlet { fill: var(--sil-d); stroke: var(--sil-l); stroke-width: 2; }
+.char-art .ca-strap { fill: none; stroke: #7a4a2a; stroke-width: 7; stroke-linecap: round; }
+/* 霜月散修：冰蓝符纸 */
+.char-art .ca-talisman-ice rect { fill: #dcecf7; stroke: #9cc3e2; stroke-width: 1.2; }
+.char-art .ca-talisman-ice .ca-talisman-rune { stroke: #4a90c2; }
+/* 飞羽散修 / 白鹤仙子：羽饰 + 铜罗盘 */
+.char-art .ca-feather { fill: #d9c289; }
+.char-art .ca-compass-rim { fill: #c9a24a; }
+.char-art .ca-compass-face { fill: #f3ead2; }
+.char-art .ca-compass-needle { fill: #c23b22; }
+/* 白鹤仙子 / 瑶池圣母：玉净瓶 / 玉杯 */
+.char-art .ca-vase-neck, .char-art .ca-vase-body,
+.char-art .ca-goblet-cup, .char-art .ca-goblet-base { fill: #bfe0d4; stroke: #7fae9c; stroke-width: 1; }
+.char-art .ca-goblet-stem { fill: #7fae9c; }
+/* 玄冥蛇姬 / 青莲道尊：盘蛇法杖 / 拂尘 */
+.char-art .ca-staff { fill: #7a4a2a; }
+.char-art .ca-staff-line { fill: none; stroke: #8a5a32; stroke-width: 3.4; stroke-linecap: round; }
+.char-art .ca-snake { fill: #5c8a6a; stroke: #3d6350; stroke-width: 1; }
+.char-art .ca-whisk path { fill: #e8e2d2; }
+/* 蚩尤残魂：赤瞳 / 图腾纹 / 牛角 / 巨斧 + 赤雷 / 破碎魔甲 */
+.char-art .ca-eye-red { fill: #d43a2f; }
+.char-art .ca-totem { fill: none; stroke: #8a5a3a; stroke-width: 1.3; stroke-linecap: round; }
+.char-art .ca-horn { fill: #d8cbb2; stroke: #a3927a; stroke-width: 1; }
+.char-art .ca-axe-head { fill: #c9a24a; stroke: #8a6d2f; stroke-width: 1; }
+.char-art .ca-lightning { fill: none; stroke: #d43a2f; stroke-width: 2; stroke-linecap: round; }
+.char-art .ca-armor-broken { fill: var(--sil-d); stroke: var(--sil-l); stroke-width: 1.2; }
+/* 瑶池圣母：金凤冠 / 头光 / 金莲台 */
+.char-art .ca-crown-phoenix { fill: #e0b64f; stroke: #b8862f; stroke-width: 1; }
+.char-art .ca-halo { fill: none; stroke: rgba(224,182,79,.8); stroke-width: 2.5; }
+.char-art .ca-halo-h { fill: none; stroke: rgba(224,182,79,.4); stroke-width: 1.4; }
+.char-art .ca-lotus-p { fill: #e0b64f; opacity: .85; }
 /* 阵法环缓转 / 符纸微悬 / 炉火摇曳（仅 SR/SSR 卡面启用，见 .dyn-1/.dyn-2）*/
 .portrait__card.dyn-1 .ca-rune, .portrait__card.dyn-2 .ca-rune { animation: ca-rune-spin 9s linear infinite; transform-box: fill-box; transform-origin: 50% 50%; }
 .portrait__card.dyn-1 .ca-talisman, .portrait__card.dyn-2 .ca-talisman { animation: ca-float 2.8s ease-in-out infinite; }
@@ -797,23 +855,41 @@
 /* 皮影化：全身像塌缩为五行代表色三阶单色剪影（人形轮廓 + 武器仍可辨识）*/
 .char-art.is-sil .ca-skin, .char-art.is-sil .ca-skin-sh, .char-art.is-sil .ca-hand,
 .char-art.is-sil .ca-hair, .char-art.is-sil .ca-hair-b, .char-art.is-sil .ca-hair-l,
-.char-art.is-sil .ca-shoe, .char-art.is-sil .ca-crown { fill: var(--sil); }
+.char-art.is-sil .ca-shoe, .char-art.is-sil .ca-crown,
+.char-art.is-sil .ca-ear, .char-art.is-sil .ca-horn, .char-art.is-sil .ca-tail { fill: var(--sil); }
 .char-art.is-sil .ca-robe, .char-art.is-sil .ca-sleeve-d, .char-art.is-sil .ca-cape,
 .char-art.is-sil .ca-collar, .char-art.is-sil .ca-hem, .char-art.is-sil .ca-shield,
-.char-art.is-sil .ca-tlg { fill: var(--sil-d); }
-.char-art.is-sil .ca-sleeve { stroke: var(--sil); }
+.char-art.is-sil .ca-tlg,
+.char-art.is-sil .ca-gauntlet, .char-art.is-sil .ca-snake,
+.char-art.is-sil .ca-armor-broken, .char-art.is-sil .ca-shell { fill: var(--sil-d); }
+.char-art.is-sil .ca-sleeve, .char-art.is-sil .ca-fore-bare { stroke: var(--sil); }
 .char-art.is-sil .ca-fore { stroke: var(--sil-d); }
 .char-art.is-sil .ca-sash, .char-art.is-sil .ca-sash-tail, .char-art.is-sil .ca-band,
 .char-art.is-sil .ca-ribbon, .char-art.is-sil .ca-blade, .char-art.is-sil .ca-guard,
 .char-art.is-sil .ca-shield-boss, .char-art.is-sil .ca-mirror, .char-art.is-sil .ca-mirror-rim,
 .char-art.is-sil .ca-tlg-l, .char-art.is-sil .ca-flame, .char-art.is-sil .ca-crown-b,
-.char-art.is-sil .ca-hilt, .char-art.is-sil .ca-talisman rect { fill: var(--sil-l); }
+.char-art.is-sil .ca-hilt, .char-art.is-sil .ca-talisman rect,
+.char-art.is-sil .ca-ear-in, .char-art.is-sil .ca-tail-tip, .char-art.is-sil .ca-leaf,
+.char-art.is-sil .ca-blade-bamboo, .char-art.is-sil .ca-blade-gold,
+.char-art.is-sil .ca-blade-fire, .char-art.is-sil .ca-hammer-head,
+.char-art.is-sil .ca-pauldron, .char-art.is-sil .ca-feather,
+.char-art.is-sil .ca-compass-rim, .char-art.is-sil .ca-compass-face,
+.char-art.is-sil .ca-compass-needle, .char-art.is-sil .ca-vase-neck,
+.char-art.is-sil .ca-vase-body, .char-art.is-sil .ca-goblet-cup,
+.char-art.is-sil .ca-goblet-base, .char-art.is-sil .ca-goblet-stem,
+.char-art.is-sil .ca-staff, .char-art.is-sil .ca-whisk path,
+.char-art.is-sil .ca-axe-head, .char-art.is-sil .ca-crown-phoenix,
+.char-art.is-sil .ca-lotus-p, .char-art.is-sil .ca-eye-red { fill: var(--sil-l); }
 .char-art.is-sil .ca-line, .char-art.is-sil .ca-hairpin,
-.char-art.is-sil .ca-talisman-rune { stroke: var(--sil-l); }
+.char-art.is-sil .ca-talisman-rune, .char-art.is-sil .ca-totem,
+.char-art.is-sil .ca-lightning, .char-art.is-sil .ca-halo, .char-art.is-sil .ca-halo-h,
+.char-art.is-sil .ca-staff-line, .char-art.is-sil .ca-shell-line,
+.char-art.is-sil .ca-strap { stroke: var(--sil-l); }
 .char-art.is-sil .ca-eye { fill: var(--sil-l); }
 .char-art.is-sil .ca-rune { stroke: var(--sil-l); }
 .char-art.is-sil .ca-blade, .char-art.is-sil .ca-shield, .char-art.is-sil .ca-mirror,
-.char-art.is-sil .ca-hand, .char-art.is-sil .ca-talisman rect { stroke: none; }
+.char-art.is-sil .ca-hand, .char-art.is-sil .ca-talisman rect,
+.char-art.is-sil .ca-gauntlet, .char-art.is-sil .ca-armor-broken { stroke: none; }
 /* 稀有度光环：青玉 / 紫金 / 彩凰 */
 .silu .aura-R   { border-color: var(--sil, #9a8a72); }
 .silu .aura-SR  { border-color: var(--r-SR); box-shadow: 0 0 6px var(--r-SR); }

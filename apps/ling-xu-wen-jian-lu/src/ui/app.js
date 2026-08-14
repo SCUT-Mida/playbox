@@ -46,7 +46,7 @@ import {
 import { makeRng } from '../core/rng.js';
 import { BattleScene } from './battle-scene.js';
 import { Portrait3D } from './portrait3D.js';
-import { charBust } from './charArt.js';
+import { charBust, charFigure } from './charArt.js';
 
 const TABS = [
   { key: 'lineup', icon: '⚔️', label: '阵容' },
@@ -650,7 +650,9 @@ export class GameUI {
     return h('div', { class: 'cult-detail' },
       h('div', { class: 'panel' },
         h('div', { class: 'panel__head' }, `绘卷 · ${style.name}`),
-        h('div', { class: 'panel__body' },
+        h('div', { class: 'panel__body art-panel' },
+          // 角色专属立绘预览（charArt.js 的 15 人 15 面预制素材，与提示词设定一一对应）
+          h('div', { class: 'art-figure' }, charFigure(def)),
           h('div', { class: 'art-spec' },
             h('div', { class: 'art-spec__row' }, h('span', { class: 'muted' }, '形象'), h('span', null, preset.appearance)),
             h('div', { class: 'art-spec__row' }, h('span', { class: 'muted' }, '色调'), h('span', null, preset.palette)),

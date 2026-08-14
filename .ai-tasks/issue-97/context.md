@@ -1,14 +1,4 @@
-收到！以下是 《灵墟·问剑录》全15位角色 的完整AI绘图提示词清单，按 R / SR / SSR 分组，每张卡包含 英文版（可直接粘贴Midjourney/Stable Diffusion） + 中文释义（方便你理解调整）。所有提示词严格对齐前文设计的画风、视角、构图与职业特征。
-
-通用参数说明（所有提示词统一后缀）
-
-参数 值 说明
-画幅比例 --ar 4:3 适配卡牌竖版构图（4:3）
-版本 --v 6.0 Midjourney V6 模型
-风格 --style raw --s 150 保留更多原始画风，不做过份美化
-输出画质 --quality 2 最高画质
-
-Stable Diffusion用户：将提示词中的 --ar 4:3 --v 6.0 替换为 , masterpiece, best quality, 8k, (highres:1.2)，并在Negative Prompt中添加 (worst quality, low quality:1.4), deformed, blurry, bad anatomy。
+我是要求根据这些要求重新预置人物素材，当前几乎所有人物角色都一样！！！！
 
 一、R卡 · 逸品青玉（9张）
 
@@ -70,7 +60,3 @@ SR卡（4张） 工笔重彩 Midjourney V6（用--style raw降低美化） MJ直
 SSR卡（2张） 泼墨泼彩 Midjourney V6（需高频迭代） / DALL-E 3（色彩控制好） 两者并用，择优选取
 
 提示词技巧：每张卡跑 4~6次（Variations），挑选气质最贴切的一张。如果眼神或姿态不对，在提示词中加 (looking down slightly:1.2) 或 (heroic pose:1.3) 加重权重。
-
----
-
-现在你手里有了 15套可直接扔进AI的完整指令，加上“一键抠图+分层”的落地流程，美术资产可以同步开动了。需要我帮你整理 Midjourney参数速查卡 或 SD的Negative Prompt模板 吗？随时追加！

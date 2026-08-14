@@ -197,12 +197,16 @@ export class Portrait3D {
       }
     });
 
-    const end = () => {
+    const end = (e) => {
       clearTimeout(this._holdTimer);
       const wasDrag = dragging;
       dragging = false;
       if (wasDrag) { this._applyTransform(0, baseRot); this._applyParallax(0); }
-      else { /* 视作点击，由 click 处理 */ }
+      else if (e && e.type === 'pointercancel') {
+        // pointercancel（如触屏长按被系统手势打断）后不会派发 click，
+        // 主动清掉长按预览留下的抑制标志，避免吞掉用户下一次正常点击。
+        this._suppressClick = false;
+      } else { /* 视作点击，由 click 处理 */ }
     };
     wrap.addEventListener('pointerup', end);
     wrap.addEventListener('pointercancel', end);
@@ -283,7 +287,15 @@ export class Portrait3D {
     const cloneCanvas = clone.querySelector('canvas.portrait__stream');
     if (cloneCanvas) {
       cloneStream = createInkStream(cloneCanvas, { color: this._streamColor || silhouetteColor(this.card), density: 24 });
+      // 克隆画布没接 ResizeObserver，而首次 resize 时 stage 还在 scale(.6) 过渡初值，
+      // 拿到的是缩放后尺寸；等 show 过渡结束后补一次 resize，避免粒子发糊。
+      const t0 = setTimeout(() => { if (cloneStream) cloneStream.resize(); }, 320);
+      this._timers.push(t0);
     }
+    // 克隆体不会带走原卡已挂的动画句柄：重新挂上飘动 / 眨眼，沉浸预览保持同等等动态。
+    const cloneAnim = attachAnimations(clone, this.card, this.rarity, {
+      blinkEyes: clone.querySelector('.portrait__eyes'),
+    });
     void backdrop.offsetWidth;
     backdrop.classList.add('show');
     // 长按后的 pointerup 仍会派发 click，标记由 click 处理器消费。
@@ -292,6 +304,7 @@ export class Portrait3D {
     const close = () => {
       if (closed) return;
       closed = true;
+      if (cloneAnim && cloneAnim.destroy) cloneAnim.destroy();
       if (cloneStream && cloneStream.destroy) cloneStream.destroy();
       cloneStream = null;
       backdrop.classList.remove('show');

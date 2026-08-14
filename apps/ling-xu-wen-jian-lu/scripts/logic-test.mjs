@@ -612,6 +612,10 @@ console.log('— character portrait —');
   ok(CARDS.every((c) => typeof c.voiceQuote === 'string' && c.voiceQuote.length > 0), '每张卡有语音文案 voiceQuote');
   ok(CARDS.every((c) => /^#[0-9a-fA-F]{6}$/.test(c.silhouetteColor)), '每张卡有合法剪影色 silhouetteColor');
   // 取色 / 取诗：优先卡牌字段，缺省回退五行色 / quote
+  // 用与五行色不同的自定义色断言，确保真正覆盖 override 路径
+  //（历史上每张卡的 silhouetteColor 恰等于五行色，等值断言是假阳性）。
+  ok(silhouetteColor({ element: 'water', silhouetteColor: '#123456' }) === '#123456', 'silhouetteColor 读卡牌驼峰字段覆盖');
+  ok(silhouetteColor({ element: 'water', silhouette_color: '#654321' }) === '#654321', 'silhouetteColor 读卡牌蛇形字段覆盖');
   ok(silhouetteColor(CARD_MAP.SR001) === CARD_MAP.SR001.silhouetteColor, 'silhouetteColor 读卡牌字段');
   ok(silhouetteColor({ element: 'fire' }) === '#d4564f', 'silhouetteColor 缺省回退五行色');
   ok(poemOf(CARD_MAP.SR001) === '云鹤九霄外，仙踪不可寻', 'poemOf 取白鹤仙子诗词');

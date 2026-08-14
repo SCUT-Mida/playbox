@@ -263,9 +263,12 @@ export const CLASSES = [
 const CLASS_MAP = Object.fromEntries(CLASSES.map((c) => [c.id, c]));
 export function classDef(cls) { return CLASS_MAP[cls] || CLASSES[0]; }
 
-// 战场剪影用色（五行代表色），可被卡牌 silhouette_color 覆盖（设计稿增量 第六节）。
+// 战场剪影用色（五行代表色），可被卡牌自定义色覆盖（设计稿增量 第六节；兼容蛇形/驼峰两种字段名）。
 export function silhouetteColor(card) {
-  if (card && card.silhouette_color) return card.silhouette_color;
+  if (card) {
+    const custom = card.silhouette_color || card.silhouetteColor;
+    if (custom) return custom;
+  }
   const e = elDef(card && card.element);
   return e ? e.color : '#9a8a72';
 }

@@ -301,10 +301,18 @@
 .codex-scroll { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 10px; margin-top: 10px; }
 .codex-card { background: rgba(255,255,255,0.6); border: 1px solid var(--line); border-radius: 10px; padding: 10px 6px; text-align: center; }
 .codex-card.locked { filter: grayscale(1); opacity: 0.6; }
+.codex-card.clickable { cursor: pointer; }
+.codex-card.clickable:active { transform: scale(0.97); }
 .codex-card__art { width: 48px; height: 48px; margin: 0 auto 6px; border-radius: 50%; border: 2px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 22px; background: var(--paper-2); overflow: hidden; }
 .codex-card__art .char-art { width: 40px; }
 .codex-card__name { font-size: 12px; font-weight: bold; }
 .codex-card__sub { font-size: 10px; }
+
+/* —— 绘卷（形象预设 + AI 绘图提示词）—— */
+.art-spec { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.art-spec__row { display: flex; gap: 10px; align-items: baseline; }
+.art-spec__row .muted { flex: 0 0 3em; font-size: 12px; }
+.art-prompt { white-space: pre-wrap; word-break: break-word; font-size: 11px; line-height: 1.6; background: var(--paper-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 8px 0; max-height: 180px; overflow-y: auto; color: var(--ink); font-family: inherit; }
 
 /* —— 设置 —— */
 .save-code { width: 100%; height: 80px; font-size: 11px; border: 1px solid var(--line); border-radius: 8px; padding: 6px; resize: vertical; word-break: break-all; margin: 8px 0; }

@@ -14,6 +14,7 @@ import {
   EVOLUTION, STAMINA_MAX, STAMINA_PER_SWEEP, SWEEP_BATCH,
 } from '../config.js';
 import { CARDS, cardDef, cardEvolutionPath } from '../data/cards.js';
+import { artPreset, fullPrompt, artStyle, ART_SUFFIX, SD_TRANSLATE } from '../data/artPresets.js';
 import { BOSSES } from '../data/enemies.js';
 import {
   newPlayer, recompute, addRes, countRes, canAfford, spendRes,
@@ -441,16 +442,17 @@ export class GameUI {
     );
 
     // 底部页签
-    const tabs = ['cultivate', 'star', 'skill', 'affinity'].map((k) => h('button', {
+    const tabs = ['cultivate', 'star', 'skill', 'affinity', 'art'].map((k) => h('button', {
       class: `cult-tab ${this.detailTab === k ? 'active' : ''}`,
       onClick: () => { this.detailTab = k; this.refresh(); },
-    }, { cultivate: '修炼', star: '升星·道果', skill: '功法', affinity: '知音' }[k]));
+    }, { cultivate: '修炼', star: '升星·道果', skill: '功法', affinity: '知音', art: '绘卷' }[k]));
     const tabBar = h('div', { class: 'cult-tabs' }, ...tabs);
 
     let detail;
     if (this.detailTab === 'star') detail = this.detailStar(def, inst, r);
     else if (this.detailTab === 'skill') detail = this.detailSkill(def, inst);
     else if (this.detailTab === 'affinity') detail = this.detailAffinity(def, inst);
+    else if (this.detailTab === 'art') detail = this.detailArt(def);
     else detail = this.detailCultivate(def, inst);
 
     this.contentEl.append(picker, h('div', { class: 'cult-3d-wrap' }, stage, statsPanel), tabBar, detail);
@@ -638,6 +640,52 @@ export class GameUI {
       5: `${def.name}执手相看：「此生得一知己，足矣。」`,
     };
     return lines[al.tier] || lines[1];
+  }
+
+  // 绘卷子页（issue #97）：角色形象预设 + 可投喂的 AI 绘图提示词
+  detailArt(def) {
+    const preset = artPreset(def);
+    if (!preset) return h('div', { class: 'cult-detail' }, h('p', { class: 'muted' }, '此卡暂无绘卷设定。'));
+    const style = artStyle(def.rarity);
+    return h('div', { class: 'cult-detail' },
+      h('div', { class: 'panel' },
+        h('div', { class: 'panel__head' }, `绘卷 · ${style.name}`),
+        h('div', { class: 'panel__body' },
+          h('div', { class: 'art-spec' },
+            h('div', { class: 'art-spec__row' }, h('span', { class: 'muted' }, '形象'), h('span', null, preset.appearance)),
+            h('div', { class: 'art-spec__row' }, h('span', { class: 'muted' }, '色调'), h('span', null, preset.palette)),
+            h('div', { class: 'art-spec__row' }, h('span', { class: 'muted' }, '场景'), h('span', null, preset.scene)),
+            h('div', { class: 'art-spec__row' }, h('span', { class: 'muted' }, '画风'), h('span', null, style.prefixZh)),
+          ),
+        ),
+      ),
+      h('div', { class: 'panel' },
+        h('div', { class: 'panel__head' }, 'AI 绘图提示词（Midjourney / SD 通用）'),
+        h('div', { class: 'panel__body' },
+          h('pre', { class: 'art-prompt' }, fullPrompt(def)),
+          h('div', { class: 'row' },
+            h('button', { class: 'btn btn-ghost', onClick: () => { copyText(fullPrompt(def)); this.toast('绘图提示词已复制'); } }, '复制提示词'),
+            h('button', { class: 'btn btn-ghost', onClick: () => this.openSdPrompt(def) }, 'SD 版（含负面词）'),
+          ),
+          h('p', { class: 'muted' }, `统一参数：${ART_SUFFIX} · 每张跑 4~6 次择优；眼神 / 姿态不合意可加权 (looking down slightly:1.2)。`),
+        ),
+      ),
+    );
+  }
+  // SD 版弹窗：替换 MJ 参数为 SD 通用后缀，并附负面词
+  openSdPrompt(def) {
+    const sd = fullPrompt(def).replace(ART_SUFFIX, SD_TRANSLATE.replace.trim());
+    this.openModal('Stable Diffusion 版提示词', h('div', { class: 'pad' },
+      h('p', { class: 'muted' }, '正向提示词：'),
+      h('pre', { class: 'art-prompt' }, sd),
+      h('p', { class: 'muted' }, '负面提示词（Negative Prompt）：'),
+      h('pre', { class: 'art-prompt' }, SD_TRANSLATE.negative),
+    ), {
+      foot: [
+        h('button', { class: 'btn btn-ghost', onClick: () => { copyText(sd); this.toast('SD 正向提示词已复制'); } }, '复制正向'),
+        h('button', { class: 'btn btn-primary', onClick: () => this.closeModal() }, '关闭'),
+      ],
+    });
   }
 
   doFeedPill(inst, pillId) {
@@ -837,7 +885,10 @@ export class GameUI {
       }),
       h('div', { class: 'codex-scroll' }, ...CARDS.map((c) => {
         const got = !!p.codex[c.id];
-        return h('div', { class: `codex-card ${got ? '' : 'locked'}` },
+        return h('div', {
+          class: `codex-card ${got ? 'clickable' : 'locked'}`,
+          onClick: got ? () => this.openCodexArt(c) : null,
+        },
           h('div', { class: 'codex-card__art', style: { borderColor: rarityDef(c.rarity).color } },
             got ? charBust(c) : '？'),
           h('div', { class: 'codex-card__name' }, got ? c.name : '???'),
@@ -845,6 +896,14 @@ export class GameUI {
         );
       })),
     );
+  }
+
+  // 图鉴卡点击 → 绘卷详情（形象预设 + AI 绘图提示词，issue #97）
+  openCodexArt(c) {
+    this.openModal(`绘卷 · ${c.name}`, h('div', { class: 'pad' },
+      h('p', { class: 'muted center' }, `${rarityDef(c.rarity).name} · ${elName(c.element)}系${c.cls}`),
+      this.detailArt(c),
+    ));
   }
 
   // ============ 设置 ============

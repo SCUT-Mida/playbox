@@ -105,6 +105,8 @@ export class BattleScene {
     const hpBar = bar(data.hp, data.maxHp, { class: 'bs-hp', color: side === 'player' ? '' : '#d4564f' });
     // 我方真实卡牌 → 皮影剪影 + 属性光晕（设计稿增量 第六节）；敌方仍用五行 emoji 头像。
     const playerCard = side === 'player' && data.ref ? cardDef(data.ref) : null;
+    // 战斗事件只携带卡牌 id（data.ref），拿不到 instance，故光环用卡牌基础稀有度
+    // playerCard.rarity；进化升档后的 effectiveRarity 光环可能与卡面不一致，属已知取舍。
     const art = h('div', { class: 'bs-unit__art', style: { background: hexA(EL_COLOR[data.element], 0.16) } },
       playerCard ? renderSilhouette(playerCard, playerCard.rarity) : (elEmoji(data.element) || '✦'));
     const el = h('div', {

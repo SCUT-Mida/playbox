@@ -44,6 +44,7 @@ export class Portrait3D {
     this._bursts = [];
     this._timers = [];
     this._immersive = null;
+    this._immersiveBackdrop = null;
     this._holdTimer = null;
   }
 
@@ -308,7 +309,11 @@ export class Portrait3D {
       if (cloneStream && cloneStream.destroy) cloneStream.destroy();
       cloneStream = null;
       backdrop.classList.remove('show');
-      const t = setTimeout(() => { if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop); this._immersive = null; }, 260);
+      const t = setTimeout(() => {
+        if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+        this._immersive = null;
+        this._immersiveBackdrop = null;
+      }, 260);
       this._timers.push(t);
       backdrop.removeEventListener('click', close);
       doc.removeEventListener('keydown', onKey);
@@ -317,6 +322,8 @@ export class Portrait3D {
     backdrop.addEventListener('click', close);
     doc.addEventListener('keydown', onKey);
     this._immersive = { close };
+    // 供 destroy() 在清空 _timers 前同步摘除 backdrop（见 destroy 注释）。
+    this._immersiveBackdrop = backdrop;
   }
 
   // —— 养成成功特效（升级 / 突破 / 升星 / 进化）——
@@ -356,6 +363,13 @@ export class Portrait3D {
     // 先关闭沉浸预览（close 可能再 push 一个收尾 timer），随后统一清理。
     if (this._immersive && this._immersive.close) this._immersive.close();
     this._immersive = null;
+    // close() 依赖「260ms 后移除 backdrop」的 timer，而该 timer 会在下方被
+    // clearTimeout 一并清掉（destroy 与沉浸预览关闭 / 重渲染竞态时）；
+    // 这里同步摘除 backdrop，避免透明遮罩残留 body 中锁死整页输入。
+    if (this._immersiveBackdrop) {
+      if (this._immersiveBackdrop.parentNode) this._immersiveBackdrop.parentNode.removeChild(this._immersiveBackdrop);
+      this._immersiveBackdrop = null;
+    }
     if (this._anim && this._anim.destroy) this._anim.destroy();
     if (this._stream && this._stream.destroy) this._stream.destroy();
     for (const b of this._bursts) if (b && b.destroy) b.destroy();

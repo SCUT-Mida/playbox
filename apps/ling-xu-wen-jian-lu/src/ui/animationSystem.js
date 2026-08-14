@@ -26,12 +26,14 @@ export function attachAnimations(cardEl, card, rarity, opts = {}) {
   const timers = [];
 
   // 眨眼：仅 SR/SSR 启用（interval > 0）；周期性给眼睛加 .blink（合眼 ~150ms）。
+  // 合眼收尾句柄复用单个变量而非 push 进数组，避免长会话下数组无界增长。
+  let blinkOff = null;
   if (eyes && interval > 0) {
     const id = setInterval(() => {
       if (!eyes.parentNode) return;
       eyes.classList.add('blink');
-      const t = setTimeout(() => eyes.classList.remove('blink'), 150);
-      timers.push(t);
+      if (blinkOff) clearTimeout(blinkOff);
+      blinkOff = setTimeout(() => eyes.classList.remove('blink'), 150);
     }, interval);
     timers.push(id);
   }
@@ -39,6 +41,9 @@ export function attachAnimations(cardEl, card, rarity, opts = {}) {
   return {
     // 悬停 / 失焦时由 portrait3D 调用，整体加快飘动（CSS 据 .is-hover 缩短动画时长）。
     setHover(on) { cardEl.classList.toggle('is-hover', !!on); },
-    destroy() { for (const t of timers) { clearTimeout(t); clearInterval(t); } },
+    destroy() {
+      if (blinkOff) clearTimeout(blinkOff);
+      for (const t of timers) { clearTimeout(t); clearInterval(t); }
+    },
   };
 }

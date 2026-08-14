@@ -45,6 +45,7 @@ import {
 import { makeRng } from '../core/rng.js';
 import { BattleScene } from './battle-scene.js';
 import { Portrait3D } from './portrait3D.js';
+import { charBust } from './charArt.js';
 
 const TABS = [
   { key: 'lineup', icon: '⚔️', label: '阵容' },
@@ -378,6 +379,7 @@ export class GameUI {
       const def = cardDef(r.cardId);
       const c = rarityDef(r.rarity).color;
       return h('div', { class: `gacha-card rarity-${r.rarity}`, style: { borderColor: c } },
+        def ? h('div', { class: 'gacha-card__art' }, charBust(def)) : null,
         h('div', { class: 'gacha-card__name', style: { color: c } }, def ? def.name : r.cardId),
         h('div', { class: 'gacha-card__sub' }, `${r.rarity} · ${def ? elName(def.element) : ''}${def ? def.cls : ''}`),
         r.isNew ? h('span', { class: 'tag tag-new' }, 'NEW') : (r.frag ? h('span', { class: 'tag tag-dup' }, `+${r.frag}碎片`) : null),
@@ -837,7 +839,7 @@ export class GameUI {
         const got = !!p.codex[c.id];
         return h('div', { class: `codex-card ${got ? '' : 'locked'}` },
           h('div', { class: 'codex-card__art', style: { borderColor: rarityDef(c.rarity).color } },
-            got ? elEmoji(c.element) : '？'),
+            got ? charBust(c) : '？'),
           h('div', { class: 'codex-card__name' }, got ? c.name : '???'),
           got ? h('div', { class: 'codex-card__sub', style: { color: rarityDef(c.rarity).color } }, `${c.rarity} · ${elName(c.element)}${c.cls}`) : null,
         );
@@ -944,6 +946,8 @@ export class GameUI {
         h('span', { class: 'mini-card__el' }, elEmoji(def.element)),
         h('span', { class: 'mini-card__star', style: { color: r.color } }, `${def.rarity}${'★'.repeat(instance.star)}`),
       ),
+      // 人物胸像（预制矢量素材，替代旧 emoji 头像，与修炼页立绘同源）
+      h('div', { class: 'mini-card__art' }, charBust(def)),
       h('div', { class: 'mini-card__name' }, def.name),
       h('div', { class: 'mini-card__sub' }, `Lv.${instance.level} · 战力${instancePower(instance)}`),
       h('div', { class: 'mini-card__stats' },

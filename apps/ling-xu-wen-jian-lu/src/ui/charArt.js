@@ -521,6 +521,8 @@ const CHAR_SPECS = {
   // 蚩尤残魂：牛角盔碎暗金魔甲，持巨斧（赤雷缠绕），红眼狂发，面部图腾纹。
   SSR001: {
     base: 'body', face: FACE_FIERCE, hairColor: '#26201c',
+    // 巨斧战神不佩盾：显式去掉躯体默认的负后圆盾（同 R005 石拳套力士）。
+    weaponBack: '',
     weapon: `
     <g class="ca-weapon">
       <g class="ca-axe">

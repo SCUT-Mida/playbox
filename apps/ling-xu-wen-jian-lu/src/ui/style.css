@@ -666,6 +666,8 @@
 .char-art .ca-leaf { fill: #6f9e5a; }
 /* 金戈锐士：金刃 + 兽吞肩甲 */
 .char-art .ca-blade-gold { fill: #e8c765; stroke: #b8933d; stroke-width: 1; }
+/* 赤霄剑尊：赤红巨剑（火焰缠绕） */
+.char-art .ca-blade-fire { fill: #c23b22; stroke: #8a2a1e; stroke-width: 1; }
 .char-art .ca-pauldron { fill: var(--sil-l); stroke: var(--sil-d); stroke-width: 1.4; }
 /* 玄龟甲士：铁锤 + 龟甲纹胸甲 */
 .char-art .ca-hammer-head { fill: #8d9299; stroke: #5c6167; stroke-width: 1; }

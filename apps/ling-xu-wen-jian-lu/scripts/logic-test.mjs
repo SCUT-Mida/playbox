@@ -7,6 +7,7 @@ import {
   clamp, dayKey, initiative, POS_AGGRO, CAVE_CAP_HOURS,
 } from '../src/config.js';
 import { CARDS, CARD_MAP, cardDef } from '../src/data/cards.js';
+import { ART_PRESETS, artPreset, fullPrompt, artStyle, ART_SUFFIX, SD_TRANSLATE } from '../src/data/artPresets.js';
 import { BOSSES, makeEnemy, makeBoss, makeEnemyFormation, makeBossPower } from '../src/data/enemies.js';
 import {
   newPlayer, recompute, addRes, countRes, canAfford, spendRes,
@@ -92,6 +93,19 @@ ok(CARDS.every((c) => ['metal', 'wood', 'water', 'fire', 'earth'].includes(c.ele
 ok(CARDS.every((c) => typeof c.story === 'string' && c.story.length > 0), '每张卡有故事');
 // SSR 必有被动
 ok(CARDS.filter((c) => c.rarity === 'SSR').every((c) => c.passives.length >= 2), 'SSR 至少 2 个被动');
+
+// ---------- 人物角色美术预设（issue #97）----------
+console.log('— art presets —');
+ok(CARDS.every((c) => artPreset(c.id) !== null), '15 张卡全部有美术预设');
+ok(CARDS.every((c) => { const p = artPreset(c); return typeof p.appearance === 'string' && p.appearance.length >= 8; }), '每张卡有形象释义 appearance');
+ok(CARDS.every((c) => { const p = artPreset(c); return typeof p.palette === 'string' && p.palette.length > 0 && typeof p.scene === 'string' && p.scene.length > 0; }), '每张卡有色调 palette 与场景 scene');
+ok(CARDS.every((c) => /^Half-body portrait|^Epic half-body portrait|^Ethereal half-body portrait/.test(artPreset(c).promptEn)), '英文提示词均为半身肖像句式');
+ok(CARDS.every((c) => fullPrompt(c.id).endsWith(ART_SUFFIX)), 'fullPrompt 统一携带 MJ 参数后缀');
+ok(fullPrompt('SSR001').startsWith(artPreset('SSR001').promptEn), 'fullPrompt = 提示词 + 后缀');
+ok(fullPrompt('NOPE') === '' && artPreset('NOPE') === null, '未知卡回退空值');
+ok(artStyle('R').prefixZh.includes('墨线白描') && artStyle('SR').prefixZh.includes('工笔重彩') && artStyle('SSR').prefixZh.includes('泼墨泼彩'), '三档画风前缀齐备');
+ok(SD_TRANSLATE.negative.includes('bad anatomy'), 'SD 负面词模板齐备');
+ok(new Set(Object.keys(ART_PRESETS)).size === 15, '预设键无重复且共 15 条');
 
 // ---------- 玩家 / 资源 ----------
 console.log('— player / resources —');

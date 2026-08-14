@@ -10,6 +10,7 @@
 import { h, clear, bar } from './dom.js';
 import { elEmoji, resName, resEmoji } from '../config.js';
 import { cardDef } from '../data/cards.js';
+import { renderSilhouette } from './silhouetteRenderer.js';
 
 const EL_COLOR = { metal: '#c8a951', wood: '#5fa85f', water: '#4a90c2', fire: '#d4564f', earth: '#a17b4a', none: '#9a8a72' };
 
@@ -102,12 +103,16 @@ export class BattleScene {
     }
     const floatLayer = h('div', { class: 'bs-unit__float' });
     const hpBar = bar(data.hp, data.maxHp, { class: 'bs-hp', color: side === 'player' ? '' : '#d4564f' });
+    // 我方真实卡牌 → 皮影剪影 + 属性光晕（设计稿增量 第六节）；敌方仍用五行 emoji 头像。
+    const playerCard = side === 'player' && data.ref ? cardDef(data.ref) : null;
+    const art = h('div', { class: 'bs-unit__art', style: { background: hexA(EL_COLOR[data.element], 0.16) } },
+      playerCard ? renderSilhouette(playerCard, playerCard.rarity) : (elEmoji(data.element) || '✦'));
     const el = h('div', {
       class: `bs-unit bs-unit--${side} ${data.isBoss ? 'bs-unit--boss' : ''}`,
       dataset: { side, pos: String(pos) },
       style: { borderColor: EL_COLOR[data.element] || '#9a8a72' },
     },
-      h('div', { class: 'bs-unit__art', style: { background: hexA(EL_COLOR[data.element], 0.16) } }, elEmoji(data.element) || '✦'),
+      art,
       h('div', { class: 'bs-unit__name' }, data.name),
       hpBar,
       floatLayer,

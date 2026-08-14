@@ -554,3 +554,231 @@
 .sweep-batch-btns { display: flex; gap: 8px; margin-top: 8px; }
 .stamina-chip { display: inline-flex; align-items: center; gap: 4px; background: rgba(74,144,194,0.14); border: 1px solid rgba(74,144,194,0.4); border-radius: 12px; padding: 2px 8px; font-size: 12px; }
 
+/* ============================================================================
+   角色人物视觉系统（设计稿增量 第一~六节）
+   —— 2.5D 三叠层视差立绘 + 稀有度差异 + 职业剪影 + 交互反馈
+   ============================================================================ */
+/* —— 三叠层容器 —— */
+.portrait__card { position: relative; transition: transform .12s ease; }
+.portrait__bg, .portrait__char, .portrait__fx {
+  position: absolute; inset: 0; pointer-events: none; border-radius: 14px;
+}
+.portrait__bg { z-index: 0; overflow: hidden; transition: transform .25s ease; }
+.portrait__char { z-index: 1; display: flex; align-items: flex-end; justify-content: center; transition: transform .18s ease; }
+.portrait__fx { z-index: 2; overflow: hidden; transition: transform .12s ease; }
+.portrait__card.breakframe { overflow: visible; }
+.portrait__card.breakframe .portrait__char { overflow: visible; }
+
+/* —— 意境背景（水墨山水 / 门派洞府，低饱和度）—— */
+.portrait__bg.scene-metal { background: radial-gradient(circle at 30% 20%, #e9e2cf, #cfc6ad 70%, #b6aa8c); }
+.portrait__bg.scene-wood  { background: radial-gradient(circle at 30% 25%, #d7e6cf, #b6cda6 70%, #8fae7c); }
+.portrait__bg.scene-water { background: radial-gradient(circle at 35% 20%, #d4e2ee, #aecbe2 70%, #82a6c4); }
+.portrait__bg.scene-fire  { background: radial-gradient(circle at 35% 25%, #f0d6cf, #e2a59a 70%, #c66f5f); }
+.portrait__bg.scene-earth { background: radial-gradient(circle at 30% 25%, #e4d8c4, #cbb38e 70%, #a08254); }
+.portrait__bg::after {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle at 50% 62%, transparent 38%, rgba(44,24,16,0.30));
+}
+/* R 卡：纯色宣纸底纹，无具体场景（设计稿增量 二·2.1）*/
+.portrait__card.inkline .portrait__bg { background: var(--paper); }
+.portrait__card.inkline .portrait__bg::after { background: radial-gradient(circle at 50% 60%, transparent 55%, rgba(44,24,16,0.10)); }
+
+/* —— 角色本体·程序化立绘（头 / 袍服 / 武器 / 飘动部件）—— */
+.portrait__doll { position: absolute; left: 21%; bottom: 14%; width: 58%; }
+.portrait__card.dyn-0 .portrait__doll { height: 50%; }   /* R 占卡面 50% */
+.portrait__card.dyn-1 .portrait__doll { height: 64%; }   /* SR 65% */
+.portrait__card.dyn-2 .portrait__doll { height: 74%; }   /* SSR 75% */
+
+.pc__robe {
+  position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 80%; height: 62%; z-index: 1;
+  background: linear-gradient(180deg, var(--sil-l), var(--sil) 55%, var(--sil-d));
+  clip-path: polygon(38% 0, 62% 0, 78% 100%, 22% 100%);
+  box-shadow: inset 0 -6px 10px rgba(0,0,0,0.25);
+}
+/* 五大职业袍服剪影（姿态识别，设计稿增量 三）*/
+.cls-sword .pc__robe    { clip-path: polygon(42% 0, 58% 0, 64% 100%, 36% 100%); }
+.cls-body .pc__robe     { clip-path: polygon(26% 0, 74% 0, 88% 100%, 12% 100%); }
+.cls-alchemy .pc__robe  { clip-path: polygon(34% 0, 66% 0, 96% 100%, 4% 100%); }
+.cls-array .pc__robe    { clip-path: polygon(30% 4%, 70% 4%, 82% 42%, 96% 100%, 4% 100%, 18% 42%); }
+.cls-talisman .pc__robe { clip-path: polygon(34% 0, 66% 0, 80% 100%, 20% 100%); }
+/* R 卡墨线白描：袍服改为淡墨晕染（设计稿增量 二·2.1）*/
+.portrait__card.inkline .pc__robe { background: rgba(44,24,16,0.22); box-shadow: inset 0 0 0 2px rgba(44,24,16,0.35); }
+
+.pc__head {
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 42%; aspect-ratio: 1; border-radius: 50%; z-index: 2;
+  background: linear-gradient(160deg, #f3e7d6, #e3cdb4);
+  box-shadow: inset -2px -2px 4px rgba(0,0,0,0.15);
+}
+.portrait__card.inkline .pc__head { background: var(--paper); box-shadow: inset 0 0 0 2px rgba(44,24,16,0.4); }
+.pc__hair {
+  position: absolute; top: -10%; left: 15%; width: 70%; height: 76%;
+  border-radius: 50% 50% 40% 40%; z-index: 0; transform-origin: 50% 0;
+  background: linear-gradient(180deg, var(--sil-d), var(--sil));
+}
+.portrait__eyes { position: absolute; top: 46%; left: 50%; transform: translate(-50%,-50%); display: flex; gap: 5px; }
+.portrait__eyes i { width: 4px; height: 5px; background: var(--ink); border-radius: 50%; transition: height .08s ease; }
+.portrait__eyes.blink i { height: 1px; }
+.portrait__eyes.smile i { height: 3px; border-radius: 3px 3px 0 0; } /* 满好感·微笑（设计稿 四）*/
+
+.pc__weapon {
+  position: absolute; z-index: 3; font-size: 22px; line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
+}
+.cls-sword .pc__weapon    { right: -2%; top: 30%; transform: rotate(22deg); }
+.cls-body .pc__weapon     { left: 50%; bottom: -6%; transform: translateX(-50%); font-size: 20px; }
+.cls-alchemy .pc__weapon  { left: 50%; bottom: -10%; transform: translateX(-50%); font-size: 20px; }
+.cls-array .pc__weapon    { left: 50%; top: 40%; transform: translate(-50%,-50%); font-size: 26px; opacity: .82; z-index: 0; }
+.cls-talisman .pc__weapon { left: 50%; top: 56%; transform: translate(-50%,-50%) rotate(-8deg); font-size: 20px; }
+
+/* 飘动部件（衣袂 / 飘带 / 双袖，仅 SR/SSR 渲染）*/
+.pc__part { position: absolute; transform-origin: 50% 0; z-index: 2; }
+.part-ribbon { right: 6%; top: 20%; width: 11%; height: 52%; border-radius: 0 0 45% 45%; opacity: .85; background: linear-gradient(180deg, var(--sil-l), var(--sil)); }
+.part-arm_L { left: 3%; top: 36%; width: 17%; height: 32%; background: linear-gradient(180deg, var(--sil), var(--sil-d)); clip-path: polygon(40% 0, 100% 0, 78% 100%, 0 100%); }
+.part-arm_R { right: 3%; top: 36%; width: 17%; height: 32%; background: linear-gradient(180deg, var(--sil), var(--sil-d)); clip-path: polygon(0 0, 60% 0, 100% 100%, 22% 100%); }
+
+/* —— 动态系统：R 呼吸 / SR 局部飘动 / SSR 全动态（设计稿增量 二）—— */
+@keyframes pc-breath { 0%,100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+@keyframes pc-sway   { 0%,100% { transform: rotate(-5deg); } 50% { transform: rotate(6deg); } }
+@keyframes pc-sway-r { 0%,100% { transform: rotate(6deg); } 50% { transform: rotate(-7deg); } }
+.portrait__card.dyn-0 .portrait__doll { animation: pc-breath 4s ease-in-out infinite; }
+.portrait__card.dyn-1 .pc__hair    { animation: pc-sway   3.6s ease-in-out infinite; }
+.portrait__card.dyn-1 .part-ribbon { animation: pc-sway-r 4s   ease-in-out infinite; }
+.portrait__card.dyn-1 .part-arm_L  { animation: pc-sway   4.4s ease-in-out infinite; }
+.portrait__card.dyn-1 .part-arm_R  { animation: pc-sway-r 4.2s ease-in-out infinite; }
+.portrait__card.dyn-2 .pc__hair    { animation: pc-sway   2.4s ease-in-out infinite; }
+.portrait__card.dyn-2 .part-ribbon { animation: pc-sway-r 2.6s ease-in-out infinite; }
+.portrait__card.dyn-2 .part-arm_L  { animation: pc-sway   3s   ease-in-out infinite; }
+.portrait__card.dyn-2 .part-arm_R  { animation: pc-sway-r 2.8s ease-in-out infinite; }
+/* SSR 流光循环扫过全卡（设计稿增量 二·2.3 七彩流光）*/
+.portrait__card.dyn-2 .portrait__fx::after {
+  content: ''; position: absolute; inset: -40% -10%; pointer-events: none;
+  background: linear-gradient(115deg, transparent 35%, rgba(255,255,255,0.22) 50%, transparent 65%);
+  animation: portrait-shine 3.4s ease-in-out infinite;
+}
+@keyframes portrait-shine { 0% { transform: translateX(-60%); } 60%,100% { transform: translateX(60%); } }
+/* 悬停：飘动加速（设计稿增量 四·悬停预览）*/
+.portrait__card.is-hover .pc__hair,
+.portrait__card.is-hover .part-ribbon,
+.portrait__card.is-hover .part-arm_L,
+.portrait__card.is-hover .part-arm_R { animation-duration: 1.1s !important; }
+.portrait__card.is-hover .pc__head { transform: translateX(-50%) rotateY(8deg); transition: transform .2s ease; }
+
+/* —— 朱砂印章（R/SR 左下；SSR 右上金字，设计稿增量 二）—— */
+.portrait__seal {
+  position: absolute; z-index: 4; font-size: 9px; letter-spacing: 1px; font-weight: bold;
+  padding: 3px 6px; border-radius: 3px; color: var(--paper);
+  background: var(--red); box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.portrait__seal.pos-bl { left: 8px; bottom: 8px; }
+.portrait__seal.pos-tr { right: 8px; top: 8px; color: var(--ink); background: linear-gradient(135deg, var(--gold), #b8862f); }
+
+/* —— 交互反馈（设计稿增量 四）—— */
+.portrait__ripple {
+  position: absolute; left: 50%; top: 50%; width: 0; height: 0; border: 2px solid rgba(255,255,255,0.5);
+  border-radius: 50%; transform: translate(-50%,-50%); animation: portrait-ripple .9s ease-out forwards;
+}
+@keyframes portrait-ripple { to { width: 150%; height: 150%; opacity: 0; } }
+.portrait__card.is-strike { animation: portrait-strike .6s ease; }
+@keyframes portrait-strike {
+  0%,100% { box-shadow: 0 14px 30px rgba(0,0,0,0.3); }
+  30% { box-shadow: 0 0 0 3px var(--gold), 0 0 22px 6px rgba(212,160,74,0.8); }
+}
+.portrait__poem {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); white-space: nowrap;
+  font-size: 11px; letter-spacing: 1px; color: var(--paper); z-index: 5;
+  background: rgba(44,24,16,0.72); padding: 3px 9px; border-radius: 10px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5); animation: portrait-poem 2.6s ease forwards;
+}
+@keyframes portrait-poem {
+  0% { opacity: 0; transform: translate(-50%, 8px); }
+  15% { opacity: 1; transform: translate(-50%, 0); }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+/* 升级 / 突破成功：金色光柱 + 微震（celebrate）*/
+.portrait__beam {
+  position: absolute; left: 50%; bottom: 0; width: 70%; height: 100%; z-index: 4; pointer-events: none;
+  transform-origin: bottom; mix-blend-mode: screen;
+  background: linear-gradient(0deg, rgba(212,160,74,0.7), rgba(212,160,74,0));
+  animation: portrait-beam .9s ease-out forwards;
+}
+@keyframes portrait-beam { 0% { opacity: 0; transform: translateX(-50%) scaleY(0); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) scaleY(1); } }
+.portrait__card.is-shake { animation: portrait-shake .34s ease; }
+@keyframes portrait-shake {
+  0%,100% { transform: rotateX(12deg) rotateY(16deg); }
+  20% { transform: rotateX(12deg) rotateY(16deg) translate(-2px, 1px); }
+  40% { transform: rotateX(12deg) rotateY(16deg) translate(2px, -1px); }
+  60% { transform: rotateX(12deg) rotateY(16deg) translate(-1px, 1px); }
+  80% { transform: rotateX(12deg) rotateY(16deg) translate(1px, 0); }
+}
+
+/* SSR 水墨粒子画布 + 一次性冲天墨粒爆裂 */
+.portrait__stream, .portrait__burst { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.portrait__stream { mix-blend-mode: screen; opacity: .9; }
+
+/* —— 满好感：柔光 + 粉色花瓣环绕（设计稿增量 四）—— */
+.portrait__card.is-affinity { box-shadow: 0 0 16px 3px rgba(255,180,200,0.55), 0 14px 30px rgba(0,0,0,0.3); }
+.portrait__fx.is-affinity::before, .portrait__fx.is-affinity::after {
+  content: '🌸'; position: absolute; font-size: 12px; left: 28%; top: -10%; opacity: 0;
+  animation: petal-fall 5s linear infinite;
+}
+.portrait__fx.is-affinity::after { left: 62%; animation-delay: -2.5s; }
+@keyframes petal-fall {
+  0% { top: -10%; opacity: 0; }
+  15% { opacity: .9; }
+  100% { top: 110%; opacity: 0; transform: rotate(360deg) translateX(8px); }
+}
+
+/* —— 长按·全屏沉浸预览（设计稿增量 四·长按详情）—— */
+.portrait__immersive {
+  position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 14px;
+  background: rgba(0,0,0,0); transition: background .26s ease;
+}
+.portrait__immersive.show { background: rgba(20,12,6,0.6); }
+.portrait__immersive-tip { color: var(--paper); font-size: 12px; opacity: 0; transition: opacity .26s ease .1s; }
+.portrait__immersive.show .portrait__immersive-tip { opacity: .85; }
+.portrait__immersive-stage { transform: scale(.6); opacity: 0; transition: transform .3s cubic-bezier(.2,.8,.3,1.2), opacity .26s ease; }
+.portrait__immersive.show .portrait__immersive-stage { transform: scale(1.15); opacity: 1; }
+.portrait__immersive-stage .cult-3d__card { width: 200px !important; height: 280px !important; transform: rotateX(6deg) rotateY(0deg) !important; }
+.portrait__immersive-stage .pc__weapon { font-size: 34px; }
+
+/* ============================================================================
+   战场剪影·皮影模式（设计稿增量 第六节）
+   ============================================================================ */
+.silu { position: relative; width: 100%; height: 100%; }
+.silu__body {
+  position: absolute; left: 50%; bottom: 10%; transform: translateX(-50%);
+  width: 60%; height: 62%;
+  background: linear-gradient(180deg, var(--sil-l), var(--sil) 60%, var(--sil-d));
+  clip-path: polygon(40% 0, 60% 0, 72% 100%, 28% 100%);
+}
+.silu__head {
+  position: absolute; left: 50%; top: 8%; transform: translateX(-50%);
+  width: 40%; aspect-ratio: 1; border-radius: 50%;
+  background: linear-gradient(160deg, var(--sil-l), var(--sil));
+}
+.silu__weapon { position: absolute; left: 50%; top: 42%; transform: translate(-50%,-50%); font-size: 13px; filter: drop-shadow(0 1px 1px rgba(0,0,0,.4)); }
+.silu__el { position: absolute; right: -1px; top: -1px; font-size: 9px; opacity: .85; }
+.silu__aura {
+  position: absolute; left: 50%; bottom: -2%; transform: translateX(-50%);
+  width: 82%; height: 12%; border-radius: 50%; border: 2px solid var(--sil);
+  opacity: .55; animation: silu-aura 4s linear infinite;
+}
+@keyframes silu-aura { from { transform: translateX(-50%) rotate(0); } to { transform: translateX(-50%) rotate(360deg); } }
+/* 各职业剪影差异 */
+.silu--sword .silu__body    { clip-path: polygon(44% 0, 56% 0, 62% 100%, 38% 100%); }
+.silu--body .silu__body     { clip-path: polygon(28% 0, 72% 0, 86% 100%, 14% 100%); }
+.silu--alchemy .silu__body  { clip-path: polygon(34% 0, 66% 0, 94% 100%, 6% 100%); }
+.silu--array .silu__body    { clip-path: polygon(30% 6%, 70% 6%, 82% 44%, 96% 100%, 4% 100%, 18% 44%); }
+.silu--talisman .silu__body { clip-path: polygon(34% 0, 66% 0, 80% 100%, 20% 100%); }
+/* 稀有度光环：青玉 / 紫金 / 彩凰 */
+.silu .aura-R   { border-color: var(--sil); }
+.silu .aura-SR  { border-color: var(--r-SR); box-shadow: 0 0 6px var(--r-SR); }
+.silu .aura-SSR { border-color: var(--gold); box-shadow: 0 0 8px var(--gold); opacity: .75; }
+/* 战场态：出手选中 → 剪影还原为淡彩实体（设计稿 六·选中高亮）*/
+.bs-unit.acting .silu__body, .bs-unit.acting .silu__head { filter: saturate(1.25) brightness(1.1); }
+.bs-unit.acting .silu__body { box-shadow: 0 0 8px rgba(212,160,74,.7); }
+

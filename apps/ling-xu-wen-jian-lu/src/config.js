@@ -250,6 +250,72 @@ export const BREAK_STONE = { metal: 'break_metal', wood: 'break_wood', water: 'b
 // 五行 → 五行精华 id（化凡入圣用）
 export const ESSENCE_STONE = { metal: 'essence_metal', wood: 'essence_wood', water: 'essence_water', fire: 'essence_fire', earth: 'essence_earth' };
 
+// ── 五大职业剪影（设计稿增量 第三节）──────────────────────────────────────────
+// 仅凭「姿态 + 武器 + 服饰轮廓」即可判断职业，缩略图也能一眼识别。
+// key：拉丁标识（用于 CSS 选择器）；weapon：核心武器 emoji；sway：可飘动部件。
+export const CLASSES = [
+  { id: '剑修', key: 'sword',    name: '剑修', weapon: '⚔️', pose: '侧身执剑', garment: '窄袖劲装·披风', color: '#c8a951', sway: ['hair', 'ribbon'] },
+  { id: '体修', key: 'body',     name: '体修', weapon: '🛡️', pose: '正面双臂微张', garment: '短打·护心镜', color: '#a17b4a', sway: ['arm_R'] },
+  { id: '丹修', key: 'alchemy',  name: '丹修', weapon: '⚗️', pose: '单手托炉', garment: '宽袍大袖·飘带', color: '#5fa85f', sway: ['ribbon', 'arm_L'] },
+  { id: '阵修', key: 'array',    name: '阵修', weapon: '🌀', pose: '双手结印', garment: '道冠·法衣', color: '#9B6BCC', sway: ['hair', 'ribbon'] },
+  { id: '符修', key: 'talisman', name: '符修', weapon: '📜', pose: '持符点指', garment: '鹤氅·符袋', color: '#C23B22', sway: ['ribbon', 'arm_R'] },
+];
+const CLASS_MAP = Object.fromEntries(CLASSES.map((c) => [c.id, c]));
+export function classDef(cls) { return CLASS_MAP[cls] || CLASSES[0]; }
+
+// 战场剪影用色（五行代表色），可被卡牌 silhouette_color 覆盖（设计稿增量 第六节）。
+export function silhouetteColor(card) {
+  if (card && card.silhouette_color) return card.silhouette_color;
+  const e = elDef(card && card.element);
+  return e ? e.color : '#9a8a72';
+}
+
+// 点击浮现的专属诗词（设计稿增量 第四节·点击选中）：缺省回退到角色 quote。
+export function poemOf(card) {
+  if (!card) return '';
+  return card.poem || card.quote || '';
+}
+
+// ── 稀有度人物美术规格（设计稿增量 第二节）──────────────────────────────────────
+// dynamic：动态层级（0 静态呼吸 / 1 局部飘动 / 2 全动态粒子）；
+// seal：左下角朱砂印章名；particles：是否启用 SSR 水墨粒子背景；breakFrame：破框特效。
+export const RARITY_PORTRAIT = {
+  R:   { dynamic: 0, seal: '逸品·青玉', inkline: true,  particles: false, breakFrame: false },
+  SR:  { dynamic: 1, seal: '绝品·紫金', inkline: false, particles: false, breakFrame: false },
+  SSR: { dynamic: 2, seal: '至品·彩凰', inkline: false, particles: true,  breakFrame: true },
+};
+export function rarityPortrait(rarity) { return RARITY_PORTRAIT[rarity] || RARITY_PORTRAIT.R; }
+
+// PSD 分层命名（body/head/hair/arm_L/arm_R/weapon/accessory）按卡牌 id 约定导出，
+// 供 CSS 分体动画逐层操控（设计稿增量 第五节）。无实图时由 portrait3D.js 程序化绘制。
+export function portraitLayers(card) {
+  const id = (card && card.id) || '';
+  const base = `assets/portraits/${id}`;
+  return {
+    bg: `${base}_bg.webp`,
+    body: `${base}_body.png`,
+    head: `${base}_head.png`,
+    hair: `${base}_hair.png`,
+    arm_L: `${base}_armL.png`,
+    arm_R: `${base}_armR.png`,
+    weapon: `${base}_weapon.png`,
+    accessory: `${base}_accessory.png`,
+  };
+}
+// 角色立绘动画配置：飘动部件取自职业，眨眼间隔随稀有度递减（越稀有越灵动）。
+export function portraitConfig(card, rarity) {
+  const cls = classDef(card && card.cls);
+  const rp = rarityPortrait(rarity || (card && card.rarity));
+  return {
+    layers: portraitLayers(card),
+    animations: {
+      sway_parts: cls.sway.slice(),
+      blink_interval: rp.dynamic >= 2 ? 5000 : rp.dynamic >= 1 ? 6000 : 0,
+      dynamic: rp.dynamic,
+    },
+  };
+}
+
 // ── 起始资源（新档）─────────────────────────────────────────────────────────────
 export const START_RESOURCES = {
   lingshi: 3000,

@@ -44,6 +44,7 @@ import {
 } from '../core/save.js';
 import { makeRng } from '../core/rng.js';
 import { BattleScene } from './battle-scene.js';
+import { Portrait3D } from './portrait3D.js';
 
 const TABS = [
   { key: 'lineup', icon: '⚔️', label: '阵容' },
@@ -88,6 +89,7 @@ export class GameUI {
 
   destroy() {
     if (this._battleScene) { this._battleScene.destroy(); this._battleScene = null; }
+    if (this._portrait) { try { this._portrait.destroy(); } catch (_) {} this._portrait = null; }
     this.stopLoop();
     if (this._detachKeyboard) this._detachKeyboard();
     try { document.removeEventListener('visibilitychange', this._onVis); } catch (_) {}
@@ -265,6 +267,8 @@ export class GameUI {
   }
 
   renderTab() {
+    // 重建内容前先拆解上一张卡的视差引擎（rAF / canvas / 定时器），避免跨刷新累积泄漏。
+    if (this._portrait) { try { this._portrait.destroy(); } catch (_) {} this._portrait = null; }
     clear(this.contentEl);
     switch (this.tab) {
       case 'lineup': return this.renderLineup();
@@ -450,45 +454,24 @@ export class GameUI {
     this.contentEl.append(picker, h('div', { class: 'cult-3d-wrap' }, stage, statsPanel), tabBar, detail);
   }
 
-  // 2.5D 卡牌展示区：perspective 立体卡 + 拖拽旋转 + 点击水墨涟漪（设计稿增量 1.3）
+  // 2.5D 卡牌展示区：三叠层视差立绘 + 悬停 / 点击 / 拖拽 / 长按交互（设计稿增量 一/四）。
+  // 由 Portrait3D 引擎渲染；展示区随养成成功触发 celebrate() 庆祝特效。
   buildCardStage(def, inst, r) {
-    const wrap = h('div', { class: 'cult-3d' });
-    const card = h('div', {
-      class: `cult-3d__card ${r.short === 'SSR' || inst.evo ? 'glow' : ''}`,
-      style: {
-        background: `linear-gradient(160deg, ${r.color}, ${shade(r.color, -0.25)})`,
-        border: `2px solid ${r.short === 'SSR' ? '#D4A04A' : 'rgba(255,255,255,0.4)'}`,
-      },
-    },
-      h('div', { class: 'cult-3d__art' }, elEmoji(def.element)),
-      h('div', { class: 'cult-3d__name' }, def.name),
-      h('div', { class: 'cult-3d__sub' }, `${r.short} · ${elName(def.element)}${def.cls}`),
-      h('div', { class: 'cult-3d__sub' }, `${'★'.repeat(inst.star)}${'☆'.repeat(Math.max(0, 9 - inst.star))}`),
-    );
-    wrap.appendChild(card);
-    // 拖拽旋转：pointerdown 时捕获指针，后续 move/up 均派发到 wrap 本身，
-    // 避免向 window 注册监听造成跨刷新累积泄漏。
-    let dragging = false; let startX = 0; let rotY = 18;
-    const clientX = (e) => (e.touches ? e.touches[0].clientX : e.clientX);
-    wrap.addEventListener('pointerdown', (e) => {
-      dragging = true; startX = clientX(e);
-      try { if (wrap.setPointerCapture && e.pointerId != null) wrap.setPointerCapture(e.pointerId); } catch (_) {}
+    if (this._portrait) { try { this._portrait.destroy(); } catch (_) {} this._portrait = null; }
+    const portrait = new Portrait3D({
+      card: def,
+      instance: inst,
+      rarity: effectiveRarity(inst),
+      onPoem: (text) => this.toast(text),
     });
-    wrap.addEventListener('pointermove', (e) => {
-      if (!dragging) return;
-      rotY = 18 + Math.max(-50, Math.min(50, (clientX(e) - startX) * 0.4));
-      card.style.transform = `rotateX(12deg) rotateY(${rotY}deg)`;
-    });
-    wrap.addEventListener('pointerup', () => { dragging = false; });
-    wrap.addEventListener('pointercancel', () => { dragging = false; });
-    // 点击水墨涟漪
-    wrap.addEventListener('click', () => {
-      const rip = h('span', { class: 'cult-3d__ripple' });
-      rip.style.left = '50%'; rip.style.top = '50%'; rip.style.transform = 'translate(-50%, -50%)';
-      wrap.appendChild(rip);
-      setTimeout(() => { if (rip.parentNode) rip.parentNode.removeChild(rip); }, 720);
-    });
-    return wrap;
+    this._portrait = portrait;
+    return portrait.mount();
+  }
+
+  // 养成成功庆祝：金光柱 + 冲天墨粒 + 微震（设计稿增量 四·升级/突破成功）。
+  // 须在 afterAction()（重建卡面）之后调用，使特效落到新渲染的卡面上。
+  _celebrate() {
+    if (this._portrait) { try { this._portrait.celebrate(); } catch (_) {} }
   }
 
   // 修炼子页：升级 + 突破
@@ -658,13 +641,15 @@ export class GameUI {
   doFeedPill(inst, pillId) {
     const r = feedPill(this.player, inst, pillId, 1);
     if (!r.ok) { this.toast(r.reason); return; }
+    const leveled = (r.logs || []).some((l) => l.kind === 'level');
     for (const l of (r.logs || [])) if (l.kind === 'level') this.toast(l.text);
     this.afterAction();
+    if (leveled) this._celebrate();
   }
-  doBreak(inst) { const r = doBreakThrough(this.player, inst); if (!r.ok) this.toast(r.reason); else this.toast(r.text); this.afterAction(); }
-  doStar(inst) { const r = doStarUp(this.player, inst); if (!r.ok) this.toast(r.reason); else this.toast(r.text); this.afterAction(); }
+  doBreak(inst) { const r = doBreakThrough(this.player, inst); if (!r.ok) this.toast(r.reason); else this.toast(r.text); this.afterAction(); if (r.ok) this._celebrate(); }
+  doStar(inst) { const r = doStarUp(this.player, inst); if (!r.ok) this.toast(r.reason); else this.toast(r.text); this.afterAction(); if (r.ok) this._celebrate(); }
   doSkill(inst) { const r = doSkillUp(this.player, inst); if (!r.ok) this.toast(r.reason); else this.toast(r.text); this.afterAction(); }
-  doEvolve(inst) { const r = doEvolve(this.player, inst); if (!r.ok) this.toast(r.reason); else { this.toast(r.text); } this.afterAction(); }
+  doEvolve(inst) { const r = doEvolve(this.player, inst); if (!r.ok) this.toast(r.reason); else { this.toast(r.text); } this.afterAction(); if (r.ok) this._celebrate(); }
   doGift(inst) { const r = doGift(this.player, inst); if (!r.ok) this.toast(r.reason); else this.toast(r.text); this.afterAction(); }
   doTea(def, inst) {
     const al = affinityLevel(inst.affinity);
@@ -1019,15 +1004,6 @@ function skillTypeLabel(sk) {
 function targetLabel(t) {
   const map = { enemy_one: '敌方单体', enemy_all: '敌方全体', ally_lowest: '最低血盟友', ally_all: '我方全体', self: '自身' };
   return map[t] || t;
-}
-// 颜色加深 / 变亮（amt 负数加深，正数变亮）——用于 2.5D 卡牌渐变底色
-function shade(hex, amt) {
-  if (!hex || hex[0] !== '#') return hex || '#333';
-  const n = hex.length === 4
-    ? hex.slice(1).split('').map((c) => parseInt(c + c, 16))
-    : [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
-  const f = (v) => Math.max(0, Math.min(255, Math.round(v + 255 * amt)));
-  return `rgb(${f(n[0])}, ${f(n[1])}, ${f(n[2])})`;
 }
 function cn(n) { return ['零', '壹', '贰', '叁', '肆', '伍', '陆', '柒', '捌', '玖', '拾', '拾壹', '拾贰'][n] || String(n); }
 function copyText(text) {

@@ -35,6 +35,7 @@ import {
   prepareStageBattle, settleStage, computeStageStars,
 } from '../core/stage.js';
 import { canSweep, sweepBatch, sweepReason, sweepUnlocked } from '../core/sweep.js';
+import { SHOP_GOODS, canBuy, buyGoods } from '../core/shop.js';
 import { staminaValue, staminaPreview, regenStamina } from '../core/stamina.js';
 import { enterFloor, tianOf, floorPower, TOTAL_FLOORS, resetSecret } from '../core/secret.js';
 import { collectCave, previewCave, caveTotalLevel, caveSSRCount } from '../core/cave.js';
@@ -55,6 +56,7 @@ const TABS = [
   { key: 'stage', icon: '🗺️', label: '主线' },
   { key: 'secret', icon: '🌀', label: '秘境' },
   { key: 'cave', icon: '🏘️', label: '洞府' },
+  { key: 'shop', icon: '🏮', label: '坊市' },
   { key: 'codex', icon: '📖', label: '图鉴' },
   { key: 'setting', icon: '⚙️', label: '设置' },
 ];
@@ -279,6 +281,7 @@ export class GameUI {
       case 'stage': return this.renderStage();
       case 'secret': return this.renderSecret();
       case 'cave': return this.renderCave();
+      case 'shop': return this.renderShop();
       case 'codex': return this.renderCodex();
       case 'setting': return this.renderSetting();
       default: return this.renderLineup();
@@ -414,7 +417,7 @@ export class GameUI {
     const r = rarityDef(er);
     const st = instanceStats(inst);
 
-    // 左：2.5D 卡牌展示；右：基础属性面板
+    // 左：卡牌立绘平铺展示；右：基础属性面板
     const stage = this.buildCardStage(def, inst, r);
     const statsPanel = h('div', { class: 'cult-card' },
       h('div', { class: 'cult-card__head' },
@@ -458,7 +461,8 @@ export class GameUI {
     this.contentEl.append(picker, h('div', { class: 'cult-3d-wrap' }, stage, statsPanel), tabBar, detail);
   }
 
-  // 2.5D 卡牌展示区：三叠层视差立绘 + 悬停 / 点击 / 拖拽 / 长按交互（设计稿增量 一/四）。
+  // 卡牌展示区：三叠层立绘平铺展示 + 悬停 / 点击 / 长按交互（设计稿增量 一/四）。
+  // issue #100：人物查看 / 修炼场景不再 2.5D 倾斜（flat），倾斜视角只留给战斗场景。
   // 由 Portrait3D 引擎渲染；展示区随养成成功触发 celebrate() 庆祝特效。
   buildCardStage(def, inst, r) {
     if (this._portrait) { try { this._portrait.destroy(); } catch (_) {} this._portrait = null; }
@@ -466,6 +470,7 @@ export class GameUI {
       card: def,
       instance: inst,
       rarity: effectiveRarity(inst),
+      flat: true,
       onPoem: (text) => this.toast(text),
     });
     this._portrait = portrait;
@@ -870,6 +875,50 @@ export class GameUI {
         h('p', { class: 'muted center' }, '每小时产出：灵石 = 总等级/10；修为丹·小 = SSR 数量。'),
       ),
     );
+  }
+
+  // ============ 坊市（issue #100：灵石消费出口） ============
+  renderShop() {
+    const p = this.player;
+    const tags = ['问道', '修炼', '升星', '知音', '云游'];
+    const groups = tags.map((tag) => h('div', { class: 'shop-group' },
+      h('h3', { class: 'sec-title' }, `坊市 · ${tag}`),
+      h('div', { class: 'shop-grid' },
+        ...SHOP_GOODS.filter((g) => g.tag === tag).map((g) => this.shopCard(g))),
+    ));
+    this.contentEl.append(
+      h('div', { class: 'shop-head' },
+        h('h3', { class: 'sec-title' }, `坊市 · 灵石易物（当前 🪙 灵石 ×${countRes(p, 'lingshi')}）`),
+        h('p', { class: 'muted' }, '主线、秘境与洞府产出的灵石，可在此兑换问道令、丹药与符箓。'),
+      ),
+      ...groups,
+    );
+  }
+  shopCard(goods) {
+    const p = this.player;
+    const ok2 = canBuy(p, goods, 1);
+    // 资源包逐项列出内容；灵气类直接展示恢复量。
+    const giveText = goods.kind === 'stamina'
+      ? `💨 灵气 +${goods.give}`
+      : Object.entries(goods.give).map(([id, n]) => `${resEmoji(id)}${resName(id)}×${n}`).join('　');
+    return h('div', { class: `shop-card ${ok2 ? '' : 'off'}` },
+      h('div', { class: 'shop-card__head' },
+        h('span', { class: 'shop-card__give' }, giveText),
+        h('span', { class: 'shop-card__price' }, `🪙 ${goods.price}`),
+      ),
+      h('p', { class: 'muted' }, goods.desc),
+      h('button', {
+        class: 'btn btn-primary shop-card__btn', disabled: !ok2,
+        dataset: { goods: goods.id },
+        onClick: () => this.doBuy(goods),
+      }, ok2 ? '购买' : (goods.kind === 'stamina' && staminaValue(p) >= STAMINA_MAX ? '灵气已满' : '灵石不足')),
+    );
+  }
+  doBuy(goods) {
+    const r = buyGoods(this.player, goods, 1);
+    if (!r.ok) this.toast(r.reason);
+    else this.toast(r.text);
+    this.afterAction();
   }
 
   // ============ 图鉴 ============

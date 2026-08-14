@@ -55,11 +55,11 @@ ok(Object.keys(ui.player.cards).length === 4, `初始 4 张卡（实际 ${Object
 {
   let renderErr = null;
   try {
-    for (const tab of ['lineup', 'ask', 'cultivate', 'stage', 'secret', 'cave', 'codex', 'setting']) {
+    for (const tab of ['lineup', 'ask', 'cultivate', 'stage', 'secret', 'cave', 'shop', 'codex', 'setting']) {
       ui.tab = tab; ui.refresh(); await sleep(5);
     }
   } catch (e) { renderErr = e; }
-  ok(!renderErr, `八大功能页渲染无异常（${renderErr ? renderErr.message : 'ok'}）`);
+  ok(!renderErr, `九大功能页（含坊市）渲染无异常（${renderErr ? renderErr.message : 'ok'}）`);
   ui.tab = 'lineup'; ui.refresh();
 }
 
@@ -102,7 +102,13 @@ ok(Object.keys(ui.player.cards).length === 4, `初始 4 张卡（实际 ${Object
   bigBtn.click(); await sleep(5);
   ok(ui.player.cards[ui.cultivateId].level > lv0, `喂大丹后等级提升（${lv0} → ${ui.player.cards[ui.cultivateId].level}）`);
   // 灵犀阁四个子页签（修炼/升星/功法/知音）都能渲染
-  ok(document.querySelector('.cult-3d') !== null, '2.5D 卡牌展示区渲染');
+  ok(document.querySelector('.cult-3d') !== null, '卡牌展示区渲染');
+  // issue #100：人物查看 / 修炼场景卡面平铺，不再 2.5D 倾斜（transform 无 rotateX/Y）
+  {
+    const cardEl = document.querySelector('.cult-3d .portrait__card');
+    const tf = cardEl ? (cardEl.style.transform || '') : '';
+    ok(cardEl && !/rotate/i.test(tf), `修炼页卡面平铺展示（transform="${tf}"）`);
+  }
   let detailErr = null;
   try {
     for (const sub of ['star', 'skill', 'affinity', 'cultivate']) { ui.detailTab = sub; ui.refresh(); await sleep(5); }
@@ -163,6 +169,27 @@ ok(Object.keys(ui.player.cards).length === 4, `初始 4 张卡（实际 ${Object
   ok(/完成 1 次扫荡/.test(document.querySelector('.sheet')?.textContent || ''), '扫荡结算展示完成次数');
   ok(p.stamina.value === stam0 - 10, `扫荡消耗 10 灵气（${stam0} → ${p.stamina.value}）`);
   ui.closeModal(); await sleep(5);
+}
+
+// ---------- 7c) 坊市：灵石购买问道令 ----------
+{
+  ui.tab = 'shop'; await sleep(5); ui.refresh(); await sleep(5);
+  const cards = document.querySelectorAll('.shop-card');
+  ok(cards.length >= 8, `坊市列出 ≥8 件商品（实际 ${cards.length}）`);
+  const p = ui.player;
+  p.res.lingshi = 1000;
+  ui.refresh(); await sleep(5);
+  const ls0 = p.res.lingshi;
+  const wd0 = p.res.wendao;
+  const wendaoBtn = [...document.querySelectorAll('.shop-card__btn')].find((b) => b.dataset.goods === 'wendao');
+  ok(!!wendaoBtn && !wendaoBtn.disabled, '灵石足够时问道令可购买');
+  wendaoBtn.click(); await sleep(5);
+  ok(p.res.lingshi === ls0 - 300 && p.res.wendao === wd0 + 1, `购买问道令扣 300 灵石并到账（${ls0} → ${p.res.lingshi}，令 ${wd0} → ${p.res.wendao}）`);
+  // 灵石不足 → 按钮禁用
+  p.res.lingshi = 0;
+  ui.refresh(); await sleep(5);
+  const wendaoBtn2 = [...document.querySelectorAll('.shop-card__btn')].find((b) => b.dataset.goods === 'wendao');
+  ok(wendaoBtn2.disabled, '灵石不足时购买按钮禁用');
 }
 
 // ---------- 8) 设置：导出存档码 ----------

@@ -295,6 +295,20 @@
 .cave__box { background: var(--paper-2); border-radius: 10px; padding: 12px; margin: 10px 0; text-align: center; }
 .cave__box .big { font-size: 20px; font-weight: bold; color: var(--red); margin-right: 8px; }
 
+/* —— 坊市（灵石商城，issue #100）—— */
+.shop-head { margin-bottom: 4px; }
+.shop-group { margin-bottom: 6px; }
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.shop-card {
+  background: rgba(255,255,255,0.6); border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px; display: flex; flex-direction: column; gap: 6px;
+}
+.shop-card.off { opacity: 0.62; }
+.shop-card__head { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.shop-card__give { font-size: 13px; font-weight: bold; color: var(--ink); }
+.shop-card__price { font-size: 13px; color: var(--gold); font-weight: bold; white-space: nowrap; }
+.shop-card__btn { margin-top: auto; font-size: 13px; padding: 6px 10px; }
+
 /* —— 图鉴 —— */
 .codex-tier { display: flex; justify-content: space-between; padding: 6px 10px; border-radius: 8px; background: var(--paper-2); margin-bottom: 6px; font-size: 13px; }
 .codex-tier.done { background: rgba(74, 138, 74, 0.16); }
@@ -526,16 +540,17 @@
 .cult-3d {
   position: relative; flex: 1 1 160px; min-width: 150px;
   min-height: 200px; display: flex; align-items: center; justify-content: center;
-  perspective: 900px; user-select: none; cursor: grab;
+  user-select: none; cursor: pointer;
   background: radial-gradient(circle at 50% 30%, rgba(212,160,74,0.10), transparent 60%);
   border-radius: 14px;
 }
+/* 平铺展示（issue #100）：人物查看 / 修炼场景不再 2.5D 倾斜，正对玩家 */
 .cult-3d__card {
   width: 130px; height: 180px; border-radius: 14px;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 8px; padding: 12px; color: var(--paper);
-  transform: rotateX(12deg) rotateY(18deg);
-  transform-style: preserve-3d; transition: transform 0.1s ease;
+  transform: none;
+  transition: transform 0.1s ease;
   box-shadow: 0 14px 30px rgba(0,0,0,0.3);
   position: relative; overflow: hidden;
 }
@@ -797,13 +812,13 @@
 }
 @keyframes portrait-beam { 0% { opacity: 0; transform: translateX(-50%) scaleY(0); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) scaleY(1); } }
 .portrait__card.is-shake { animation: portrait-shake .34s ease; }
-/* --rot-y 由 portrait3D._applyTransform 实时写入，震屏时不跳回固定角度 */
+/* 平铺模式（issue #100）：震屏只做位移，不再带回 2.5D 旋转 */
 @keyframes portrait-shake {
-  0%,100% { transform: rotateX(12deg) rotateY(var(--rot-y, 16deg)); }
-  20% { transform: rotateX(12deg) rotateY(var(--rot-y, 16deg)) translate(-2px, 1px); }
-  40% { transform: rotateX(12deg) rotateY(var(--rot-y, 16deg)) translate(2px, -1px); }
-  60% { transform: rotateX(12deg) rotateY(var(--rot-y, 16deg)) translate(-1px, 1px); }
-  80% { transform: rotateX(12deg) rotateY(var(--rot-y, 16deg)) translate(1px, 0); }
+  0%,100% { transform: none; }
+  20% { transform: translate(-2px, 1px); }
+  40% { transform: translate(2px, -1px); }
+  60% { transform: translate(-1px, 1px); }
+  80% { transform: translate(1px, 0); }
 }
 
 /* SSR 水墨粒子画布 + 一次性冲天墨粒爆裂 */
@@ -840,7 +855,7 @@
 .portrait__immersive.show .portrait__immersive-tip { opacity: .85; }
 .portrait__immersive-stage { transform: scale(.6); opacity: 0; transition: transform .3s cubic-bezier(.2,.8,.3,1.2), opacity .26s ease; }
 .portrait__immersive.show .portrait__immersive-stage { transform: scale(1.15); opacity: 1; }
-.portrait__immersive-stage .cult-3d__card { width: 200px !important; height: 280px !important; transform: rotateX(6deg) rotateY(0deg) !important; }
+.portrait__immersive-stage .cult-3d__card { width: 200px !important; height: 280px !important; }
 
 /* ============================================================================
    战场剪影·皮影模式（设计稿增量 第六节）

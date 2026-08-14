@@ -37,6 +37,10 @@ export class Portrait3D {
     this._dead = false;
     this._anim = null;
     this._stream = null;
+    this._streamCanvas = null;
+    this._streamColor = null;
+    this._ro = null;
+    this._suppressClick = false;
     this._bursts = [];
     this._timers = [];
     this._immersive = null;
@@ -82,7 +86,12 @@ export class Portrait3D {
     if (rp.particles) {
       const canvas = h('canvas', { class: 'portrait__stream' });
       this.fx.appendChild(canvas);
+      this._streamCanvas = canvas;
+      this._streamColor = sil;
       this._stream = createInkStream(canvas, { color: sil, density: 24 });
+      // wrap 此时尚未插入 DOM，createInkStream 的首次 resize 拿不到真实尺寸；
+      // 等 canvas 挂载后再补一次 resize（见 _deferStreamResize）。
+      this._deferStreamResize(canvas);
     }
     // 飘动 / 呼吸 / 眨眼动画系统。
     this._anim = attachAnimations(this.cardEl, def, this.rarity, {
@@ -92,6 +101,24 @@ export class Portrait3D {
     this._wire();
     this._applyTransform(0, 16); // 初始微侧视角，营造立体感
     return this.wrap;
+  }
+
+  // 等 canvas 真正插入 DOM 且有尺寸后，对常驻粒子流补一次 resize。
+  // 优先 ResizeObserver（顺带覆盖后续布局变化）；不可用时轮询 isConnected。
+  _deferStreamResize(canvas) {
+    const doResize = () => { if (!this._dead && this._stream) this._stream.resize(); };
+    if (typeof ResizeObserver === 'function') {
+      this._ro = new ResizeObserver(doResize);
+      this._ro.observe(canvas);
+      return;
+    }
+    let tries = 0;
+    const tick = () => {
+      if (this._dead || !this._stream) return;
+      if (canvas.isConnected) doResize();
+      else if (tries++ < 90) setTimeout(tick, 32); // 约 3s 内等待插入
+    };
+    setTimeout(tick, 0);
   }
 
   // —— 程序化立绘：头 / 袍服剪影 / 武器 / 飘动部件 ——
@@ -139,6 +166,7 @@ export class Portrait3D {
     wrap.addEventListener('pointerdown', (e) => {
       if (this._dead) return;
       dragging = false; moved = 0;
+      this._suppressClick = false;
       startX = cx(e); startY = cy(e);
       try { if (wrap.setPointerCapture && e.pointerId != null) wrap.setPointerCapture(e.pointerId); } catch (_) {}
       // 长按详情（1.5s）。
@@ -181,6 +209,8 @@ export class Portrait3D {
 
     // 点击选中：金光描边闪烁 + 底部浮现诗词（设计稿 四·点击选中）。
     wrap.addEventListener('click', () => {
+      // 长按打开沉浸预览后的 pointerup 仍会派发 click，这里消费掉，避免额外选中。
+      if (this._suppressClick) { this._suppressClick = false; return; }
       if (this._dead || moved > 6) return;
       this._strike();
       this._showPoem();
@@ -198,6 +228,8 @@ export class Portrait3D {
     if (this._dead) return;
     this._rotY = rotY;
     this.cardEl.style.transform = `rotateX(${(12 + tiltX).toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg)`;
+    // 记录当前角度供 portrait-shake 关键帧引用，避免震屏时跳回固定 16deg。
+    this.cardEl.style.setProperty('--rot-y', `${rotY.toFixed(2)}deg`);
     // 旋转时三层也产生轻微视差位移，强化「实物把玩」感。
     const px = (rotY - 16) / 30; // [-1..1]
     this._applyParallax(px);
@@ -245,9 +277,23 @@ export class Portrait3D {
       h('div', { class: 'portrait__immersive-stage' }, clone),
     );
     (doc.body || this.wrap.parentNode).appendChild(backdrop);
+    // cloneNode 不会复制画布内容：为克隆的粒子画布重建一条水墨流，
+    // 保证沉浸预览下 SSR「全动态」效果不退化为静态分层。
+    let cloneStream = null;
+    const cloneCanvas = clone.querySelector('canvas.portrait__stream');
+    if (cloneCanvas) {
+      cloneStream = createInkStream(cloneCanvas, { color: this._streamColor || silhouetteColor(this.card), density: 24 });
+    }
     void backdrop.offsetWidth;
     backdrop.classList.add('show');
+    // 长按后的 pointerup 仍会派发 click，标记由 click 处理器消费。
+    this._suppressClick = true;
+    let closed = false;
     const close = () => {
+      if (closed) return;
+      closed = true;
+      if (cloneStream && cloneStream.destroy) cloneStream.destroy();
+      cloneStream = null;
       backdrop.classList.remove('show');
       const t = setTimeout(() => { if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop); this._immersive = null; }, 260);
       this._timers.push(t);
@@ -270,7 +316,11 @@ export class Portrait3D {
     this.cardEl.appendChild(beam);
     // 底部冲天墨粒（SSR 复用常驻流，其它卡临时爆裂）。
     if (this._stream && this._stream.burst) this._stream.burst();
-    else this._bursts.push(burstInk(this.cardEl, sil, { count: 30, dur: 900 }));
+    else {
+      // 先回收已自毁（done）的句柄，避免长时间会话下数组只增不减。
+      this._bursts = this._bursts.filter((b) => b && !b.done);
+      this._bursts.push(burstInk(this.cardEl, sil, { count: 30, dur: 900 }));
+    }
     this._shake();
     const t = setTimeout(() => {
       this.cardEl.classList.remove('is-celebrate');
@@ -289,15 +339,18 @@ export class Portrait3D {
 
   destroy() {
     this._dead = true;
-    for (const t of this._timers) clearTimeout(t);
-    this._timers = [];
     clearTimeout(this._holdTimer);
+    // 先关闭沉浸预览（close 可能再 push 一个收尾 timer），随后统一清理。
+    if (this._immersive && this._immersive.close) this._immersive.close();
+    this._immersive = null;
     if (this._anim && this._anim.destroy) this._anim.destroy();
     if (this._stream && this._stream.destroy) this._stream.destroy();
     for (const b of this._bursts) if (b && b.destroy) b.destroy();
     this._bursts = [];
-    if (this._immersive && this._immersive.close) this._immersive.close();
-    this._anim = this._stream = this._immersive = null;
+    if (this._ro) { this._ro.disconnect(); this._ro = null; }
+    for (const t of this._timers) clearTimeout(t);
+    this._timers = [];
+    this._anim = this._stream = null;
   }
 }
 

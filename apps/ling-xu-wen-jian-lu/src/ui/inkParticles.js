@@ -54,8 +54,13 @@ export function createInkStream(canvas, opts = {}) {
     // 退化为 attribute 尺寸；仍无尺寸则跳过绘制。
     w = rect.width || parseFloat(canvas.getAttribute('width')) || canvas.clientWidth || 0;
     h = rect.height || parseFloat(canvas.getAttribute('height')) || canvas.clientHeight || 0;
-    canvas.width = Math.max(1, Math.round(w));
-    canvas.height = Math.max(1, Math.round(h));
+    const nw = Math.max(1, Math.round(w));
+    const nh = Math.max(1, Math.round(h));
+    // 尺寸未变时不动 backing store，避免 ResizeObserver 自激循环。
+    if (nw !== canvas.width || nh !== canvas.height) {
+      canvas.width = nw;
+      canvas.height = nh;
+    }
     // 按密度补齐粒子
     while (parts.length < density) parts.push(spawn(w || 120, h || 160, color));
   }
@@ -110,8 +115,9 @@ export function burstInk(hostEl, color, opts = {}) {
   hostEl.appendChild(canvas);
   const ctx = canvas.getContext && canvas.getContext('2d');
   if (!ctx) { // 无 2D 上下文：留一个光柱占位后清理，保证视觉有反馈。
-    setTimeout(() => { if (canvas.parentNode) canvas.parentNode.removeChild(canvas); }, opts.dur || 900);
-    return { destroy() {} };
+    const fallback = { done: false, destroy() { if (canvas.parentNode) canvas.parentNode.removeChild(canvas); fallback.done = true; } };
+    setTimeout(() => { if (canvas.parentNode) canvas.parentNode.removeChild(canvas); fallback.done = true; }, opts.dur || 900);
+    return fallback;
   }
   const rect = hostEl.getBoundingClientRect();
   const w = rect.width || 130, h = rect.height || 180;
@@ -134,6 +140,16 @@ export function burstInk(hostEl, color, opts = {}) {
   }
   const start = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
   let raf = 0; let running = true;
+  // done：自然播完自毁后置位，供调用方清理引用句柄（防止数组只增不减）。
+  const handle = {
+    done: false,
+    destroy() {
+      running = false;
+      if (raf) CAF(raf);
+      if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
+      handle.done = true;
+    },
+  };
   function frame() {
     if (!running) return;
     const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -152,14 +168,8 @@ export function burstInk(hostEl, color, opts = {}) {
       ctx.fill();
     }
     if (t < dur) raf = RAF(frame);
-    else { running = false; if (canvas.parentNode) canvas.parentNode.removeChild(canvas); }
+    else { running = false; if (canvas.parentNode) canvas.parentNode.removeChild(canvas); handle.done = true; }
   }
   raf = RAF(frame);
-  return {
-    destroy() {
-      running = false;
-      if (raf) CAF(raf);
-      if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
-    },
-  };
+  return handle;
 }

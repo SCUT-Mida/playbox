@@ -706,12 +706,13 @@
 }
 @keyframes portrait-beam { 0% { opacity: 0; transform: translateX(-50%) scaleY(0); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) scaleY(1); } }
 .portrait__card.is-shake { animation: portrait-shake .34s ease; }
+/* --rot-y 由 portrait3D._applyTransform 实时写入，震屏时不跳回固定角度 */
 @keyframes portrait-shake {
-  0%,100% { transform: rotateX(12deg) rotateY(16deg); }
-  20% { transform: rotateX(12deg) rotateY(16deg) translate(-2px, 1px); }
-  40% { transform: rotateX(12deg) rotateY(16deg) translate(2px, -1px); }
-  60% { transform: rotateX(12deg) rotateY(16deg) translate(-1px, 1px); }
-  80% { transform: rotateX(12deg) rotateY(16deg) translate(1px, 0); }
+  0%,100% { transform: rotateX(12deg) rotateY(var(--rot-y, 16deg)); }
+  20% { transform: rotateX(12deg) rotateY(var(--rot-y, 16deg)) translate(-2px, 1px); }
+  40% { transform: rotateX(12deg) rotateY(var(--rot-y, 16deg)) translate(2px, -1px); }
+  60% { transform: rotateX(12deg) rotateY(var(--rot-y, 16deg)) translate(-1px, 1px); }
+  80% { transform: rotateX(12deg) rotateY(var(--rot-y, 16deg)) translate(1px, 0); }
 }
 
 /* SSR 水墨粒子画布 + 一次性冲天墨粒爆裂 */

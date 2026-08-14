@@ -34,6 +34,9 @@ export const CARDS = [
     passives: [],
     story: '青云山外门的执剑童子，以竹为剑，招式朴素却暗合剑理。',
     quote: '一竹一剑，亦可问道。',
+    poem: '青竹三尺剑，问道一峰云',
+    voiceQuote: '师弟，今日剑谱可练熟了？',
+    silhouetteColor: '#5fa85f',
   },
   {
     id: 'R002', name: '赤焰灵狐', rarity: 'R', element: 'fire', cls: '符修',
@@ -43,6 +46,9 @@ export const CARDS = [
     passives: [],
     story: '生于赤焰峡谷的灵狐，尾火不熄，灼敌于无形。',
     quote: '可别被我的尾巴燎到了。',
+    poem: '尾火燃千岭，灵狐过九原',
+    voiceQuote: '嘻，别踩到我的尾巴哦。',
+    silhouetteColor: '#d4564f',
   },
   {
     id: 'R003', name: '玄龟甲士', rarity: 'R', element: 'water', cls: '体修',
@@ -52,6 +58,9 @@ export const CARDS = [
     passives: [],
     story: '寒潭深处的玄龟一族，背甲坚逾玄铁，世代为阵前盾卫。',
     quote: '有我在，谁也越不过此阵。',
+    poem: '玄甲沉渊底，一盾定江山',
+    voiceQuote: '阵在我前，谁敢越雷池？',
+    silhouetteColor: '#4a90c2',
   },
   {
     id: 'R004', name: '金戈锐士', rarity: 'R', element: 'metal', cls: '剑修',
@@ -60,6 +69,9 @@ export const CARDS = [
     passives: [],
     story: '金戈铁壁的守关锐士，一柄长戈可破百甲。',
     quote: '破阵，只在须臾。',
+    poem: '金戈横大漠，一破百甲开',
+    voiceQuote: '破阵只在须臾，你看好了。',
+    silhouetteColor: '#c8a951',
   },
   {
     id: 'R005', name: '厚土力士', rarity: 'R', element: 'earth', cls: '体修',
@@ -69,6 +81,9 @@ export const CARDS = [
     passives: [],
     story: '地煞迷宫中修土行的大汉，一步撼地，万夫迟滞。',
     quote: '大地，皆为我臂助。',
+    poem: '厚土承千钧，撼地万夫迟',
+    voiceQuote: '脚下这片地，都听我的。',
+    silhouetteColor: '#a17b4a',
   },
   {
     id: 'R006', name: '柳叶医仙', rarity: 'R', element: 'wood', cls: '丹修',
@@ -77,6 +92,9 @@ export const CARDS = [
     passives: [],
     story: '万木回廊采药的医仙，以柳叶为针，回春续命。',
     quote: '且安心，伤可愈。',
+    poem: '柳叶为针细，回春续寸心',
+    voiceQuote: '且安心，伤总能好的。',
+    silhouetteColor: '#5fa85f',
   },
   {
     id: 'R007', name: '流火散修', rarity: 'R', element: 'fire', cls: '剑修',
@@ -85,6 +103,9 @@ export const CARDS = [
     passives: [],
     story: '游历四方的散修剑客，剑走偏锋，烈焰裹刃。',
     quote: '我的剑，烫得很。',
+    poem: '流火焚长夜，孤剑走天涯',
+    voiceQuote: '我这剑烫得很，小心些。',
+    silhouetteColor: '#d4564f',
   },
   {
     id: 'R008', name: '霜月散修', rarity: 'R', element: 'water', cls: '符修',
@@ -94,6 +115,9 @@ export const CARDS = [
     passives: [],
     story: '寒潭月下修符的散修，一咒凝冰，封敌于瞬。',
     quote: '且在这霜寒中静一静。',
+    poem: '霜月凝寒露，一符锁千秋',
+    voiceQuote: '在这霜寒里，静一静吧。',
+    silhouetteColor: '#4a90c2',
   },
   {
     id: 'R009', name: '飞羽散修', rarity: 'R', element: 'metal', cls: '阵修',
@@ -103,6 +127,9 @@ export const CARDS = [
     passives: [],
     story: '布阵如飞的散修道人，一聚灵，全队锋芒更盛。',
     quote: '灵气已聚，放手施为。',
+    poem: '飞羽布灵阵，一气聚锋芒',
+    voiceQuote: '灵气已聚，放手施为便是。',
+    silhouetteColor: '#c8a951',
   },
 
   // ── SR 卡（4）绝品·紫金 ──────────────────────────────────────────────────────
@@ -117,6 +144,9 @@ export const CARDS = [
     passives: [{ kind: 'heal_in', amount: 0.15 }], // 鹤羽护体：受治疗 +15%
     story: '云鹤化形的仙子，仙羽轻拂，百病皆消。',
     quote: '愿这甘霖，洗净诸般苦厄。',
+    poem: '云鹤九霄外，仙踪不可寻',
+    voiceQuote: '道友，可愿与我共饮一杯？',
+    silhouetteColor: '#4a90c2',
   },
   {
     id: 'SR002', name: '赤霄剑尊', rarity: 'SR', element: 'fire', cls: '剑修',
@@ -128,6 +158,9 @@ export const CARDS = [
     passives: [{ kind: 'crit', amount: 0.10 }], // 剑心通明：暴击率 +10%
     story: '执赤霄神剑的剑道尊者，九式连环，星火燎原。',
     quote: '剑出赤霄，万里燎原。',
+    poem: '赤霄横万里，一剑燎中原',
+    voiceQuote: '剑出赤霄，便无回头之路。',
+    silhouetteColor: '#d4564f',
   },
   {
     id: 'SR003', name: '玄冥蛇姬', rarity: 'SR', element: 'earth', cls: '符修',
@@ -141,6 +174,9 @@ export const CARDS = [
     passives: [{ kind: 'thorns', amount: 0.15 }], // 蛇鳞反噬：受击反伤 15%
     story: '玄冥深处的蛇姬，一瞥石化，毒雾蚀骨。',
     quote: '与我斗，先问问我的鳞。',
+    poem: '玄冥蛇影晦，毒雾蚀枯骨',
+    voiceQuote: '与我斗？先问过我的鳞。',
+    silhouetteColor: '#a17b4a',
   },
   {
     id: 'SR004', name: '青莲道尊', rarity: 'SR', element: 'wood', cls: '阵修',
@@ -154,6 +190,9 @@ export const CARDS = [
     passives: [{ kind: 'resist', amount: 0.20 }], // 道法自然：效果抵抗 +20%
     story: '青莲峰上的道尊，一念成阵，万法自然。',
     quote: '道法自然，何须强求。',
+    poem: '青莲生一念，万法自成阵',
+    voiceQuote: '道法自然，何须强求。',
+    silhouetteColor: '#5fa85f',
   },
 
   // ── SSR 卡（2）至品·彩凰 ─────────────────────────────────────────────────────
@@ -173,6 +212,9 @@ export const CARDS = [
     ],
     story: '上古兵主蚩尤的一缕残魂，重聚九黎战意，所向披靡。',
     quote: '吾乃九黎之主，战魂不灭！',
+    poem: '九黎图腾起，战魂燃苍穹',
+    voiceQuote: '吾乃九黎之主，战魂不灭！',
+    silhouetteColor: '#d4564f',
   },
   {
     id: 'SSR002', name: '瑶池圣母', rarity: 'SSR', element: 'water', cls: '丹修',
@@ -190,6 +232,9 @@ export const CARDS = [
     ],
     story: '瑶池之主，慈航普度，一滴仙露可活白骨。',
     quote: '天泽万物，生生不息。',
+    poem: '瑶池金母降，一滴活白骨',
+    voiceQuote: '天泽万物，生生不息。',
+    silhouetteColor: '#4a90c2',
   },
 ];
 

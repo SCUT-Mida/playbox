@@ -597,5 +597,49 @@ console.log('— battle events —');
   void beforeLen;
 }
 
+// ---------- 角色人物视觉系统（增量 第一~七节：分层立绘 / 职业剪影 / 诗词）----------
+console.log('— character portrait —');
+{
+  const {
+    CLASSES, classDef, silhouetteColor, poemOf,
+    RARITY_PORTRAIT, rarityPortrait, portraitConfig, portraitLayers,
+  } = await import(new URL('../src/config.js', import.meta.url).href);
+  ok(CLASSES.length === 5, '五大职业（剑/体/丹/阵/符）');
+  ok(new Set(CARDS.map((c) => c.cls)).size === 5, '卡牌覆盖全部 5 个职业');
+  ok(CARDS.every((c) => classDef(c.cls).weapon), '每张卡的职业均有核心武器');
+  // 数据字段（设计稿增量 七·cards.json 扩展）
+  ok(CARDS.every((c) => typeof c.poem === 'string' && c.poem.length > 0), '每张卡有专属诗词 poem');
+  ok(CARDS.every((c) => typeof c.voiceQuote === 'string' && c.voiceQuote.length > 0), '每张卡有语音文案 voiceQuote');
+  ok(CARDS.every((c) => /^#[0-9a-fA-F]{6}$/.test(c.silhouetteColor)), '每张卡有合法剪影色 silhouetteColor');
+  // 取色 / 取诗：优先卡牌字段，缺省回退五行色 / quote
+  // 用与五行色不同的自定义色断言，确保真正覆盖 override 路径
+  //（历史上每张卡的 silhouetteColor 恰等于五行色，等值断言是假阳性）。
+  ok(silhouetteColor({ element: 'water', silhouetteColor: '#123456' }) === '#123456', 'silhouetteColor 读卡牌驼峰字段覆盖');
+  ok(silhouetteColor({ element: 'water', silhouette_color: '#654321' }) === '#654321', 'silhouetteColor 读卡牌蛇形字段覆盖');
+  ok(silhouetteColor(CARD_MAP.SR001) === CARD_MAP.SR001.silhouetteColor, 'silhouetteColor 读卡牌字段');
+  ok(silhouetteColor({ element: 'fire' }) === '#d4564f', 'silhouetteColor 缺省回退五行色');
+  ok(poemOf(CARD_MAP.SR001) === '云鹤九霄外，仙踪不可寻', 'poemOf 取白鹤仙子诗词');
+  ok(poemOf({ quote: 'Q' }) === 'Q', 'poemOf 缺省回退 quote');
+  // 稀有度美术规格：R 静态 / SR 局部 / SSR 全动态
+  ok(rarityPortrait('R').dynamic === 0 && rarityPortrait('SR').dynamic === 1 && rarityPortrait('SSR').dynamic === 2, '稀有度动态层级 0/1/2');
+  ok(rarityPortrait('SSR').particles === true && rarityPortrait('SSR').breakFrame === true, 'SSR 启用粒子背景 + 破框');
+  ok(rarityPortrait('R').inkline === true, 'R 启用墨线白描');
+  // 立绘分层 + 动画配置
+  const cfg = portraitConfig(CARD_MAP.SR001, 'SR');
+  ok(Object.keys(cfg.layers).length >= 7 && cfg.layers.weapon.endsWith('_weapon.png'), 'portraitConfig 含分层 PSD 命名（≥7 层）');
+  ok(cfg.animations.sway_parts.length >= 1, 'portraitConfig 派生飘动部件');
+  ok(cfg.animations.blink_interval === 6000, 'SR 眨眼间隔 6000ms');
+  ok(portraitConfig(CARD_MAP.SSR001, 'SSR').animations.blink_interval === 5000, 'SSR 眨眼间隔 5000ms');
+  ok(portraitConfig(CARD_MAP.R001, 'R').animations.blink_interval === 0, 'R 不眨眼（静态）');
+  ok(portraitLayers(CARD_MAP.R002).bg === 'assets/portraits/R002_bg.webp', 'portraitLayers 按卡牌 id 约定导出');
+  // 战斗 init 事件携带 cls + ref（供战场剪影渲染）
+  {
+    const specs = playerSpecsFrom((() => { const q = newPlayer(); ownCard(q, 'SR001'); setFormation(q, ['SR001', null, null, null, null]); return q; })());
+    const battle = createBattle(specs, makeEnemyFormation(100, 'fire', 'normal', makeRng(1)), makeRng(1));
+    const init = battle.events.find((e) => e.t === 'init' && e.side === 'player');
+    ok(init && init.cls === '丹修' && init.ref === 'SR001', 'init 事件携带职业 cls 与卡牌 ref');
+  }
+}
+
 console.log(`\n结果: ${pass} 通过, ${fail} 失败`);
 process.exit(fail ? 1 : 0);

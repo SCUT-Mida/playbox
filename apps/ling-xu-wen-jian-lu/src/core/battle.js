@@ -27,6 +27,7 @@ export function buildCombatant(spec, side, pos) {
     name: spec.name || '无名',
     element: spec.element || null,
     role: spec.role || 'dps',
+    cls: spec.cls || null,
     baseAtk: s.atk, baseDef: s.def, baseSpd: s.spd,
     maxHp: Math.max(1, Math.round(s.hp)), hp: Math.max(1, Math.round(s.hp)),
     baseCrit: 0.05,
@@ -75,7 +76,7 @@ export function playerSpecsFrom(player) {
     const def = cardDef(id);
     if (!def) continue;
     out.push({
-      ref: id, name: def.name, element: def.element, role: def.role,
+      ref: id, name: def.name, element: def.element, role: def.role, cls: def.cls,
       stats: instanceStats(inst), actives: def.actives, passives: def.passives,
       skillMult: skillMult(inst),
     });
@@ -105,7 +106,7 @@ export function createBattle(playerSpecs, enemySpecs, rng) {
   const events = [];
   // 初始化事件：把所有参战单位及其初始面板喂给动画回放器。
   for (const c of [...players, ...enemies]) {
-    events.push({ t: 'init', side: c.side, pos: c.pos, name: c.name, element: c.element, role: c.role, hp: c.hp, maxHp: c.maxHp, isBoss: !!c.isBoss });
+    events.push({ t: 'init', side: c.side, pos: c.pos, name: c.name, element: c.element, role: c.role, cls: c.cls, ref: c.ref, hp: c.hp, maxHp: c.maxHp, isBoss: !!c.isBoss });
   }
   return {
     players, enemies,

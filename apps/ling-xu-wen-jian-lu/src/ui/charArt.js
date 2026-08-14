@@ -184,22 +184,25 @@ const BODIES = {
   ${FEET}
   ${slot(s, 'robe', ROBE_SWORD)}
   ${slot(s, 'weapon', WEAPON_SWORD)}
-  <circle class="ca-hand" cx="105.5" cy="100" r="4.4"/>
+  ${slot(s, 'handR', `<circle class="ca-hand" cx="105.5" cy="100" r="4.4"/>`)}
   ${slot(s, 'armL', ARM_SWORD_L)}
   ${slot(s, 'front', '')}
   <g class="ca-head">${slot(s, 'face', FACE)}</g>
   ${slot(s, 'hair', HAIR_PONY)}`,
 
   // 体修：短打 + 护心镜（可换龟甲纹 / 破碎魔甲 / 皮甲），双臂外张抱元。
+  // 武器分两层：盾等负于身后的走 weaponBack（袍服之前），斧 / 锤等大型武器走
+  // weapon（袍服之后、双臂之前绘制），刃部不被躯干遮挡，掌心覆于柄上呈握持状。
   body: (s) => `
   ${slot(s, 'back', '')}
+  ${slot(s, 'weaponBack', WEAPON_SHIELD)}
   ${NECK}
   ${FEET}
-  ${slot(s, 'weapon', WEAPON_SHIELD)}
   <path class="ca-robe" d="M58 64C56 92 64 112 66 130C58 168 52 228 50 292Q80 304 110 292C108 228 102 168 94 130C96 112 104 92 102 64Q80 55 58 64Z"/>
   <path class="ca-collar" d="M72 58L80 73L88 58L94 61L80 86L66 61Z"/>
   <path class="ca-sash" d="M66 126Q80 133 94 126L95 137Q80 144 65 137Z"/>
   ${slot(s, 'chest', CHEST_MIRROR)}
+  ${slot(s, 'weapon', '')}
   ${slot(s, 'armL', ARM_BODY_L)}
   ${slot(s, 'armR', ARM_BODY_R)}
   ${slot(s, 'front', '')}
@@ -224,8 +227,9 @@ const BODIES = {
 
   // 阵修：道冠 + 法衣（下摆卦纹带），双手于胸前结印，身后阵法环旋转。
   array: (s) => `
+  ${slot(s, 'hairBack', `
   <path class="ca-hair-b" d="M65 34C58 62 60 92 67 110L75 110C69 88 68 58 69 40Z"/>
-  <path class="ca-hair-b" d="M95 34C102 62 100 92 93 110L85 110C91 88 92 58 91 40Z"/>
+  <path class="ca-hair-b" d="M95 34C102 62 100 92 93 110L85 110C91 88 92 58 91 40Z"/>`)}
   ${slot(s, 'back', `<g class="pc__part part-ribbon"><path class="ca-ribbon" d="M92 70C110 76 122 96 120 120C126 94 113 70 93 64Z"/></g>`)}
   ${NECK}
   ${FEET}
@@ -309,10 +313,13 @@ const CHAR_SPECS = {
   // 玄龟甲士：龟甲纹重铠，持圆盾 + 铁锤，灰短发。
   R003: {
     base: 'body', hairColor: '#93938c',
-    weapon: `
+    weaponBack: `
     <g class="ca-weapon">
       <path class="ca-shield" d="M40 90Q29 95 30.5 108Q32 123 40 129Q48 123 49.5 108Q51 95 40 90Z"/>
       <circle class="ca-shield-boss" cx="40" cy="109" r="4.4"/>
+    </g>`,
+    weapon: `
+    <g class="ca-weapon">
       <g class="ca-hammer">
         <rect class="ca-hilt" x="111" y="76" width="4" height="40" rx="2"/>
         <rect class="ca-hammer-head" x="101.5" y="66" width="23" height="13" rx="2.5"/>
@@ -358,6 +365,8 @@ const CHAR_SPECS = {
       <circle class="ca-gauntlet" cx="113" cy="110" r="7.2"/>
     </g>`,
     weapon: '',
+    // 石拳套力士不佩盾：显式去掉躯体默认的负后圆盾。
+    weaponBack: '',
   },
   // 柳叶医仙：温柔女医，青白道袍，捧青瓷药炉，长发披散。
   R006: {
@@ -380,6 +389,8 @@ const CHAR_SPECS = {
       <path class="ca-guard" d="M100 102l6-3 2 4-6 3z"/>
     </g>`,
     weapon: '',
+    // 剑扛肩上：右手改握肩头剑格，而非默认的右手下垂握剑位。
+    handR: `<circle class="ca-hand" cx="105" cy="102.5" r="4.4"/>`,
     hair: `
     <g class="pc__hair">
       <path class="ca-hair" d="M62 44C60 23 69 16 80 16C91 16 100 23 98 44C96 31 90 25.5 80 25.5C70 25.5 64 31 62 44Z"/>
@@ -408,6 +419,8 @@ const CHAR_SPECS = {
   // 飞羽散修：敏捷阵修，金线羽纹道袍，持罗盘，短黑发 + 羽簪。
   R009: {
     base: 'array',
+    // 短黑发：显式去掉躯体默认的两侧垂发（hairBack），只留头顶层 + 羽簪。
+    hairBack: '',
     weapon: `
     <g class="ca-weapon">
       <circle class="ca-rune" cx="80" cy="112" r="22"/>
@@ -484,6 +497,7 @@ const CHAR_SPECS = {
   // 青莲道尊：青莲道袍宽袖，持拂尘，灰白长发木簪，出尘安和。
   SR004: {
     base: 'array', hairColor: '#cfcac0',
+    // 灰白长发：保留躯体默认的两侧垂发（hairBack），由 hairColor 染成灰白。
     weapon: `
     <g class="ca-weapon">
       <circle class="ca-rune" cx="80" cy="112" r="22"/>

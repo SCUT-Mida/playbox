@@ -650,6 +650,8 @@
 .char-art .portrait__eyes { transform-box: fill-box; transform-origin: 50% 50%; transition: transform .08s ease; }
 .char-art .portrait__eyes.blink { transform: scaleY(0.12); }
 .char-art .portrait__eyes.smile { transform: scaleY(0.55) translateY(1px); }
+/* 眨眼与微笑同时命中（满好感角色眨眼）时，眨眼应胜出——提 specificity 盖过后置的 .smile */
+.char-art .portrait__eyes.blink.smile { transform: scaleY(0.12); }
 
 /* R 卡墨线白描：整体褪为淡彩素色（设计稿增量 二·2.1）*/
 .portrait__card.inkline .char-art { filter: saturate(0.45) contrast(0.94); }
@@ -780,7 +782,7 @@
 .silu__el { position: absolute; right: -1px; top: -1px; font-size: 9px; opacity: .85; }
 .silu__aura {
   position: absolute; left: 50%; bottom: -2%; transform: translateX(-50%);
-  width: 82%; height: 12%; border-radius: 50%; border: 2px solid var(--sil);
+  width: 82%; height: 12%; border-radius: 50%; border: 2px solid var(--sil, #9a8a72);
   opacity: .55; animation: silu-aura 4s linear infinite;
 }
 @keyframes silu-aura { from { transform: translateX(-50%) rotate(0); } to { transform: translateX(-50%) rotate(360deg); } }
@@ -805,7 +807,7 @@
 .char-art.is-sil .ca-blade, .char-art.is-sil .ca-shield, .char-art.is-sil .ca-mirror,
 .char-art.is-sil .ca-hand, .char-art.is-sil .ca-talisman rect { stroke: none; }
 /* 稀有度光环：青玉 / 紫金 / 彩凰 */
-.silu .aura-R   { border-color: var(--sil); }
+.silu .aura-R   { border-color: var(--sil, #9a8a72); }
 .silu .aura-SR  { border-color: var(--r-SR); box-shadow: 0 0 6px var(--r-SR); }
 .silu .aura-SSR { border-color: var(--gold); box-shadow: 0 0 8px var(--gold); opacity: .75; }
 /* 战场态：出手选中 → 剪影还原为淡彩实体（设计稿 六·选中高亮）*/

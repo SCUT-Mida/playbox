@@ -19,9 +19,9 @@
 import { h } from './dom.js';
 import {
   elEmoji, elName, rarityDef, classDef, silhouetteColor, poemOf,
-  rarityPortrait, affinityLevel, AFFINITY_MAX,
+  rarityPortrait, affinityLevel, AFFINITY_MAX, shade,
 } from '../config.js';
-import { charFigure } from './charArt.js';
+import { charFigure, charArtVars } from './charArt.js';
 import { attachAnimations } from './animationSystem.js';
 import { createInkStream, burstInk } from './inkParticles.js';
 
@@ -74,9 +74,8 @@ export class Portrait3D {
       ].filter(Boolean).join(' '),
       style: {
         background: `linear-gradient(160deg, ${r.color}, ${shade(r.color, -0.28)})`,
-        '--sil': sil,
-        '--sil-d': shade(sil, -0.35),
-        '--sil-l': shade(sil, 0.32),
+        // --sil* 三阶与内部 .char-art 取同一份（charArtVars），避免内层覆盖卡面出现两档高光色。
+        ...charArtVars(def),
         '--cls': cls.color,
       },
     }, this.bg, this.char, this.fx, this._buildSeal(rp));
@@ -370,14 +369,4 @@ export class Portrait3D {
     this._timers = [];
     this._anim = this._stream = null;
   }
-}
-
-// 颜色加深 / 变亮（与 app.js 同实现，独立于此避免循环依赖）。
-function shade(hex, amt) {
-  if (!hex || hex[0] !== '#') return hex || '#333';
-  const n = hex.length === 4
-    ? hex.slice(1).split('').map((c) => parseInt(c + c, 16))
-    : [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
-  const f = (v) => Math.max(0, Math.min(255, Math.round(v + 255 * amt)));
-  return `rgb(${f(n[0])}, ${f(n[1])}, ${f(n[2])})`;
 }

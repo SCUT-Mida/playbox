@@ -263,6 +263,17 @@ export const CLASSES = [
 const CLASS_MAP = Object.fromEntries(CLASSES.map((c) => [c.id, c]));
 export function classDef(cls) { return CLASS_MAP[cls] || CLASSES[0]; }
 
+// 颜色加深 / 变亮：amt 负数加深、正数变亮。卡面（portrait3D）与立绘（charArt）
+// 共用同一实现与常量，避免同屏出现两档深 / 亮色（曾分别在两处各存一份）。
+export function shade(hex, amt) {
+  if (!hex || hex[0] !== '#') return hex || '#333';
+  const n = hex.length === 4
+    ? hex.slice(1).split('').map((c) => parseInt(c + c, 16))
+    : [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+  const f = (v) => Math.max(0, Math.min(255, Math.round(v + 255 * amt)));
+  return `rgb(${f(n[0])}, ${f(n[1])}, ${f(n[2])})`;
+}
+
 // 战场剪影用色（五行代表色），可被卡牌自定义色覆盖（设计稿增量 第六节；兼容蛇形/驼峰两种字段名）。
 export function silhouetteColor(card) {
   if (card) {

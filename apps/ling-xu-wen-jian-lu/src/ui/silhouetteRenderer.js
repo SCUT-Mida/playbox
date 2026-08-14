@@ -10,7 +10,7 @@
 // ============================================================================
 import { h } from './dom.js';
 import { classDef, elDef } from '../config.js';
-import { charFigure } from './charArt.js';
+import { charFigure, charArtVars } from './charArt.js';
 
 // card：卡牌定义（含 cls / element）；rarity：用于光环配色。
 export function renderSilhouette(card, rarity, opts = {}) {
@@ -21,6 +21,9 @@ export function renderSilhouette(card, rarity, opts = {}) {
   return h('div', {
     class: `silu silu--${cls.key} silu--${size} rarity-${rar}`,
     title: cls.pose,
+    // --sil* 落在根元素而非仅内部 .char-art：.silu__aura 是 .char-art 的兄弟节点，
+    // style.css 的 var(--sil) 光环描边依赖从这里继承（否则回退 currentColor 丢失五行色）。
+    style: charArtVars(card),
   },
     // 单色多层皮影剪影（is-sil：肤色 / 深衣 / 武器三阶墨色，轮廓仍可辨人形与武器）。
     charFigure(card, { sil: true }),

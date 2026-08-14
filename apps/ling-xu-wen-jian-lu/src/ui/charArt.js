@@ -15,7 +15,7 @@
 //   charBust(card, opts)   → HTMLElement 同素材的胸像裁切（迷你卡 / 图鉴 / 问道结果）
 // ============================================================================
 import { h } from './dom.js';
-import { classDef, silhouetteColor } from '../config.js';
+import { classDef, silhouetteColor, shade } from '../config.js';
 
 // —— 共用部件（五官 / 颈 / 足），坐标基于 viewBox 0 0 160 320 ——
 // 眼睛组沿用 .portrait__eyes 类名：动画系统在其上打 .blink（合眼）/ .smile（满好感微笑）。
@@ -209,17 +209,8 @@ export function charBust(card, opts = {}) {
 }
 
 // 五行代表色三阶（正 / 深 / 亮），供容器内联着色。
+// 卡面（portrait3D）与战场剪影（silhouetteRenderer）都从这里取值，保证同屏只有一档色。
 export function charArtVars(card) {
   const sil = silhouetteColor(card);
   return { '--sil': sil, '--sil-d': shade(sil, -0.35), '--sil-l': shade(sil, 0.3) };
-}
-
-// 颜色加深 / 变亮：amt 负数加深、正数变亮（与 app.js 的 shade 同实现，独立避免循环依赖）。
-function shade(hex, amt) {
-  if (!hex || hex[0] !== '#') return hex || '#333';
-  const n = hex.length === 4
-    ? hex.slice(1).split('').map((c) => parseInt(c + c, 16))
-    : [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
-  const f = (v) => Math.max(0, Math.min(255, Math.round(v + 255 * amt)));
-  return `rgb(${f(n[0])}, ${f(n[1])}, ${f(n[2])})`;
 }

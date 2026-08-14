@@ -12,8 +12,9 @@
 // 交互（设计稿增量 四）：
 //   悬停预览：角色微转头 + 飘动加速 + 背景墨迹涟漪；
 //   点击选中：金光描边闪烁 + 底部浮现专属诗词；
-//   拖拽旋转：卡牌绕 Y 轴 ±30° 旋转，三层视差位移；
-//   长按详情：角色「跃出」放大至 120%，进入全屏沉浸预览。
+//   长按详情：角色「跃出」放大，进入全屏沉浸预览。
+// 展示形态（issue #100）：默认 flat 平铺——人物查看 / 修炼场景卡面不倾斜、不旋转；
+// 2.5D 倾斜、拖拽旋转与悬停视差仅保留给战斗场景（battle-scene.js），flat:false 可复现旧版。
 // 养成反馈（设计稿增量 四·升级/突破成功）：celebrate() 金色光柱 + 冲天水墨粒子 + 微震。
 // ============================================================================
 import { h } from './dom.js';
@@ -29,12 +30,15 @@ import { createInkStream, burstInk } from './inkParticles.js';
 const LAYER_SPEED = { bg: 0.25, char: 0.55, fx: 0.95 };
 
 export class Portrait3D {
-  // opts: { card, instance, rarity, onPoem }
+  // opts: { card, instance, rarity, onPoem, flat }
+  // flat = true（默认）：卡面平铺展示——人物查看 / 修炼场景不倾斜、不旋转；
+  // 2.5D 视差 / 拖拽旋转只留给战斗场景（battle-scene.js）。传 flat: false 可恢复旧版 2.5D 把玩。
   constructor(opts = {}) {
     this.card = opts.card;
     this.instance = opts.instance || {};
     this.onPoem = opts.onPoem || (() => {});
     this.rarity = opts.rarity || (this.card && this.card.rarity) || 'R';
+    this.flat = opts.flat !== false;
     this._dead = false;
     this._anim = null;
     this._stream = null;
@@ -100,7 +104,8 @@ export class Portrait3D {
     });
 
     this._wire();
-    this._applyTransform(0, 16); // 初始微侧视角，营造立体感
+    // 平铺展示（issue #100）：人物查看 / 修炼场景不再倾斜 2.5D。
+    this._applyTransform(0, 0);
     return this.wrap;
   }
 
@@ -140,12 +145,14 @@ export class Portrait3D {
   }
 
   // —— 交互布线 ——
+  // 平铺模式（flat）下只保留：悬停（飘动加速 + 涟漪）、点击选中、长按沉浸预览；
+  // 拖拽旋转与悬停视差位移随 2.5D 一起关闭（2.5D 只属于战斗场景）。
   _wire() {
     const wrap = this.wrap;
     let dragging = false;
     let moved = 0;
     let startX = 0, startY = 0;
-    let baseRot = 16;
+    let baseRot = 0; // 平铺基准角：0（旧版 2.5D 为 16）
     let hoverPx = 0; // 悬停视差量 [-1..1]
 
     const cx = (e) => (e.touches ? e.touches[0].clientX : e.clientX);
@@ -167,7 +174,7 @@ export class Portrait3D {
     });
 
     wrap.addEventListener('pointermove', (e) => {
-      if (this._dead) return;
+      if (this._dead || this.flat) return; // 平铺：无拖拽旋转 / 悬停视差
       const dx = cx(e) - startX;
       const dy = cy(e) - startY;
       if (e.buttons > 0 || dragging) {
@@ -219,9 +226,16 @@ export class Portrait3D {
   }
 
   // 三层 transform：cardEl 绕 Y/X 轴旋转；bg/char/fx 各自 translateX 视差。
+  // 平铺模式（flat）下不施加任何旋转，卡面正对玩家（issue #100）。
   _applyTransform(tiltX, rotY) {
     if (this._dead) return;
     this._rotY = rotY;
+    if (this.flat) {
+      this.cardEl.style.transform = '';
+      this.cardEl.style.setProperty('--rot-y', '0deg');
+      this._applyParallax(0);
+      return;
+    }
     this.cardEl.style.transform = `rotateX(${(12 + tiltX).toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg)`;
     // 记录当前角度供 portrait-shake 关键帧引用，避免震屏时跳回固定 16deg。
     this.cardEl.style.setProperty('--rot-y', `${rotY.toFixed(2)}deg`);

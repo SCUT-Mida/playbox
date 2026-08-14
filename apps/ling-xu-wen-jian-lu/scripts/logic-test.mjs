@@ -655,5 +655,55 @@ console.log('— character portrait —');
   }
 }
 
+// ---------- 坊市·商城（issue #100：灵石消费出口） ----------
+console.log('— shop —');
+{
+  const { SHOP_GOODS, goodsById, canBuy, buyGoods, buyReason } = await import(new URL('../src/core/shop.js', import.meta.url).href);
+  // 用「当前时刻」作 lastSeen，避免 staminaValue 的离线恢复把测试值顶到上限。
+  const nowSecTest = Math.floor(Date.now() / 1000);
+  ok(SHOP_GOODS.length >= 8, `坊市商品 ≥8 件（实际 ${SHOP_GOODS.length}）`);
+  ok(SHOP_GOODS.every((g) => g.price > 0 && (g.kind === 'res' || g.kind === 'stamina')), '每件商品有正价且类型合法');
+  ok(goodsById('wendao') === SHOP_GOODS.find((g) => g.id === 'wendao'), 'goodsById 可查商品');
+
+  const p = newPlayer(); // 初始灵石 3000、问道令 10
+  const wendao0 = countRes(p, 'wendao');
+  ok(canBuy(p, goodsById('wendao')) === true, '灵石足够时可购买');
+  const r1 = buyGoods(p, goodsById('wendao'));
+  ok(r1.ok && countRes(p, 'lingshi') === 3000 - 300, `买问道令扣 300 灵石（余 ${countRes(p, 'lingshi')}）`);
+  ok(countRes(p, 'wendao') === wendao0 + 1, '买问道令到账 +1');
+
+  // 灵石不足 → 拒绝购买且资源不变
+  p.res.lingshi = 0;
+  ok(canBuy(p, goodsById('exp_m')) === false, '灵石不足时不可购买');
+  ok(buyGoods(p, goodsById('exp_m')).ok === false, '灵石不足购买失败');
+  ok(buyReason(p, goodsById('exp_m')) === '灵石不足', '失败原因为灵石不足');
+  ok(countRes(p, 'exp_m') === 3, '购买失败不改资源');
+
+  // 资源包：一次到账全部内容
+  p.res.lingshi = 600;
+  const r2 = buyGoods(p, goodsById('break_pack'));
+  ok(r2.ok && countRes(p, 'break_fire') === 3 && countRes(p, 'break_earth') === 3, '五行突破石礼包一次到账各 +1');
+  ok(countRes(p, 'lingshi') === 100, '礼包扣价 500 灵石');
+
+  // 灵气恢复：不满时可买，满时拒绝（newPlayer 不含 stamina 字段，这里手动构造）
+  p.res.lingshi = 1000;
+  p.stamina = { value: 30, lastSeen: nowSecTest };
+  const r3 = buyGoods(p, goodsById('stamina'));
+  ok(r3.ok && p.stamina.value === 90, `聚灵露恢复 60 灵气（30 → ${p.stamina.value}）`);
+  p.stamina.value = STAMINA_MAX; p.stamina.lastSeen = nowSecTest;
+  ok(canBuy(p, goodsById('stamina')) === false, '灵气已满时不可购买聚灵露');
+  ok(buyGoods(p, goodsById('stamina')).ok === false, '灵气已满购买失败');
+  ok(countRes(p, 'lingshi') === 850, `灵气已满时不扣灵石（余 ${countRes(p, 'lingshi')}）`);
+  // 恢复不越过上限
+  p.stamina.value = 100; p.stamina.lastSeen = nowSecTest;
+  buyGoods(p, goodsById('stamina'));
+  ok(p.stamina.value === STAMINA_MAX, `灵气恢复封顶 ${STAMINA_MAX}（实际 ${p.stamina.value}）`);
+
+  // 购买后存档结构仍可 recompute（幂等迁移不报错）
+  let recErr = null;
+  try { recompute(p); } catch (e) { recErr = e; }
+  ok(!recErr, '坊市购买后 recompute 幂等无异常');
+}
+
 console.log(`\n结果: ${pass} 通过, ${fail} 失败`);
 process.exit(fail ? 1 : 0);

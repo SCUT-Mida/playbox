@@ -21,6 +21,7 @@ import {
   elEmoji, elName, rarityDef, classDef, silhouetteColor, poemOf,
   rarityPortrait, affinityLevel, AFFINITY_MAX,
 } from '../config.js';
+import { charFigure } from './charArt.js';
 import { attachAnimations } from './animationSystem.js';
 import { createInkStream, burstInk } from './inkParticles.js';
 
@@ -122,26 +123,16 @@ export class Portrait3D {
     setTimeout(tick, 0);
   }
 
-  // —— 程序化立绘：头 / 袍服剪影 / 武器 / 飘动部件 ——
+  // —— 预制矢量立绘（charArt.js）：真实人形全身像，含头 / 交领袍服 / 双臂 / 武器 ——
+  // 飘动部件（hair / ribbon / 双袖）与眼睛直接内嵌在 SVG 分组里，
+  // 由 CSS 关键帧（.pc__hair / .part-*）与动画系统（.portrait__eyes 眨眼）驱动。
   _buildDoll(def, cls, sil, rp, maxAff) {
-    const parts = [];
-    // 武器（职业识别核心），位置由 CSS 的 cls-<key> 控制。
-    parts.push(h('span', { class: 'pc__weapon' }, cls.weapon));
-    // 袍服躯干：clip-path 剪影，按剪影色着色。
-    parts.push(h('span', { class: 'pc__robe' }));
-    // 头部 + 眼睛（满好感时微笑）。
-    parts.push(h('span', { class: 'pc__head' },
-      h('span', { class: `portrait__eyes${maxAff ? ' smile' : ''}` }, h('i'), h('i')),
-      h('span', { class: 'pc__hair' }),
-    ));
-    // 飘动部件（仅 SR/SSR）。hair 额外由头部承担，这里补 ribbon / 双袖等。
-    if (rp.dynamic >= 1) {
-      for (const p of cls.sway) {
-        if (p === 'hair') continue; // 头发已在头部，避免重复
-        parts.push(h('span', { class: `pc__part part-${p}` }));
-      }
+    const figure = charFigure(def);
+    if (maxAff) {
+      const eyes = figure.querySelector('.portrait__eyes');
+      if (eyes) eyes.classList.add('smile'); // 满好感·微笑
     }
-    return h('div', { class: `portrait__doll cls-${cls.key}` }, ...parts);
+    return h('div', { class: `portrait__doll cls-${cls.key}` }, figure);
   }
 
   // 朱砂印章：R/SR 左下角，SSR 右上角金字飘浮（设计稿增量 二）。

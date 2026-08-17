@@ -197,19 +197,24 @@ export function talentCost(branch, rank) { return (TALENT_BY_BRANCH[branch] || {
 
 // —— 敌人定义池（按楼层分阶）——
 // stances：敌人摆出各架势的相对权重；reward：星骸 / 零件 / 经验基准。
+// look：开罗风形象（引用共享素材库 _lib/kairo.js 的 preset + 配色覆盖）；emoji 作行文点缀保留。
 export const ENEMIES = [
-  { id: 'puppet',  name: '弃械傀儡', emoji: '🤖', minFloor: 1, hp: 26, atk: 7,  stances: { thrust: 4, slash: 3, smash: 2 }, stardust: 4,  parts: 2, exp: 6 },
-  { id: 'wraith',  name: '游荡幽影', emoji: '👻', minFloor: 1, hp: 20, atk: 9,  stances: { thrust: 3, slash: 2, smash: 4 }, stardust: 5,  parts: 1, exp: 7 },
-  { id: 'spore',   name: '孢子蛛',   emoji: '🕷️', minFloor: 1, hp: 16, atk: 6,  stances: { thrust: 3, slash: 4, smash: 2 }, stardust: 3,  parts: 1, exp: 5 },
-  { id: 'bat',     name: '锈翼蝠',   emoji: '🦇', minFloor: 4, hp: 34, atk: 11, stances: { thrust: 5, slash: 2, smash: 1 }, stardust: 7,  parts: 3, exp: 10 },
-  { id: 'crab',    name: '晶甲蟹',   emoji: '🦀', minFloor: 4, hp: 46, atk: 10, stances: { thrust: 2, slash: 5, smash: 3 }, stardust: 8,  parts: 4, exp: 12 },
-  { id: 'shard',   name: '晶屑虫',   emoji: '🐛', minFloor: 4, hp: 30, atk: 13, stances: { thrust: 4, slash: 3, smash: 2 }, stardust: 6,  parts: 3, exp: 9 },
-  { id: 'knight',  name: '残响骑士', emoji: '🛡️', minFloor: 7, hp: 60, atk: 14, stances: { thrust: 3, slash: 4, smash: 4 }, stardust: 11, parts: 5, exp: 16 },
-  { id: 'stalker', name: '虚空潜行者', emoji: '👹', minFloor: 7, hp: 52, atk: 17, stances: { thrust: 4, slash: 3, smash: 3 }, stardust: 12, parts: 4, exp: 18 },
-  { id: 'warden',  name: '虚空典狱', emoji: '👁️', minFloor: 7, hp: 58, atk: 15, stances: { thrust: 3, slash: 5, smash: 2 }, stardust: 13, parts: 5, exp: 17 },
-  { id: 'reaver',  name: '星骸劫夺者', emoji: '💀', minFloor: 7, hp: 48, atk: 19, stances: { thrust: 5, slash: 2, smash: 4 }, stardust: 14, parts: 4, exp: 19 },
-  { id: 'core',    name: '星骸之核', emoji: '🌟', minFloor: 10, hp: 160, atk: 20, stances: { thrust: 3, slash: 3, smash: 3 }, stardust: 60, parts: 30, exp: 100, boss: true },
+  { id: 'puppet',  name: '弃械傀儡', emoji: '🤖', minFloor: 1, hp: 26, atk: 7,  stances: { thrust: 4, slash: 3, smash: 2 }, stardust: 4,  parts: 2, exp: 6, look: { preset: 'robot', body: '#8a98a8', name: '弃械傀儡' } },
+  { id: 'wraith',  name: '游荡幽影', emoji: '👻', minFloor: 1, hp: 20, atk: 9,  stances: { thrust: 3, slash: 2, smash: 4 }, stardust: 5,  parts: 1, exp: 7, look: { preset: 'ghosty', body: '#9ec8de', body2: '#8ab8d2', name: '游荡幽影' } },
+  { id: 'spore',   name: '孢子蛛',   emoji: '🕷️', minFloor: 1, hp: 16, atk: 6,  stances: { thrust: 3, slash: 4, smash: 2 }, stardust: 3,  parts: 1, exp: 5, look: { preset: 'spiderBeast', body: '#7a5a9a', name: '孢子蛛' } },
+  { id: 'bat',     name: '锈翼蝠',   emoji: '🦇', minFloor: 4, hp: 34, atk: 11, stances: { thrust: 5, slash: 2, smash: 1 }, stardust: 7,  parts: 3, exp: 10, look: { preset: 'batBeast', body: '#a06a3a', name: '锈翼蝠' } },
+  { id: 'crab',    name: '晶甲蟹',   emoji: '🦀', minFloor: 4, hp: 46, atk: 10, stances: { thrust: 2, slash: 5, smash: 3 }, stardust: 8,  parts: 4, exp: 12, look: { preset: 'crabBeast', body: '#5a9ac8', shell: '#6ab0d8', shellRim: '#a8e0f0', name: '晶甲蟹' } },
+  { id: 'shard',   name: '晶屑虫',   emoji: '🐛', minFloor: 4, hp: 30, atk: 13, stances: { thrust: 4, slash: 3, smash: 2 }, stardust: 6,  parts: 3, exp: 9, look: { preset: 'bugBeast', body: '#8ab8c8', name: '晶屑虫' } },
+  { id: 'knight',  name: '残响骑士', emoji: '🛡️', minFloor: 7, hp: 60, atk: 14, stances: { thrust: 3, slash: 4, smash: 4 }, stardust: 11, parts: 5, exp: 16, look: { preset: 'knight', body: '#8a96a8', name: '残响骑士' } },
+  { id: 'stalker', name: '虚空潜行者', emoji: '👹', minFloor: 7, hp: 52, atk: 17, stances: { thrust: 4, slash: 3, smash: 3 }, stardust: 12, parts: 4, exp: 18, look: { preset: 'demon', body: '#4a3a6a', name: '虚空潜行者' } },
+  { id: 'warden',  name: '虚空典狱', emoji: '👁️', minFloor: 7, hp: 58, atk: 15, stances: { thrust: 3, slash: 5, smash: 2 }, stardust: 13, parts: 5, exp: 17, look: { preset: 'watcher', body: '#5a4a8a', hatColor: '#4a3a6a', glow: '#c060d0', name: '虚空典狱' } },
+  { id: 'reaver',  name: '星骸劫夺者', emoji: '💀', minFloor: 7, hp: 48, atk: 19, stances: { thrust: 5, slash: 2, smash: 4 }, stardust: 14, parts: 4, exp: 19, look: { preset: 'reaper', name: '星骸劫夺者' } },
+  { id: 'core',    name: '星骸之核', emoji: '🌟', minFloor: 10, hp: 160, atk: 20, stances: { thrust: 3, slash: 3, smash: 3 }, stardust: 60, parts: 30, exp: 100, boss: true, look: { preset: 'starBeast', name: '星骸之核' } },
 ];
+
+// —— 玩家 / 商人形象（开罗风，共享素材库 preset）——
+export const PLAYER_LOOK = { preset: 'astronaut', body: '#dfe7ee', name: '星骸旅者' };
+export const MERCHANT_LOOK = { preset: 'merchant', body: '#c9a24f', packColor: '#8a6831', name: '拾荒商人' };
 
 // 按楼层挑选一个合适敌人定义（同 minFloor 池中加权随机由调用方处理）。
 export function enemyPoolFor(floor) {

@@ -213,7 +213,7 @@ export function enemyFromDef(def, floor) {
   // 敌人 HP / 攻击随楼层小幅上扬，保证后期更有压力。
   const tier = Math.max(0, (floor || 1) - (def.minFloor || 1));
   return {
-    defId: def.id, name: def.name, emoji: def.emoji,
+    defId: def.id, name: def.name, emoji: def.emoji, look: def.look,
     hp: def.hp + tier * 4, maxHp: def.hp + tier * 4,
     atk: def.atk + tier, stances: { ...def.stances },
     stardust: def.stardust, parts: def.parts, exp: def.exp,

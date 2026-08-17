@@ -6,6 +6,7 @@
 // ============================================================================
 import './style.css';
 import { attachKeyboardShell } from '../../../_lib/keyboard-shell.js';
+import { kairoSVG } from '../../../_lib/kairo.js';
 import { h, clear, bar } from './dom.js';
 import {
   PALETTE, GRID, VISION_RADIUS, isWalkable,
@@ -13,7 +14,7 @@ import {
   TALENTS, TALENT_BY_BRANCH, talentCost,
   STAMINA_COST_PER_ROUND, STAMINA_REGEN_PER_STEP, STAMINA_REGEN_INTERVAL_MS, STAMINA_TIRED,
   SHOP_ITEMS, DRONE_COST, EVENT_META, MEMORY_CHAPTERS, STORY, ENDINGS, MAX_FLOOR, expToNext,
-  biomeFor, DECOR, PLANETS, planetFor, GEAR_SLOT_META,
+  biomeFor, DECOR, PLANETS, planetFor, GEAR_SLOT_META, PLAYER_LOOK, MERCHANT_LOOK,
 } from '../config.js';
 import {
   newPlayer, migrate, maxHp, maxStamina, effectiveAtk, effectiveDef, effectiveMoveRange,
@@ -467,10 +468,11 @@ export class GameUI {
         if (cell.className !== cls) cell.className = cls;
         cell.style.background = ''; // 纹理统一交由 CSS .t-<id>
         // 内容优先级：玩家 > 实体 > 阶梯图标 > 点缀；雾格无内容。
+        // 角色人物（玩家/敌人/商人）渲染为开罗风像素 SVG，道具类仍用 emoji。
         let emoji = '', kind = '';
         if (!fog && (visible || explored)) {
-          if (isPlayer) { emoji = '🧑‍🚀'; kind = 'ent'; }
-          else if (ent) { emoji = entityEmoji(ent, tileId); kind = 'ent'; }
+          if (isPlayer) { emoji = kairoSVG(PLAYER_LOOK, 22); kind = 'ent'; }
+          else if (ent) { emoji = entityContent(ent, tileId); kind = 'ent'; }
           else if (tileId === 'stairs') { emoji = '🪜'; kind = 'ent'; }
           else if (decorRow && decorRow[x] && DECOR[decorRow[x]]) { emoji = DECOR[decorRow[x]].emoji; kind = 'decor'; }
         }
@@ -478,7 +480,13 @@ export class GameUI {
         if (cell.dataset.sig !== sig) {
           cell.dataset.sig = sig;
           while (cell.firstChild) cell.removeChild(cell.firstChild);
-          if (emoji) cell.appendChild(h('span', { class: kind }, emoji));
+          // SVG 字符串（开罗风形象）走 html 注入，emoji 走文本节点
+          const isSvg = emoji.startsWith('<svg');
+          if (emoji) {
+            cell.appendChild(isSvg
+              ? h('span', { class: kind, html: emoji })
+              : h('span', { class: kind }, emoji));
+          }
         }
         cell.dataset.x = String(x);
         cell.dataset.y = String(y);
@@ -766,7 +774,7 @@ export class GameUI {
     clear(this.stage);
     const e = this.battle.enemy;
     const wrap = h('div', { class: 'battle' });
-    this.foeEmoji = h('div', { class: 'emoji' }, e.emoji || '👾');
+    this.foeEmoji = h('div', { class: 'emoji kairo-foe', html: kairoSVG(e.look || { preset: 'beast', name: e.name }, e.boss ? 96 : 80) });
     this.foeName = h('div', { class: 'name' }, `${e.name}${e.boss ? ' · BOSS' : ''}`);
     this.foeHpFill = h('div', { class: 'bar__fill', style: { background: PALETTE.monster } });
     this.foeHpLabel = h('span', { class: 'bar__label' }, `${e.hp}/${e.maxHp}`);
@@ -941,7 +949,7 @@ export class GameUI {
     const body = [
       h('div', { class: 'reward' },
         h('div', { class: 'reward__head' },
-          h('div', { class: 'reward__emoji' }, enemy.emoji || '👾'),
+          h('div', { class: 'reward__emoji kairo-foe', html: kairoSVG(enemy.look || { preset: 'beast', name: enemy.name }, 48) }),
           h('div', null,
             h('div', { class: 'reward__title' }, `击败 ${enemy.name}`),
             h('div', { class: 'muted' }, enemy.boss ? '强敌已倒下' : '战斗胜利'),
@@ -1581,11 +1589,11 @@ function adjacentEnemy(st, pos) {
   }
   return null;
 }
-function entityEmoji(ent, tileId) {
+function entityContent(ent, tileId) {
   switch (ent.type) {
-    case 'enemy': return ent.emoji || '👾';
+    case 'enemy': return kairoSVG(ent.look || { preset: 'beast', name: ent.name }, 22);
+    case 'merchant': return kairoSVG(MERCHANT_LOOK, 22);
     case 'chest': return '🎁';
-    case 'merchant': return '🛒';
     case 'drone': return '🔧';
     case 'memory': return '💎';
     case 'trap': return ''; // 陷阱不显示

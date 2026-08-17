@@ -3,16 +3,26 @@
 // 每个 NPC：id / name / emoji / 身份 / 性格文案 / 喜好礼物(liked) / 结识所需境界(meetTier)
 //   / 组队奖励倍率(teamMult，组队探险时放大收益)。
 // liked 为物品 id：赠予喜好物好感增益更高。
+// look：开罗风形象（引用共享素材库 _lib/kairo.js 的 preset + 配色覆盖），
+//       emoji 仅作行文点缀保留。
 // ============================================================================
 export const NPCS = {
-  npc_murong:  { id: 'npc_murong',  name: '慕容师兄', emoji: '🤺', title: '青云剑修', meetTier: 0, liked: 'ore_baijin',  teamMult: 1.7, desc: '寡言重义的剑修，常独行深山磨砺剑心。', line: '剑道漫漫，能与你同行一程，亦是缘分。' },
-  npc_xuanye:  { id: 'npc_xuanye',  name: '玄烨真人', emoji: '⚗️', title: '丹道宗师', meetTier: 0, liked: 'herb_lingzhi', teamMult: 1.6, desc: '痴迷丹道的老者，一身药香，出手阔绰。', line: '小友若肯助我采药，老夫自有重谢。' },
-  npc_muyan:   { id: 'npc_muyan',   name: '沐烟师妹', emoji: '🧚', title: '玄门女修', meetTier: 1, liked: 'essence_ling', teamMult: 1.9, desc: '天赋异禀的玄修少女，机敏灵动，善破阵法。', line: '师兄，这次秘境我也要去！' },
-  npc_chiyan:  { id: 'npc_chiyan',  name: '赤炎老怪', emoji: '🔥', title: '散修体修', meetTier: 1, liked: 'herb_huoyan',  teamMult: 1.8, desc: '脾气火爆的体修，崇尚以力破巧，嗜战如命。', line: '打一架再说！赢了分你一半。' },
-  npc_yinyue:  { id: 'npc_yinyue',  name: '银月姑娘', emoji: '🦊', title: '灵狐妖修', meetTier: 2, liked: 'herb_lingzhi', teamMult: 2.0, desc: '化形未久的灵狐，狡黠多智，嗅觉灵敏能寻重宝。', line: '藏宝之处，我比你先嗅到哦。' },
-  npc_qingluan:{ id: 'npc_qingluan',name: '青鸾仙子', emoji: '🦢', title: '御兽仙子', meetTier: 3, liked: 'essence_ling', teamMult: 2.1, desc: '驾驭青鸾的仙子，见识广博，所到之处机缘不断。', line: '随我云端巡游，自有奇遇。' },
-  npc_moyi:    { id: 'npc_moyi',    name: '墨衣客',   emoji: '🥷', title: '神秘散修', meetTier: 3, liked: 'ore_longgu',  teamMult: 2.1, desc: '来历成谜的黑衣修士，身法诡谲，常出入险地。', line: '各取所需，莫问出处。' },
-  npc_guxian:  { id: 'npc_guxian',  name: '谷隐仙翁', emoji: '🧙', title: '隐世高人', meetTier: 5, liked: 'ore_longgu',  teamMult: 2.4, desc: '隐居深谷的世外高人，境界莫测，随手之劳便是机缘。', line: '小友根骨不俗，老朽愿指点一二。' },
+  npc_murong:  { id: 'npc_murong',  name: '慕容师兄', emoji: '🤺', title: '青云剑修', meetTier: 0, liked: 'ore_baijin',  teamMult: 1.7, desc: '寡言重义的剑修，常独行深山磨砺剑心。', line: '剑道漫漫，能与你同行一程，亦是缘分。',
+    look: { preset: 'swordsman', body: '#3a5a78', accent: '#d7e6f2', hair: '#17120f', hairStyle: 'bun', mood: 'happy', name: '慕容师兄' } },
+  npc_xuanye:  { id: 'npc_xuanye',  name: '玄烨真人', emoji: '⚗️', title: '丹道宗师', meetTier: 0, liked: 'herb_lingzhi', teamMult: 1.6, desc: '痴迷丹道的老者，一身药香，出手阔绰。', line: '小友若肯助我采药，老夫自有重谢。',
+    look: { preset: 'sage', body: '#2f7d57', accent: '#d6f0dd', glow: '#9be8b6', name: '玄烨真人' } },
+  npc_muyan:   { id: 'npc_muyan',   name: '沐烟师妹', emoji: '🧚', title: '玄门女修', meetTier: 1, liked: 'essence_ling', teamMult: 1.9, desc: '天赋异禀的玄修少女，机敏灵动，善破阵法。', line: '师兄，这次秘境我也要去！',
+    look: { preset: 'mage', gender: 'female', hairStyle: 'long', hair: '#3c2a46', body: '#5a3a8a', accent: '#ddccf2', glow: '#b89cf0', name: '沐烟师妹' } },
+  npc_chiyan:  { id: 'npc_chiyan',  name: '赤炎老怪', emoji: '🔥', title: '散修体修', meetTier: 1, liked: 'herb_huoyan',  teamMult: 1.8, desc: '脾气火爆的体修，崇尚以力破巧，嗜战如命。', line: '打一架再说！赢了分你一半。',
+    look: { preset: 'demon', horns: 0, body: '#8a3a2a', accent: '#f0c98a', hairStyle: 'spiky', mood: 'angry', name: '赤炎老怪' } },
+  npc_yinyue:  { id: 'npc_yinyue',  name: '银月姑娘', emoji: '🦊', title: '灵狐妖修', meetTier: 2, liked: 'herb_lingzhi', teamMult: 2.0, desc: '化形未久的灵狐，狡黠多智，嗅觉灵敏能寻重宝。', line: '藏宝之处，我比你先嗅到哦。',
+    look: { preset: 'foxSpirit', body: '#c46a8a', hair: '#d8e0e8', name: '银月姑娘' } },
+  npc_qingluan:{ id: 'npc_qingluan',name: '青鸾仙子', emoji: '🦢', title: '御兽仙子', meetTier: 3, liked: 'essence_ling', teamMult: 2.1, desc: '驾驭青鸾的仙子，见识广博，所到之处机缘不断。', line: '随我云端巡游，自有奇遇。',
+    look: { preset: 'crane', body: '#8ab4d0', accent: '#f0e8d8', plume: '#8ad0e8', name: '青鸾仙子' } },
+  npc_moyi:    { id: 'npc_moyi',    name: '墨衣客',   emoji: '🥷', title: '神秘散修', meetTier: 3, liked: 'ore_longgu',  teamMult: 2.1, desc: '来历成谜的黑衣修士，身法诡谲，常出入险地。', line: '各取所需，莫问出处。',
+    look: { preset: 'ninja', name: '墨衣客' } },
+  npc_guxian:  { id: 'npc_guxian',  name: '谷隐仙翁', emoji: '🧙', title: '隐世高人', meetTier: 5, liked: 'ore_longgu',  teamMult: 2.4, desc: '隐居深谷的世外高人，境界莫测，随手之劳便是机缘。', line: '小友根骨不俗，老朽愿指点一二。',
+    look: { preset: 'sage', body: '#7a8a94', accent: '#e8e0c8', glow: '#ffe08a', beardLong: true, name: '谷隐仙翁' } },
 };
 export const NPC_LIST = Object.values(NPCS);
 

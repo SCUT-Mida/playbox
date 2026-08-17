@@ -3,19 +3,25 @@
 // ============================================================================
 
 // 妖兽原型：hp/atk/def 为相对基准（最终按玩家等级缩放），el 五行，drops 掉落池
+// look：开罗风兽形形象（引用共享素材库 _lib/kairo.js 的 preset），按 el 覆盖毛色。
 const ENEMY_ARCHETYPES = [
-  { name: '灵鼠',     hpR: 0.7, atkR: 0.8, defR: 0.5, el: 'wood',  drops: ['herb_qingmu', 'herb_qingmu', 'lingdust'] },
-  { name: '青竹蛇',   hpR: 0.8, atkR: 0.9, defR: 0.5, el: 'wood',  drops: ['herb_qingmu', 'herb_zihua', 'lingdust'] },
-  { name: '独角狼妖', hpR: 0.9, atkR: 1.1, defR: 0.6, el: 'metal', drops: ['ore_xuantie', 'lingdust', 'herb_zihua'] },
-  { name: '赤焰蜥',   hpR: 0.9, atkR: 1.0, defR: 0.7, el: 'fire',  drops: ['herb_huoyan', 'essence_ling', 'lingdust'] },
-  { name: '冰蟾',     hpR: 1.0, atkR: 0.9, defR: 0.8, el: 'water', drops: ['herb_hanbing', 'essence_ling', 'lingdust'] },
-  { name: '玄甲龟',   hpR: 1.4, atkR: 0.8, defR: 1.3, el: 'earth', drops: ['ore_xuantie', 'ore_longgu', 'lingdust'] },
-  { name: '黑翼蝠',   hpR: 0.8, atkR: 1.3, defR: 0.5, el: 'metal', drops: ['ore_baijin', 'herb_zihua', 'lingdust'] },
-  { name: '百年妖蛇', hpR: 1.2, atkR: 1.2, defR: 0.9, el: 'wood',  drops: ['herb_lingzhi', 'essence_ling', 'herb_zihua'] },
-  { name: '三眼妖虎', hpR: 1.3, atkR: 1.4, defR: 1.0, el: 'fire',  drops: ['ore_baijin', 'herb_huoyan', 'essence_ling'] },
-  { name: '寒潭蛟龙', hpR: 1.6, atkR: 1.5, defR: 1.2, el: 'water', drops: ['herb_lingzhi', 'ore_longgu', 'ore_baijin'] },
-  { name: '赤炎妖尊', hpR: 1.7, atkR: 1.7, defR: 1.2, el: 'fire',  drops: ['herb_lingzhi', 'ore_longgu', 'ore_baijin'] },
+  { name: '灵鼠',     hpR: 0.7, atkR: 0.8, defR: 0.5, el: 'wood',  drops: ['herb_qingmu', 'herb_qingmu', 'lingdust'], look: { preset: 'ratBeast', name: '灵鼠' } },
+  { name: '青竹蛇',   hpR: 0.8, atkR: 0.9, defR: 0.5, el: 'wood',  drops: ['herb_qingmu', 'herb_zihua', 'lingdust'], look: { preset: 'serpent', name: '青竹蛇' } },
+  { name: '独角狼妖', hpR: 0.9, atkR: 1.1, defR: 0.6, el: 'metal', drops: ['ore_xuantie', 'lingdust', 'herb_zihua'], look: { preset: 'wolfBeast', horns: 1, name: '独角狼妖' } },
+  { name: '赤焰蜥',   hpR: 0.9, atkR: 1.0, defR: 0.7, el: 'fire',  drops: ['herb_huoyan', 'essence_ling', 'lingdust'], look: { preset: 'serpent', beastEars: 'antenna', spines: true, name: '赤焰蜥' } },
+  { name: '冰蟾',     hpR: 1.0, atkR: 0.9, defR: 0.8, el: 'water', drops: ['herb_hanbing', 'essence_ling', 'lingdust'], look: { preset: 'toad', name: '冰蟾' } },
+  { name: '玄甲龟',   hpR: 1.4, atkR: 0.8, defR: 1.3, el: 'earth', drops: ['ore_xuantie', 'ore_longgu', 'lingdust'], look: { preset: 'turtleBeast', name: '玄甲龟' } },
+  { name: '黑翼蝠',   hpR: 0.8, atkR: 1.3, defR: 0.5, el: 'metal', drops: ['ore_baijin', 'herb_zihua', 'lingdust'], look: { preset: 'batBeast', name: '黑翼蝠' } },
+  { name: '百年妖蛇', hpR: 1.2, atkR: 1.2, defR: 0.9, el: 'wood',  drops: ['herb_lingzhi', 'essence_ling', 'herb_zihua'], look: { preset: 'serpent', horns: 2, name: '百年妖蛇' } },
+  { name: '三眼妖虎', hpR: 1.3, atkR: 1.4, defR: 1.0, el: 'fire',  drops: ['ore_baijin', 'herb_huoyan', 'essence_ling'], look: { preset: 'tigerBeast', name: '三眼妖虎' } },
+  { name: '寒潭蛟龙', hpR: 1.6, atkR: 1.5, defR: 1.2, el: 'water', drops: ['herb_lingzhi', 'ore_longgu', 'ore_baijin'], look: { preset: 'drake', name: '寒潭蛟龙' } },
+  { name: '赤炎妖尊', hpR: 1.7, atkR: 1.7, defR: 1.2, el: 'fire',  drops: ['herb_lingzhi', 'ore_longgu', 'ore_baijin'], look: { preset: 'drake', horns: 3, name: '赤炎妖尊' } },
 ];
+
+// 五行 → 毛色（兽形主体色）
+const EL_COLORS = {
+  wood: '#4a9a5a', fire: '#e06a3a', water: '#4a8ad0', metal: '#8a8a96', earth: '#b08a4a',
+};
 
 // 高境界出现更强的"妖王"（前缀 + 全属性提升）
 const ELITE_PREFIX = ['千年', '化形', '妖王', '上古'];
@@ -42,10 +48,14 @@ export function makeEnemy(lv, rng) {
   const rareDrop = lv >= 6 && r() < 0.12 ? rareDropFor(lv, r) : null;
 
   const name = elite ? `${ELITE_PREFIX[Math.floor(r() * ELITE_PREFIX.length)]}${arc.name}` : arc.name;
+  // 开罗风形象：原型 look + 五行毛色；精英附加怒容
+  const look = { ...arc.look, body: EL_COLORS[arc.el] || '#9a8a76', name };
+  if (elite) look.mood = 'angry';
   return {
     name,
     hp, maxHp: hp, atk, def, el: arc.el,
     elite,
+    look,
     rewards: { stones, drops: [{ id: dropId, qty: dropQty }], rare: rareDrop },
   };
 }

@@ -333,6 +333,9 @@
 .frxx .enemy-head { text-align: center; margin-bottom: 0.5rem; }
 .frxx .enemy-head .emo { font-size: 2.4rem; }
 .frxx .enemy-head.elite .emo { animation: frxx-pulse 1.2s infinite; }
+/* 开罗风像素形象（SVG）：块级居中，保持像素质感 */
+.frxx .kairo-emo { display: flex; justify-content: center; }
+.frxx .kairo-emo svg { display: block; image-rendering: pixelated; }
 .frxx .battle-log {
   background: #0a0703; border: 1px solid var(--line); border-radius: 8px;
   padding: 0.5rem; height: 120px; overflow-y: auto; font-size: 0.78rem; margin: 0.5rem 0;

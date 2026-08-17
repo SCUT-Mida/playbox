@@ -5,6 +5,7 @@
 // ============================================================================
 import '../ui/style.css';
 import { attachKeyboardShell } from '../../../_lib/keyboard-shell.js';
+import { kairoSVG } from '../../../_lib/kairo.js';
 import { h, clear, bar } from './dom.js';
 import { portraitSVG } from './portrait.js';
 import {
@@ -912,7 +913,7 @@ export class GameUI {
 
     const body = [
       h('div', { class: `enemy-head ${enemy.elite ? 'elite' : ''}` },
-        h('div', { class: 'emo' }, enemy.elite ? '👹' : '🐉'),
+        h('div', { class: 'emo kairo-emo', html: kairoSVG(enemy.look || { preset: 'beast' }, 56) }),
         h('div', null, `${enemy.name}${enemy.elite ? '（精英）' : ''}`),
       ),
       bar(state.enemy.hp, enemy.maxHp, { class: 'hp', label: `妖兽气血 ${Math.max(0, Math.floor(state.enemy.hp))}/${enemy.maxHp}` }),
@@ -1661,7 +1662,7 @@ export class GameUI {
       const segPct = segHi > segLo ? Math.max(0, Math.min(100, ((aff - segLo) / (segHi - segLo)) * 100)) : 100;
       c.append(h('div', { class: 'card npc-card' },
         h('div', { class: 'row' },
-          h('div', { class: 'emo sect-emo' }, npc.emoji),
+          h('div', { class: 'emo sect-emo kairo-emo', html: kairoSVG(npc.look || { preset: 'villager', name: npc.name }, 40) }),
           h('div', { class: 'grow' },
             h('div', { class: 'nm' }, `${npc.name}`),
             h('div', { class: 'muted', style: { marginTop: '0.1rem' } }, `${npc.title} · ${npc.desc}`),

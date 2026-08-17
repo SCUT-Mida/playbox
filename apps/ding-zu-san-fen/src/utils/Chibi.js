@@ -1,8 +1,13 @@
-// Chibi —— 开罗风格 Q版小人程序化绘制
-// 所有图形以容器原点 (0,0) 为角色竖直中心向上/向下构建；调用方负责整体定位/缩放。
-// 复用于武将(General)与敌军(Enemy)，由调用方传入颜色、头饰、配件等 opts。
+// Chibi —— 开罗风格 Q版小人（三国皮肤层）
+// 底层绘制已迁移到共享素材库 apps/_lib/kairo.js（像素网格 + 双后端），
+// 本文件只保留三国语境：武将/敌军的外观预设表与 opts 组装。
+// 对外 API（drawChibi / optsForGeneral / optsForEnemy / CHIBI / shade）不变，
+// General / Enemy 与各场景的调用代码无需改动。
 
 import { COLORS } from '../config.js';
+import { drawKairo, kairoSpec, shade } from '../../../_lib/kairo.js';
+
+export { shade };
 
 export const CHIBI = {
   // 按阵营微调的暖肤色
@@ -16,271 +21,39 @@ export const CHIBI = {
   ink: 0x2c2418,
 };
 
-// 颜色明暗：f<1 变暗，f>1 变亮（自动钳制到 0..255）
-export function shade(hex, f) {
-  const r = Math.min(255, Math.max(0, Math.round(((hex >> 16) & 255) * f)));
-  const g = Math.min(255, Math.max(0, Math.round(((hex >> 8) & 255) * f)));
-  const b = Math.min(255, Math.max(0, Math.round((hex & 255) * f)));
-  return (r << 16) | (g << 8) | b;
+// 旧 opts（十六进制数字）→ kairo spec（'#rrggbb' 字符串 + 共享库字段名）
+export function chibiSpec(opts = {}) {
+  const css = (v) => (typeof v === 'number' ? '#' + v.toString(16).padStart(6, '0') : v);
+  return kairoSpec({
+    plan: 'chibi',
+    skin: css(opts.skin ?? CHIBI.skins.default),
+    hair: css(opts.hair),
+    body: css(opts.body ?? 0x3a6ea5),
+    body2: css(opts.body2),
+    accent: css(opts.accent),
+    shoe: css(opts.shoe ?? 0x3a3028),
+    hat: opts.hatStyle || 'none',
+    hatColor: css(opts.hat ?? opts.body),
+    plume: css(opts.plume),
+    doublePlume: !!opts.doublePlume,
+    weapon: opts.weapon || 'none',
+    mood: opts.mood || 'happy',
+    glow: css(opts.glow),
+    fanColor: css(opts.fanColor),
+    beard: opts.beard === 'white' ? '#eae6d8' : css(opts.beard),
+    beardLong: !!opts.beardLong,
+  });
 }
 
-// 绘制一尊 Q版小人到 Graphics 对象 g
-// opts:
-//   size      总高(px)
-//   skin      肤色
-//   body      衣甲主色
-//   accent    衣领/腰带亮色
-//   shoe      鞋/裤色
-//   hat       头饰主色
-//   hatStyle  'cap' | 'plume' | 'wizard' | 'band' | 'crown'
-//   plume     缨/羽色(plume/crown/wizard 帽尖用)
-//   weapon    'sword' | 'staff' | 'shield' | null
-//   mood      'happy' | 'angry' | 'glow'
-//   glow      发光眼/法球色
+// 绘制一尊 Q版小人到 Phaser Graphics 对象 g（垂直映射与旧版对齐：脚底 ≈ +0.385×size）
 export function drawChibi(g, opts = {}) {
-  const s = opts.size || 48;
-  const ink = CHIBI.ink;
-  const skin = opts.skin ?? CHIBI.skins.default;
-  const body = opts.body ?? 0x3a6ea5;
-
-  const headR = s * 0.27;
-  const headY = -s * 0.23;
-  const bodyW = s * 0.42;
-  const bodyTop = headY + headR * 0.5;
-  const bodyH = s * 0.30;
-
-  // —— 腿 ——
-  g.fillStyle(opts.shoe ?? ink, 1);
-  g.fillRoundedRect(-s * 0.135, bodyTop + bodyH - s * 0.02, s * 0.11, s * 0.20, s * 0.04);
-  g.fillRoundedRect(s * 0.025, bodyTop + bodyH - s * 0.02, s * 0.11, s * 0.20, s * 0.04);
-
-  // —— 躯干 ——
-  g.fillStyle(body, 1);
-  g.fillRoundedRect(-bodyW / 2, bodyTop, bodyW, bodyH, bodyW * 0.42);
-  if (opts.accent != null) {
-    g.fillStyle(opts.accent, 1);
-    g.fillRoundedRect(-bodyW / 2, bodyTop, bodyW, bodyH * 0.34, bodyW * 0.42);
-  }
-
-  // —— 手臂(短桩) ——
-  g.fillStyle(body, 1);
-  g.fillCircle(-bodyW / 2 + s * 0.012, bodyTop + bodyH * 0.5, s * 0.10);
-  g.fillCircle(bodyW / 2 - s * 0.012, bodyTop + bodyH * 0.5, s * 0.10);
-  g.fillStyle(skin, 1);
-  g.fillCircle(-bodyW / 2 + s * 0.012, bodyTop + bodyH * 0.56, s * 0.062);
-  g.fillCircle(bodyW / 2 - s * 0.012, bodyTop + bodyH * 0.56, s * 0.062);
-
-  // —— 脖子 ——
-  g.fillStyle(skin, 1);
-  g.fillRect(-s * 0.07, headY + headR * 0.6, s * 0.14, s * 0.10);
-
-  // —— 头(大) ——
-  g.fillStyle(skin, 1);
-  g.fillCircle(0, headY, headR);
-  g.lineStyle(Math.max(1, s * 0.018), ink, 0.22);
-  g.strokeCircle(0, headY, headR);
-
-  drawHat(g, headY, headR, s, opts);
-  drawAccessory(g, bodyTop, bodyH, bodyW, s, opts);
-  drawFace(g, headY, headR, s, opts);
-  drawBeard(g, headY, headR, s, opts);
-}
-
-// 胡须：结合三国人物特征（关羽长髯、黄忠白须、张飞虎须）。
-// opts.beard: 颜色数字 | 'white' | true(默认黑)；opts.beardLong: 关羽式长髯
-function drawBeard(g, headY, headR, s, opts) {
-  const b = opts.beard;
-  if (!b) return;
-  const col = b === 'white' ? 0xeae6d8 : (typeof b === 'number' ? b : 0x241c14);
-  const top = headY + headR * 0.5;
-  const len = opts.beardLong ? headR * 1.5 : headR * 0.7;
-  g.fillStyle(col, 0.95);
-  // 主体：下颌处下垂的须丛
-  g.fillEllipse(0, top + len * 0.4, headR * (opts.beardLong ? 1.15 : 0.95), len);
-  // 尖端收拢（长髯更尖）
-  g.fillTriangle(-headR * 0.28, top + len * 0.5, headR * 0.28, top + len * 0.5, 0, top + len * 0.9);
-}
-
-function drawHat(g, headY, headR, s, opts) {
-  const style = opts.hatStyle || 'cap';
-  const col = opts.hat ?? opts.body ?? 0x4a3c2a;
-  const lw = Math.max(1, s * 0.016);
-
-  if (style === 'wizard') {
-    // 法师尖帽
-    g.fillStyle(col, 1);
-    g.beginPath();
-    g.moveTo(-headR * 0.92, headY - headR * 0.15);
-    g.lineTo(headR * 0.92, headY - headR * 0.15);
-    g.lineTo(s * 0.10, headY - headR * 2.1);
-    g.closePath();
-    g.fillPath();
-    g.lineStyle(lw, 0x000000, 0.18);
-    g.strokePath();
-    g.fillStyle(opts.plume ?? 0xffe08a, 1);
-    g.fillCircle(s * 0.10, headY - headR * 2.1, s * 0.05);
-    return;
-  }
-
-  if (style === 'band') {
-    // 头巾(如黄巾)：一条横带 + 飘带
-    g.fillStyle(col, 1);
-    g.fillRoundedRect(-headR * 0.98, headY - headR * 0.42, headR * 1.96, headR * 0.5, headR * 0.2);
-    g.fillTriangle(
-      -headR * 0.95, headY - headR * 0.2,
-      -headR * 1.5, headY - headR * 0.6,
-      -headR * 1.2, headY + headR * 0.05,
-    );
-    return;
-  }
-
-  // cap / plume / crown：覆盖头顶的弧形兜鍪
-  g.fillStyle(col, 1);
-  g.beginPath();
-  g.arc(0, headY, headR + s * 0.02, Math.PI * 1.04, Math.PI * 1.96, false);
-  g.lineTo(0, headY - headR * 1.12);
-  g.closePath();
-  g.fillPath();
-  g.lineStyle(lw, 0x000000, 0.18);
-  g.strokePath();
-
-  if (style === 'plume') {
-    const pc = opts.plume ?? 0xf0c040;
-    if (opts.doublePlume) {
-      // 吕布式双翎：头盔左右两根直立长羽（雉鸡翎）
-      g.fillStyle(pc, 1);
-      g.fillEllipse(-s * 0.11, headY - headR * 1.16, s * 0.05, s * 0.27);
-      g.fillEllipse(s * 0.11, headY - headR * 1.16, s * 0.05, s * 0.27);
-      g.fillStyle(0xffffff, 0.5);
-      g.fillEllipse(-s * 0.11, headY - headR * 1.24, s * 0.018, s * 0.16);
-      g.fillEllipse(s * 0.11, headY - headR * 1.24, s * 0.018, s * 0.16);
-    } else {
-      // 长羽缨(远程)
-      g.fillStyle(pc, 1);
-      g.fillEllipse(s * 0.06, headY - headR * 1.22, s * 0.055, s * 0.22);
-    }
-  } else if (style === 'cap') {
-    // 盔顶圆缨(近战/重甲)
-    if (opts.plume != null) {
-      g.fillStyle(opts.plume, 1);
-      g.fillCircle(0, headY - headR * 1.0, s * 0.06);
-    }
-  } else if (style === 'crown') {
-    // BOSS 金冠锯齿
-    g.fillStyle(opts.plume ?? 0xf0c040, 1);
-    const cy = headY - headR * 0.78;
-    for (let i = -2; i <= 2; i++) {
-      g.fillTriangle(
-        i * headR * 0.34 - headR * 0.15, cy + headR * 0.16,
-        i * headR * 0.34 + headR * 0.15, cy + headR * 0.16,
-        i * headR * 0.34, cy - headR * 0.32,
-      );
-    }
-  }
-}
-
-function drawAccessory(g, bodyTop, bodyH, bodyW, s, opts) {
-  const hx = bodyW / 2 + s * 0.03; // 右手外侧
-  const hy = bodyTop + bodyH * 0.5;
-
-  if (opts.weapon === 'bow') {
-    // 弓：竖持木弧 + 弓弦（远程射手）
-    const r = s * 0.15;
-    g.lineStyle(Math.max(1, s * 0.035), 0x6b4a2a, 1);
-    g.beginPath();
-    g.arc(hx, hy, r, -Math.PI / 2, Math.PI / 2, false);
-    g.strokePath();
-    g.lineStyle(Math.max(1, s * 0.02), 0xeae0cc, 0.85);
-    g.lineBetween(hx, hy - r, hx, hy + r);
-  } else if (opts.weapon === 'sword') {
-    g.lineStyle(Math.max(1, s * 0.05), 0x6b4a2a, 1);
-    g.lineBetween(hx, hy + s * 0.04, hx, hy - s * 0.28);
-    g.fillStyle(0xe6edf2, 1);
-    g.fillTriangle(hx - s * 0.05, hy - s * 0.24, hx + s * 0.05, hy - s * 0.24, hx, hy - s * 0.52);
-    g.lineStyle(Math.max(1, s * 0.018), 0x9aa6ad, 0.9);
-    g.strokeTriangle(hx - s * 0.05, hy - s * 0.24, hx + s * 0.05, hy - s * 0.24, hx, hy - s * 0.52);
-  } else if (opts.weapon === 'staff') {
-    g.lineStyle(Math.max(1, s * 0.045), 0x6b4a2a, 1);
-    g.lineBetween(hx, hy + s * 0.05, hx, hy - s * 0.40);
-    g.fillStyle(opts.glow ?? 0xb08bd6, 1);
-    g.fillCircle(hx, hy - s * 0.46, s * 0.085);
-    g.fillStyle(0xffffff, 0.75);
-    g.fillCircle(hx - s * 0.025, hy - s * 0.48, s * 0.032);
-  } else if (opts.weapon === 'shield') {
-    const sx = 0;
-    const sy = bodyTop + bodyH * 0.5;
-    g.fillStyle(opts.accent ?? 0xc7ccd1, 1);
-    g.fillEllipse(sx, sy, s * 0.34, s * 0.46);
-    g.lineStyle(Math.max(1, s * 0.03), 0x000000, 0.25);
-    g.strokeEllipse(sx, sy, s * 0.34, s * 0.46);
-    g.fillStyle(opts.body ?? 0x6b7378, 1);
-    g.fillCircle(sx, sy, s * 0.06);
-  } else if (opts.weapon === 'fan') {
-    // 羽扇纶巾（诸葛/貂蝉）：扇柄 + 半圆扇面 + 羽骨细纹
-    const fx = hx;
-    const fy = hy - s * 0.10;
-    g.lineStyle(Math.max(1, s * 0.028), 0x6b4a2a, 1);
-    g.lineBetween(fx, fy + s * 0.08, fx, fy);
-    const fanCol = opts.fanColor ?? 0xeae0cc;
-    g.fillStyle(fanCol, 1);
-    g.beginPath();
-    g.arc(fx, fy, s * 0.16, -Math.PI * 0.92, -Math.PI * 0.08, false);
-    g.lineTo(fx, fy);
-    g.closePath();
-    g.fillPath();
-    g.lineStyle(Math.max(1, s * 0.012), shade(fanCol, 0.65), 0.85);
-    for (let i = 0; i < 5; i++) {
-      const a = -Math.PI * 0.92 + (Math.PI * 0.84) * (i / 4);
-      g.lineBetween(fx, fy, fx + Math.cos(a) * s * 0.16, fy + Math.sin(a) * s * 0.16);
-    }
-  }
-}
-
-function drawFace(g, headY, headR, s, opts) {
-  const mood = opts.mood || 'happy';
-  const eyeY = headY + headR * 0.12;
-  const eo = headR * 0.42;
-  const er = headR * 0.2;
-  const ink = CHIBI.ink;
-
-  if (mood === 'glow') {
-    g.fillStyle(opts.glow ?? 0xffe08a, 1);
-    g.fillCircle(-eo, eyeY, er * 1.15);
-    g.fillCircle(eo, eyeY, er * 1.15);
-    g.fillStyle(0xffffff, 0.9);
-    g.fillCircle(-eo, eyeY - er * 0.25, er * 0.4);
-    g.fillCircle(eo, eyeY - er * 0.25, er * 0.4);
-  } else if (mood === 'angry') {
-    g.fillStyle(ink, 1);
-    g.fillCircle(-eo, eyeY + er * 0.1, er * 0.85);
-    g.fillCircle(eo, eyeY + er * 0.1, er * 0.85);
-    g.lineStyle(Math.max(1.4, s * 0.04), ink, 1);
-    g.lineBetween(-eo - er, eyeY - er * 0.9, -eo + er * 0.6, eyeY - er * 0.3);
-    g.lineBetween(eo + er, eyeY - er * 0.9, eo - er * 0.6, eyeY - er * 0.3);
-  } else {
-    g.fillStyle(ink, 1);
-    g.fillCircle(-eo, eyeY, er);
-    g.fillCircle(eo, eyeY, er);
-    g.fillStyle(0xffffff, 0.95);
-    g.fillCircle(-eo + er * 0.35, eyeY - er * 0.35, er * 0.42);
-    g.fillCircle(eo + er * 0.35, eyeY - er * 0.35, er * 0.42);
-  }
-
-  // 腮红
-  g.fillStyle(0xf08a78, 0.4);
-  g.fillCircle(-eo - er * 0.4, eyeY + er * 1.8, er * 0.8);
-  g.fillCircle(eo + er * 0.4, eyeY + er * 1.8, er * 0.8);
-
-  // 嘴
-  g.lineStyle(Math.max(1, s * 0.022), 0x8a3a2a, 0.85);
-  g.beginPath();
-  g.arc(0, eyeY + er * 2.3, er * 1.0, 0.12 * Math.PI, 0.88 * Math.PI, false);
-  g.strokePath();
+  const size = opts.size || 48;
+  drawKairo(g, chibiSpec(opts), size);
 }
 
 // ---------- 武将 / 敌军 风格预设 ----------
 
-// 每个武将的专属外观：覆盖阵营/职业默认配色，让 14 位武将一眼可辨
+// 每个武将的专属外观：覆盖阵营/职业默认配色，让 16 位武将一眼可辨
 // （关羽红脸长髯、张飞黑甲、赵云银甲、吕布双翎……）
 // 仅做外观覆盖，不触碰 generals.js 的纯数值数据。
 const APPEARANCE = {

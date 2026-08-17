@@ -5,6 +5,8 @@
 // ============================================================================
 import './style.css';
 import { attachKeyboardShell } from '../../../_lib/keyboard-shell.js';
+import { kairoSVG } from '../../../_lib/kairo.js';
+import { heroLook } from './heroArt.js';
 import { h, clear, bar } from './dom.js';
 import {
   TECHS, FORMATIONS, STRATAGEMS, TECH_COST_GOLD,
@@ -862,6 +864,8 @@ export class GameUI {
       const off = officeOf(h2.id);
       return h('div', { class: 'hero-card' },
         h('div', { class: 'hero-card__head' },
+          // 开罗风像素武将像（共享素材库 _lib/kairo.js，47 名将逐人预设）
+          h('span', { class: 'hero-card__avatar', html: kairoSVG(heroLook(h2), 40) }),
           h('span', { class: 'hero-card__name' }, h2.name),
           off ? h('span', { class: 'hero-card__office' }, `${off.icon}${off.name}`) : null,
           h('span', { class: 'hero-card__sub' }, h2.skill ? h2.skill.name : '无技能'),

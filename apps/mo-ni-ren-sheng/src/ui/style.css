@@ -122,6 +122,11 @@
 }
 .mnrs .id-name { font-weight: 700; font-size: 1rem; }
 .mnrs .id-stage { color: var(--gold); font-weight: 600; }
+/* 开罗风像素阶段形象：随年龄切换婴儿/学龄/成年/老年体型 */
+.mnrs .stage-avatar { display: inline-flex; vertical-align: -0.34em; margin-right: 0.1em; }
+.mnrs .stage-avatar svg { display: block; height: 1.5em; width: auto; image-rendering: pixelated; }
+.mnrs .create__avatar { flex: none; }
+.mnrs .create__avatar svg { display: block; image-rendering: pixelated; filter: drop-shadow(0 2px 0 rgba(0,0,0,0.35)); }
 .mnrs .id-age { color: var(--text); }
 .mnrs .id-turn { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
 

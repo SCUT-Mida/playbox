@@ -5,6 +5,7 @@
 // ============================================================================
 import '../ui/style.css';
 import { attachKeyboardShell } from '../../../_lib/keyboard-shell.js';
+import { kairoSVG } from '../../../_lib/kairo.js';
 import { h, clear, bar } from './dom.js';
 import {
   ATTRS, ATTR_META, ageLabel, ageYearsFromWeeks, stageForAge, EVENT_CHANCE, stepLabel,
@@ -189,10 +190,15 @@ export class GameUI {
       ),
       h('div', { class: 'create__body' },
         h('div', { class: 'card' },
-          h('h4', null, '性别'),
-          h('div', { class: 'gender-toggle' },
-            h('button', { class: t.gender === 'male' ? 'active' : '', onClick: () => { this.createTpl.gender = 'male'; this.renderCreate(); } }, '♂ 男'),
-            h('button', { class: t.gender === 'female' ? 'active' : '', onClick: () => { this.createTpl.gender = 'female'; this.renderCreate(); } }, '♀ 女'),
+          h('div', { class: 'row', style: { alignItems: 'center' } },
+            h('div', { class: 'create__avatar', html: kairoSVG({ preset: t.gender === 'female' ? 'woman' : 'man', name: '主角' }, 56) }),
+            h('div', { class: 'grow' },
+              h('h4', null, '性别'),
+              h('div', { class: 'gender-toggle' },
+                h('button', { class: t.gender === 'male' ? 'active' : '', onClick: () => { this.createTpl.gender = 'male'; this.renderCreate(); } }, '♂ 男'),
+                h('button', { class: t.gender === 'female' ? 'active' : '', onClick: () => { this.createTpl.gender = 'female'; this.renderCreate(); } }, '♀ 女'),
+              ),
+            ),
           ),
         ),
         h('div', { class: 'card' },
@@ -295,7 +301,7 @@ export class GameUI {
     this.autoBadge = h('span', { class: 'auto-badge', title: '挂机进行中（打开任意弹窗时自动暂停）', style: { display: 'none' } }, '🤖 挂机');
     this.idLine = h('div', { class: 'id-line' },
       h('span', { class: 'id-name' }, p.name),
-      h('span', { class: 'id-stage' }, stageEmoji(p) + ' ' + stageOf(p).name),
+      h('span', { class: 'id-stage' }, stageAvatarNode(p), ` ${stageOf(p).name}`),
       h('span', { class: 'id-age' }, ageLabel(p.weeks)),
       this.autoBadge,
       h('span', { class: 'id-turn' }, `第 ${p.turn} 回合`),
@@ -354,7 +360,9 @@ export class GameUI {
     const p = this.player;
     if (!p || !this.idLine) return;
     this.idLine.querySelector('.id-name').textContent = p.name;
-    this.idLine.querySelector('.id-stage').textContent = stageEmoji(p) + ' ' + stageOf(p).name;
+    // 阶段行含像素形象 SVG，整体 innerHTML 重建（内容小，代价可忽略）
+    const stageEl = this.idLine.querySelector('.id-stage');
+    if (stageEl) { stageEl.textContent = ''; stageEl.append(stageAvatarNode(p), ` ${stageOf(p).name}`); }
     this.idLine.querySelector('.id-age').textContent = ageLabel(p.weeks);
     this.idLine.querySelector('.id-turn').textContent = `第 ${p.turn} 回合`;
     for (const k of ATTRS) {
@@ -562,7 +570,7 @@ export class GameUI {
     const body = [
       h('div', { class: 'profile-head' },
         h('div', { class: 'profile-name' }, p.name),
-        h('div', { class: 'muted' }, `${stageEmoji(p)} ${stageOf(p).name} · ${ageLabel(p.weeks)} · 寿元上限 ${p.maxAge} 岁`),
+        h('div', { class: 'muted' }, stageAvatarNode(p, 18), ` ${stageOf(p).name} · ${ageLabel(p.weeks)} · 寿元上限 ${p.maxAge} 岁`),
       ),
       h('div', { class: 'attr-grid' },
         ATTRS.map((k) => h('div', { class: 'attr-mini' },
@@ -578,7 +586,7 @@ export class GameUI {
         metaRow('子女', famRow(p)),
         metaRow('房产', p.flags?.homeowner ? '有房' : '无'),
         metaRow('回合数', String(p.turn)),
-        metaRow('生命阶段', stageEmoji(p) + ' ' + stageOf(p).name),
+        metaRow('生命阶段', [stageAvatarNode(p, 18), ` ${stageOf(p).name}`]),
       ),
     ];
     this.showSheet({ title: '人物档案', body, foot: [h('button', { class: 'btn-ghost', onClick: () => this.closeModal() }, '关闭')] });
@@ -826,8 +834,21 @@ function diffAttrs(before, after) {
   }
   return out;
 }
-function stageEmoji(p) {
-  return stageForAge(ageYearsFromWeeks(p.weeks)).emoji;
+// 人生阶段 → 开罗风像素形象（共享素材库 _lib/kairo.js）：
+// 婴儿/学龄/成年/老年 四体型随年龄切换，男女发型有别。
+function stageAvatar(p, size = 20) {
+  const key = stageForAge(ageYearsFromWeeks(p.weeks)).key;
+  const f = p.gender === 'female';
+  const preset = {
+    infant: f ? 'babyGirl' : 'babyBoy',
+    child: f ? 'girl' : 'boy',
+    adult: f ? 'woman' : 'man',
+    elder: f ? 'elderWoman' : 'elderMan',
+  }[key] || 'villager';
+  return kairoSVG({ preset, name: stageOf(p).name }, size);
+}
+function stageAvatarNode(p, size = 20) {
+  return h('span', { class: 'stage-avatar', html: stageAvatar(p, size) });
 }
 function milestoneHead(stageKey) {
   // 按进入的新阶段给出里程碑标题，须与 config 中各阶段语义对齐：

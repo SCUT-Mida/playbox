@@ -310,6 +310,14 @@ async function openGame(def, btn) {
     console.error('游戏加载失败：', err)
     overlay.hidden = true
     loadingEl.hidden = true
+    // 自愈：页面壳比部署旧（长开标签页 / PWA 离线缓存壳）时，动态分片按旧哈希名
+    // 请求会 404 —— 每个会话自动整页刷新一次换新壳；刷新后仍失败则退回手动重试。
+    if (!sessionStorage.getItem('__PLAYBOX_SHELL_RELOADED__')) {
+      sessionStorage.setItem('__PLAYBOX_SHELL_RELOADED__', '1')
+      playLabel.textContent = '版本更新，正在刷新…'
+      setTimeout(() => location.reload(), 400)
+      return
+    }
     playLabel.textContent = '加载失败，点击重试'
   } finally {
     // 取消令牌：被取消时仍需恢复按钮状态，否则 playBtn 永久 disabled

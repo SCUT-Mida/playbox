@@ -8,9 +8,11 @@
 // 纯 DOM + CSS，不依赖 Canvas，可在 jsdom 中冒烟。
 // ============================================================================
 import { h, clear, bar } from './dom.js';
-import { elEmoji, resName, resEmoji } from '../config.js';
+import { resName, resEmoji } from '../config.js';
 import { cardDef } from '../data/cards.js';
 import { renderSilhouette } from './silhouetteRenderer.js';
+import { enemyLook } from './charArt.js';
+import { kairoSVG } from '../../../_lib/kairo.js';
 
 const EL_COLOR = { metal: '#c8a951', wood: '#5fa85f', water: '#4a90c2', fire: '#d4564f', earth: '#a17b4a', none: '#9a8a72' };
 
@@ -103,12 +105,12 @@ export class BattleScene {
     }
     const floatLayer = h('div', { class: 'bs-unit__float' });
     const hpBar = bar(data.hp, data.maxHp, { class: 'bs-hp', color: side === 'player' ? '' : '#d4564f' });
-    // 我方真实卡牌 → 皮影剪影 + 属性光晕（设计稿增量 第六节）；敌方仍用五行 emoji 头像。
+    // 我方真实卡牌 → 皮影剪影 + 属性光晕（设计稿增量 第六节）；敌方用开罗风像素妖魔（按五行配形）。
     const playerCard = side === 'player' && data.ref ? cardDef(data.ref) : null;
     // 战斗事件只携带卡牌 id（data.ref），拿不到 instance，故光环用卡牌基础稀有度
     // playerCard.rarity；进化升档后的 effectiveRarity 光环可能与卡面不一致，属已知取舍。
-    const art = h('div', { class: 'bs-unit__art', style: { background: hexA(EL_COLOR[data.element], 0.16) } },
-      playerCard ? renderSilhouette(playerCard, playerCard.rarity) : (elEmoji(data.element) || '✦'));
+    const art = h('div', { class: `bs-unit__art${playerCard ? '' : ' kairo-foe'}`, style: { background: hexA(EL_COLOR[data.element], 0.16) } },
+      playerCard ? renderSilhouette(playerCard, playerCard.rarity) : h('span', { class: 'kairo-foe__wrap', html: kairoSVG(enemyLook(data), 40) }));
     const el = h('div', {
       class: `bs-unit bs-unit--${side} ${data.isBoss ? 'bs-unit--boss' : ''}`,
       dataset: { side, pos: String(pos) },

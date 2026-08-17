@@ -439,6 +439,9 @@
   border: 1px solid var(--line);
 }
 .bs-unit--boss .bs-unit__art { width: 44px; height: 44px; font-size: 22px; }
+/* 敌方开罗风像素妖魔：占满圆窗 */
+.bs-unit__art .kairo-foe__wrap { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; }
+.bs-unit__art .kairo-foe__wrap svg { display: block; width: 88%; height: auto; image-rendering: pixelated; }
 .bs-unit__name { font-size: 10px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .bs-unit .bar { height: 8px; margin-top: 3px; }
 .bs-unit .bar__label { font-size: 8px; line-height: 8px; }
@@ -636,7 +639,7 @@
 
 /* 画布与容器同尺寸；全身像以脚底对齐下缘（见 svg preserveAspectRatio）*/
 .char-art { display: block; width: 100%; height: 100%; }
-.char-art svg { display: block; width: 100%; height: 100%; }
+.char-art svg { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
 
 /* —— 素材着色：肤色 / 毛发固定，袍服取五行代表色三阶（--sil / -d / -l）—— */
 .char-art .ca-skin { fill: #f2dfc6; }

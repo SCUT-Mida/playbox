@@ -85,6 +85,14 @@ const APPS = {
     desc: '问道抽卡集齐十五张五行卡牌，修炼突破升星、布阵站位，在五行克制的回合制战场上征战十二卷主线、攀爬九重天秘境；洞府挂机收菜，伪云存档随取随玩。',
     loader: () => import('../apps/ling-xu-wen-jian-lu/src/main.js'),
   },
+  dfw: {
+    key: 'dfw',
+    title: '大富翁',
+    subtitle: '棋盘 · 环游之城',
+    emblem: '富',
+    desc: '掷骰环游大城：6 张 50~80 格地图逐步解锁，购地收租、升级产业、垄断街区翻倍，机会命运祸福难料；棋盘可拖动、镜头自动跟随，带上开罗风小队与 AI 富豪斗智，破产淘汰或回合期满结算首富。',
+    loader: () => import('../apps/da-fu-weng/src/main.js'),
+  },
 }
 
 // 大类：先呈现「学习」，再呈现「游戏」。点击大类进入后，才展开其中的具体应用。
@@ -103,7 +111,7 @@ const CATEGORIES = [
     subtitle: '休闲 · 互动娱乐',
     emblem: '玩',
     desc: '消磨时光的互动小品：修仙、人生、三国战场、星骸浮岛、诸侯争霸，挑一个开始吧。',
-    appKeys: ['dzf', 'frxx', 'mnrs', 'xhlz', 'xtsg', 'lxwjl'],
+    appKeys: ['dzf', 'frxx', 'mnrs', 'xhlz', 'xtsg', 'lxwjl', 'dfw'],
   },
 ]
 

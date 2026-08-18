@@ -1,0 +1,17 @@
+{
+  "name": "da-fu-weng",
+  "version": "1.0.0",
+  "description": "《大富翁·环游之城》棋盘策略游戏 - A Monopoly-like board game with Kairo-style pixel art",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "test": "node scripts/logic-test.mjs",
+    "test:dom": "node scripts/smoke-dom.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^29.1.1",
+    "vite": "^5.4.0"
+  }
+}

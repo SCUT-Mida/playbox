@@ -5,9 +5,13 @@
 //   roll     → 等待当前玩家掷骰（人类点按钮 / AI 自动）
 //   resolve  → 已落格，待结算格子效果
 //   decision → 落在可买/可升的自家产业，等待买地/升级抉择
-//   end      → 本回合行动完毕，等待 endTurn 交给下一位
-//   over     → 终局（仅剩一家 / 达到回合上限）
+//   shop     → 落在商店，等待选购道具
+//   end      → 本回合行动完毕，等待 endTurn 交给下一位（对子加掷则再来）
+//   over     → 终局（仅剩一家 / 主角破产出局）
 //
+// 掷双骰：对子（两骰同点）加掷一回合（state.extra），连掷三次对子直接入狱；
+// 顺风骰 buff 在掷骰时自动多走 SWIFT_BONUS 步。
+// 不设回合上限：破产淘汰，一家独大者胜；主角破产即终局结算。
 // 所有随机（骰子/抽卡）走 core/rng.js 的确定性种子，存档可完整复现。
 // ============================================================================
 
@@ -19,11 +23,18 @@ import {
   TAX_MIN, MAX_LEVEL, SELL_RATE,
   AI_SAFE_CASH, AI_UPGRADE_CASH,
   CHANCE_CARDS, FATE_CARDS,
-  rentOf, upgradeCost, taxOf,
+  SHOP_ITEMS, SWIFT_BONUS, SWIFT_TURNS, SWIFT_CAP, CHARM_CAP, EQUAL_CAP,
+  rentOf, upgradeCost, taxOf, boomMult, BOOM_RATE,
 } from '../config.js';
-import { rngNext, rollDice } from './rng.js';
+import { rngNext, rollTwoDice } from './rng.js';
 
-const GAME_VERSION = 2;
+const GAME_VERSION = 3;
+
+// —— 天赋数值：购地价 / 罚款减免 ——
+export const buyPriceOf = (tile, player) =>
+  Math.round(tile.price * (1 - ((player && player.perk && player.perk.trade) || 0)));
+export const fineOf = (base, player) =>
+  Math.round(base * (1 - ((player && player.perk && player.perk.tough) || 0)));
 
 // —— 建档：heroKey 选主角，aiCount 补 1~3 位 AI 对手，mapKey 选地图 ——
 export function newGame({ heroKey, aiCount = 2, mapKey = MAPS[0].key, seed } = {}) {
@@ -31,14 +42,16 @@ export function newGame({ heroKey, aiCount = 2, mapKey = MAPS[0].key, seed } = {
   const ai = AI_CHARACTERS.slice(0, Math.max(1, Math.min(3, aiCount | 0)));
   const map = mapDefOf(mapKey);
   const board = boardOf(map.key);
-  const players = [hero, ...ai].map((c) => ({
-    key: c.key, name: c.name, look: c.look,
-    isAI: false, // hero 恒为 0 号
-    cash: START_CASH, pos: 0, laps: 0,
+  const mkPlayer = (c, isAI) => ({
+    key: c.key, name: c.name, look: c.look, isAI,
+    perk: { ...(c.perk || {}) },                       // 角色天赋（存档随行）
+    cash: START_CASH + ((c.perk && c.perk.cash) || 0), // 天赋本金
+    pos: 0, laps: 0,
     skipTurns: 0, bankrupt: false,
-  }));
-  players[0].isAI = false;
-  for (let i = 1; i < players.length; i++) players[i].isAI = true;
+    items: { swift: 0, charms: 0 },                    // 道具：顺风骰次数 / 护身符枚数
+    equalBought: 0,                                    // 均富卡本局已购数
+  });
+  const players = [mkPlayer(hero, false), ...ai.map((c) => mkPlayer(c, true))];
   return {
     ver: GAME_VERSION,
     mapKey: map.key,
@@ -47,6 +60,9 @@ export function newGame({ heroKey, aiCount = 2, mapKey = MAPS[0].key, seed } = {
     phase: 'roll',
     rng: seed | 0,
     lastDice: 0,
+    lastRoll: [0, 0],
+    doubles: 0,   // 当前玩家连续对子数
+    extra: false, // 对子加掷标记（endTurn 消化）
     players,
     tiles: board.map((t) => (t.type === 'prop' ? { owner: -1, level: 0, spent: 0 } : null)),
     log: [],
@@ -90,6 +106,16 @@ export function ranking(st) {
   return st.players
     .map((p, idx) => ({ idx, name: p.name, assets: assetsOf(st, idx), bankrupt: p.bankrupt }))
     .sort((a, b) => (a.bankrupt === b.bankrupt ? b.assets - a.assets : a.bankrupt ? 1 : -1));
+}
+
+// 现金最富的存活对手（均富卡 / AI 判断用）
+export function richestOther(st, pIdx) {
+  let rich = -1;
+  for (let i = 0; i < st.players.length; i++) {
+    if (i === pIdx || st.players[i].bankrupt) continue;
+    if (rich < 0 || st.players[i].cash > st.players[rich].cash) rich = i;
+  }
+  return rich;
 }
 
 // —— 日志 ——
@@ -159,11 +185,13 @@ export function payTo(st, fromIdx, toIdx, amount) {
   return paid;
 }
 
-// 仅剩一家 → 终局
+// 终局判定：仅剩一家 → 一家独大；主角破产 → 直接结算（观战无意义）。
 export function checkGameOver(st) {
   if (st.finished) return;
   if (alivePlayers(st).length <= 1) {
     finishGame(st, 'last');
+  } else if (st.players[0].bankrupt) {
+    finishGame(st, 'dead');
   }
 }
 
@@ -178,13 +206,14 @@ export function buyTile(st, tileIdx) {
   const t = tilesOf(st)[tileIdx];
   const ts = st.tiles[tileIdx];
   if (st.phase !== 'decision' || !ts || ts.owner !== -1) return { ok: false };
-  if (p.cash < t.price) return { ok: false };
-  p.cash -= t.price;
+  const cost = buyPriceOf(t, p);
+  if (p.cash < cost) return { ok: false };
+  p.cash -= cost;
   ts.owner = st.turnIdx;
   ts.level = 1;
-  ts.spent = t.price;
+  ts.spent = cost;
   st.phase = 'end';
-  log(st, `${p.name} 以 ${t.price} 买下「${t.name}」`);
+  log(st, `${p.name} 以 ${cost} 买下「${t.name}」${cost < t.price ? `（原价 ${t.price}）` : ''}`);
   return { ok: true };
 }
 
@@ -206,6 +235,71 @@ export function upgradeTile(st, tileIdx) {
 export function declineDecision(st) {
   if (st.phase !== 'decision') return;
   st.phase = 'end';
+}
+
+// —— 商店（shop 阶段）——
+export function buyItem(st, itemId) {
+  const p = cur(st);
+  if (st.phase !== 'shop' || st.finished) return { ok: false, reason: 'phase' };
+  const item = SHOP_ITEMS.find((s) => s.id === itemId);
+  if (!item) return { ok: false, reason: 'item' };
+  if (p.cash < item.price) return { ok: false, reason: 'cash' };
+  if (itemId === 'swift' && p.items.swift >= SWIFT_CAP) return { ok: false, reason: 'cap' };
+  if (itemId === 'charm' && p.items.charms >= CHARM_CAP) return { ok: false, reason: 'cap' };
+  if (itemId === 'equal' && p.equalBought >= EQUAL_CAP) return { ok: false, reason: 'cap' };
+  p.cash -= item.price;
+  if (itemId === 'swift') {
+    p.items.swift = Math.min(SWIFT_CAP, p.items.swift + SWIFT_TURNS);
+    log(st, `${p.name} 购入顺风骰（生效 ${p.items.swift} 次掷骰）`);
+  } else if (itemId === 'charm') {
+    p.items.charms += 1;
+    log(st, `${p.name} 购入护身符（持有 ${p.items.charms} 枚）`);
+  } else if (itemId === 'equal') {
+    // 无存活对手可平分时回滚扣款、不计限购（避免付费无效果）
+    if (!applyEqualize(st, st.turnIdx)) {
+      p.cash += item.price;
+      return { ok: false, reason: 'no_target' };
+    }
+    p.equalBought += 1;
+  }
+  return { ok: true };
+}
+
+export function leaveShop(st) {
+  if (st.phase !== 'shop') return;
+  st.phase = 'end';
+}
+
+// 均富卡：与现金最多的存活对手平分双方现金
+export function applyEqualize(st, pIdx) {
+  const p = st.players[pIdx];
+  const richIdx = richestOther(st, pIdx);
+  if (richIdx < 0) return false;
+  const rich = st.players[richIdx];
+  const total = p.cash + rich.cash;
+  p.cash = Math.round(total / 2);
+  rich.cash = total - p.cash;
+  log(st, `均富卡生效：${p.name} 与 ${rich.name} 现金拉平（${p.cash} / ${rich.cash}）`);
+  return true;
+}
+
+// AI 进店采购：均富卡（明显落后时翻盘）＞ 顺风骰 ＞ 护身符，一次至多买两件
+export function aiShopBuy(st) {
+  const p = cur(st);
+  const bought = [];
+  for (let round = 0; round < 2; round++) {
+    const richIdx = richestOther(st, st.turnIdx);
+    const gap = richIdx >= 0 ? st.players[richIdx].cash - p.cash : 0;
+    let want = null;
+    if (p.equalBought < EQUAL_CAP && gap >= 600 && p.cash - 260 >= AI_SAFE_CASH) want = 'equal';
+    else if (p.items.swift < SWIFT_CAP && p.cash - 140 >= AI_SAFE_CASH) want = 'swift';
+    else if (p.items.charms < CHARM_CAP && p.cash - 120 >= AI_SAFE_CASH) want = 'charm';
+    if (!want) break;
+    const r = buyItem(st, want);
+    if (!r.ok) break;
+    bought.push(want);
+  }
+  return bought;
 }
 
 // —— 抽卡结算 ——
@@ -254,11 +348,7 @@ function applyCard(st, pIdx, card) {
       break;
     }
     case 'give_rich': {
-      let rich = -1;
-      for (let i = 0; i < st.players.length; i++) {
-        if (i === pIdx || st.players[i].bankrupt) continue;
-        if (rich < 0 || st.players[i].cash > st.players[rich].cash) rich = i;
-      }
+      const rich = richestOther(st, pIdx);
       if (rich >= 0) { payTo(st, pIdx, rich, eff.amount); log(st, `${p.name} ${card.text}，付 ${eff.amount}`); }
       break;
     }
@@ -290,12 +380,14 @@ function applyLandingInstant(st, pIdx) {
   const p = st.players[pIdx];
   const t = tilesOf(st)[p.pos];
   if (t.type === 'jail') {
-    payTo(st, pIdx, null, JAIL_FINE);
+    const fine = fineOf(JAIL_FINE, p);
+    payTo(st, pIdx, null, fine);
     p.skipTurns = Math.max(p.skipTurns, JAIL_SKIP_TURNS);
-    log(st, `${p.name} 被押入监狱，罚款 ${JAIL_FINE} 并停 ${JAIL_SKIP_TURNS} 回合`);
+    log(st, `${p.name} 被押入监狱，罚款 ${fine} 并停 ${JAIL_SKIP_TURNS} 回合`);
   } else if (t.type === 'hospital') {
-    payTo(st, pIdx, null, HOSPITAL_FEE);
-    log(st, `${p.name} 住进医院，医药费 ${HOSPITAL_FEE}`);
+    const fee = fineOf(HOSPITAL_FEE, p);
+    payTo(st, pIdx, null, fee);
+    log(st, `${p.name} 住进医院，医药费 ${fee}`);
   }
 }
 
@@ -314,12 +406,36 @@ export function rollAndMove(st) {
     log(st, `${p.name} 停掷一回合（剩余 ${p.skipTurns}）`);
     return { ok: true, skipped: true };
   }
-  const dice = rollDice(st);
-  st.lastDice = dice;
-  const mv = movePlayer(st, st.turnIdx, dice);
-  log(st, `${p.name} 掷出 ${dice} 点，前进到「${tilesOf(st)[mv.dest].name}」`);
+  const luck = (p.perk && p.perk.luck) || 0;
+  const { d1, d2 } = rollTwoDice(st, luck);
+  st.lastRoll = [d1, d2];
+  const doubles = d1 === d2;
+  st.doubles = doubles ? (st.doubles || 0) + 1 : 0;
+  // 连掷三次对子：疑为出千，直接押入大牢（不发工资）
+  if (doubles && st.doubles >= 3) {
+    st.extra = false;
+    st.lastDice = 0;
+    const jailIdx = findTile(st, 'jail');
+    if (jailIdx >= 0) p.pos = jailIdx;
+    const fine = fineOf(JAIL_FINE, p);
+    payTo(st, st.turnIdx, null, fine);
+    p.skipTurns = Math.max(p.skipTurns, JAIL_SKIP_TURNS);
+    st.phase = 'end';
+    log(st, `${p.name} 连掷三次对子被疑出千，押入大牢（罚款 ${fine}，停 ${JAIL_SKIP_TURNS} 回合）`);
+    return { ok: true, jailed: true, d1, d2 };
+  }
+  st.extra = doubles;
+  let steps = d1 + d2;
+  if (p.items.swift > 0) {
+    p.items.swift -= 1;
+    steps += SWIFT_BONUS;
+    log(st, `${p.name} 的顺风骰助推 +${SWIFT_BONUS} 步`);
+  }
+  st.lastDice = steps;
+  const mv = movePlayer(st, st.turnIdx, steps);
+  log(st, `${p.name} 掷出 ${d1}+${d2}${doubles ? '（对子！）' : ''}，前进到「${tilesOf(st)[mv.dest].name}」`);
   st.phase = 'resolve';
-  return { ok: true, dice, dest: mv.dest };
+  return { ok: true, dice: steps, d1, d2, doubles, dest: mv.dest };
 }
 
 // —— 结算当前落格（resolve 阶段）——
@@ -333,7 +449,7 @@ export function resolveTile(st) {
     case 'prop': {
       if (ts.owner === -1) {
         st.phase = 'decision';
-        return { kind: 'buy', tile: i, price: t.price };
+        return { kind: 'buy', tile: i, price: buyPriceOf(t, p), listPrice: t.price };
       }
       if (ts.owner === st.turnIdx) {
         if (ts.level < MAX_LEVEL) {
@@ -343,14 +459,23 @@ export function resolveTile(st) {
         st.phase = 'end';
         return { kind: 'info', text: `「${t.name}」已是满级产业，安心收租` };
       }
-      // 交租
+      // 交租（护身符可自动抵消一次）
+      if (p.items.charms > 0) {
+        p.items.charms -= 1;
+        st.phase = 'end';
+        log(st, `${p.name} 的护身符碎裂，免除了一笔租金`);
+        return { kind: 'charm', tile: i };
+      }
       const owner = ts.owner;
       const mono = hasMonopoly(st, t.district, owner);
-      const rent = rentOf(t, ts.level, mono);
+      const rent = Math.round(rentOf(t, ts.level, mono) * boomMult(st.round));
       const paid = payTo(st, st.turnIdx, owner, rent);
       st.phase = 'end';
       return { kind: 'rent', tile: i, rent, owner, mono, ...paid };
     }
+    case 'shop':
+      st.phase = 'shop';
+      return { kind: 'shop', tile: i };
     case 'chance':
     case 'fate': {
       const card = drawCard(st, t.type);
@@ -366,17 +491,21 @@ export function resolveTile(st) {
       st.phase = 'end';
       return { kind: 'tax', amount };
     }
-    case 'jail':
-      payTo(st, st.turnIdx, null, JAIL_FINE);
+    case 'jail': {
+      const fine = fineOf(JAIL_FINE, p);
+      payTo(st, st.turnIdx, null, fine);
       p.skipTurns = Math.max(p.skipTurns, JAIL_SKIP_TURNS);
       st.phase = 'end';
-      log(st, `${p.name} 误入监狱，罚款 ${JAIL_FINE} 并停 ${JAIL_SKIP_TURNS} 回合`);
-      return { kind: 'jail' };
-    case 'hospital':
-      payTo(st, st.turnIdx, null, HOSPITAL_FEE);
+      log(st, `${p.name} 误入监狱，罚款 ${fine} 并停 ${JAIL_SKIP_TURNS} 回合`);
+      return { kind: 'jail', fine };
+    }
+    case 'hospital': {
+      const fee = fineOf(HOSPITAL_FEE, p);
+      payTo(st, st.turnIdx, null, fee);
       st.phase = 'end';
-      log(st, `${p.name} 就医，医药费 ${HOSPITAL_FEE}`);
-      return { kind: 'hospital' };
+      log(st, `${p.name} 就医，医药费 ${fee}`);
+      return { kind: 'hospital', fee };
+    }
     case 'park':
       st.phase = 'end';
       log(st, `${p.name} 在御园赏花，安然无恙`);
@@ -387,18 +516,27 @@ export function resolveTile(st) {
   }
 }
 
-// —— 交棒（end 阶段）——
+// —— 交棒（end 阶段）：对子加掷优先；随后轮到下一位存活玩家。
+//    不设回合上限——对局只以破产淘汰收场。
 export function endTurn(st) {
   if (st.phase !== 'end' || st.finished) return { ok: false };
+  const p = st.players[st.turnIdx];
+  if (st.extra && !p.bankrupt) {
+    st.extra = false;
+    st.phase = 'roll';
+    log(st, `${p.name} 掷出对子，再加掷一次`);
+    return { ok: true, again: true };
+  }
+  st.extra = false;
+  st.doubles = 0;
   const n = st.players.length;
-  const maxRound = mapOf(st).rounds;
   do {
     st.turnIdx = (st.turnIdx + 1) % n;
     if (st.turnIdx === 0) {
       st.round += 1;
-      if (st.round > maxRound) {
-        finishGame(st, 'rounds');
-        return { ok: true, finished: true };
+      // 城市繁荣：租金档位提升时播报（时间压力，促使对局收敛）
+      if (boomMult(st.round) > boomMult(st.round - 1)) {
+        log(st, `城市繁荣，百业兴旺——全城租金普涨 ${Math.round(BOOM_RATE * 100)}%（当前 ×${boomMult(st.round).toFixed(2)}）`);
       }
     }
   } while (st.players[st.turnIdx].bankrupt);

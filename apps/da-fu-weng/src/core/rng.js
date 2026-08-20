@@ -16,9 +16,20 @@ export function randInt(state, lo, hi) {
   return lo + Math.floor(rngNext(state) * (hi - lo + 1));
 }
 
-// 掷骰子：1~6。
+// 掷骰子：1~6（单骰，保留作通用工具）。
 export function rollDice(state) {
   return randInt(state, 1, 6);
+}
+
+// 掷双骰：luck > 0 时，点数 1~2 的骰子有 luck 概率重掷一次（角色天赋「骰运」）。
+export function rollTwoDice(state, luck = 0) {
+  let d1 = randInt(state, 1, 6);
+  let d2 = randInt(state, 1, 6);
+  if (luck > 0) {
+    if (d1 <= 2 && rngNext(state) < luck) d1 = randInt(state, 1, 6);
+    if (d2 <= 2 && rngNext(state) < luck) d2 = randInt(state, 1, 6);
+  }
+  return { d1, d2 };
 }
 
 // 非零整数随机种子（UI 开新档用；测试直接传固定值）。

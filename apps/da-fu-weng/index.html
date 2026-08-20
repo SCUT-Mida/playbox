@@ -30,6 +30,13 @@
       align-items: stretch;
       justify-content: center;
     }
+
+    /* 舞台宽度：窄屏填满视口；宽屏（桌面预览）按主框架 720:1280 竖屏画幅收窄居中。
+       若不约束，行向 flex 会让舞台收缩成内容宽（棋盘为绝对定位不参与测量），
+       整局界面被挤成窄条。 */
+    #game-container>* {
+      width: min(100%, calc(100vh * 720 / 1280));
+    }
   </style>
 </head>
 

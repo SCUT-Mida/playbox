@@ -44,6 +44,7 @@ export function sanitizeState(st) {
     if (!p.items || typeof p.items !== 'object') p.items = {};
     p.items.swift = Math.max(0, p.items.swift | 0);
     p.items.charms = Math.max(0, p.items.charms | 0);
+    p.items.equal = Math.max(0, p.items.equal | 0);   // 旧档无均富卡栏位 → 0
     if (!p.perk || typeof p.perk !== 'object') p.perk = {};
   }
   st.turnIdx = Math.min(Math.max(0, st.turnIdx | 0), st.players.length - 1);

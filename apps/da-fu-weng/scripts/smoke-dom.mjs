@@ -175,6 +175,31 @@ await sleep(50);
 ok(ui.state.phase === 'end', '离开商店进入收尾');
 ok(document.querySelector('.sheet') === null, '商店弹窗关闭');
 
+// ---------- 8b) 商店弹窗点遮罩 = 离开商店（软锁回归） ----------
+// 修复前：遮罩走默认 closeSheet，showShopSheet 的 Promise 永不 resolve，
+// playTurn 挂起、busy 永久为 true，对局死锁。
+ui.state.players[0].pos = shopIdx;
+ui.state.phase = 'resolve';
+const shopDone2 = ui.resolveLoop(0);
+ok(await waitFor(() => document.querySelector('.sheet') && /商店/.test(document.querySelector('.sheet__head')?.textContent || ''), 5000), '再次落地商店弹出购物弹窗');
+document.querySelector('.sheet-mask').click();
+const shopMaskResolved = await Promise.race([shopDone2.then(() => true), sleep(2000).then(() => false)]);
+ok(shopMaskResolved, '点遮罩后商店 Promise 正常 resolve（不软锁）');
+ok(ui.state.phase === 'end', '点遮罩等价离开商店进入收尾');
+ok(document.querySelector('.sheet') === null, '点遮罩后弹窗关闭');
+
+// ---------- 8c) 买地弹窗点遮罩 = 放弃（同款软锁回归） ----------
+const freePropIdx = ui.state.tiles.map((t, i) => (t && t.owner === -1 ? i : -1)).filter((i) => i >= 0)[0];
+ui.state.players[0].pos = freePropIdx;
+ui.state.phase = 'resolve';
+const decDone = ui.resolveLoop(0);
+ok(await waitFor(() => document.querySelector('.sheet') && /购买/.test(document.querySelector('.sheet__head')?.textContent || ''), 5000), '落到无主地弹出买地弹窗');
+document.querySelector('.sheet-mask').click();
+const decResolved = await Promise.race([decDone.then(() => true), sleep(2000).then(() => false)]);
+ok(decResolved, '点遮罩后买地 Promise 正常 resolve（不软锁）');
+ok(ui.state.phase === 'end', '点遮罩等价放弃进入收尾');
+ok(document.querySelector('.sheet') === null, '点遮罩后弹窗关闭');
+
 // ---------- 9) 地图解锁链（meta 持久化） ----------
 // 模拟主角夺冠：直接调用解锁逻辑验证 UI 状态联动
 const { unlockNext } = await import(new URL('../src/core/meta.js', import.meta.url).href);

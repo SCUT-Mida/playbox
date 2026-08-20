@@ -319,6 +319,14 @@ ok(st.players[0].equalBought === 1, '均富卡限购计数');
 st.players[0].cash = 5000;
 buyItem(st, 'equal');
 ok(buyItem(st, 'equal').ok === false, '均富卡每局限 2 张');
+// 无存活对手时购均富卡：拒绝购买并回滚扣款、不计限购（付费无效果路径）
+{
+  const eq = newGame({ heroKey: 'boy', aiCount: 1, mapKey: 'oldtown', seed: 7 });
+  eq.players[1].bankrupt = true; eq.finished = null; eq.phase = 'shop';
+  eq.players[0].cash = 1000;
+  const rEq = buyItem(eq, 'equal');
+  ok(rEq.ok === false && rEq.reason === 'no_target' && eq.players[0].cash === 1000 && eq.players[0].equalBought === 0, '无对手买均富卡：拒绝并回滚');
+}
 leaveShop(st);
 ok(st.phase === 'end', '离开商店回到收尾');
 // 护身符自动抵租
@@ -462,6 +470,18 @@ const code = exportSave(st);
 ok(importSave(code) !== null && importSave('not-a-save') === null, '导出导入往返');
 // 旧版存档（棋盘长度不符）被拒收
 ok(importSave(exportSave({ ...st, tiles: new Array(50).fill(null) })) === null, '旧棋盘长度存档拒收');
+// 手工存档码缺 items/perk 结构 → 兜底补默认，不致渲染层 TypeError
+{
+  const naked = importSave(exportSave({ ...st, players: st.players.map((p) => ({ ...p, items: undefined, perk: undefined })) }));
+  ok(naked !== null && naked.players.every((p) => p.items && p.items.swift === 0 && p.items.charms === 0 && p.perk && typeof p.perk === 'object'), '缺结构存档兜底补默认');
+}
+// 中间阶段（如商店内）导出的存档 → 拉回掷骰阶段，导入即可继续而非软锁
+{
+  const midShop = importSave(exportSave({ ...st, phase: 'shop' }));
+  ok(midShop !== null && midShop.phase === 'roll', '中间阶段存档导入拉回 roll');
+  const brokenIdx = importSave(exportSave({ ...st, turnIdx: 99 }));
+  ok(brokenIdx !== null && brokenIdx.turnIdx === st.players.length - 1, '越界 turnIdx 夹回合法区间');
+}
 deleteSlot(0);
 ok(loadFromSlot(0) === null, '删除槽位');
 

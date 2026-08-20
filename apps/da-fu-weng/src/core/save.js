@@ -24,13 +24,32 @@ function validSlot(slot) {
 }
 
 // 基础校验：必备字段存在即认为可读（详细字段由游戏层兜底）。
+// players[].items/perk 缺结构时补默认值；棋盘长度不符（旧版存档）拒收。
 function reviveState(raw) {
   const st = JSON.parse(raw);
+  if (!sanitizeState(st)) return null;
+  return st;
+}
+
+// 存档净化：导入 / 读档共用。返回净化后的 state，不可救则 null。
+export function sanitizeState(st) {
   if (!st || typeof st !== 'object') return null;
-  if (!Array.isArray(st.players) || !Array.isArray(st.tiles)) return null;
+  if (!Array.isArray(st.players) || !st.players.length || !Array.isArray(st.tiles)) return null;
   const map = mapDefOf(st.mapKey);
   if (st.tiles.length !== tileCountOf(map)) return null;
   if (typeof st.rng !== 'number' || typeof st.turnIdx !== 'number') return null;
+  // 玩家结构兜底：手工构造的存档码缺 items/perk 时，渲染层读 p.items.swift 会 TypeError
+  for (const p of st.players) {
+    if (!p || typeof p !== 'object') return null;
+    if (!p.items || typeof p.items !== 'object') p.items = {};
+    p.items.swift = Math.max(0, p.items.swift | 0);
+    p.items.charms = Math.max(0, p.items.charms | 0);
+    if (!p.perk || typeof p.perk !== 'object') p.perk = {};
+  }
+  st.turnIdx = Math.min(Math.max(0, st.turnIdx | 0), st.players.length - 1);
+  // 中间阶段（shop/decision/resolve/end）导入后无人驱动 resolveLoop，会开局即软锁：
+  // 非终局存档一律拉回掷骰阶段，当前玩家重掷即可继续（落格效果作废，好于死锁）。
+  if (!st.finished && st.phase !== 'roll') st.phase = 'roll';
   return st;
 }
 
@@ -89,8 +108,6 @@ export function exportSave(state) {
 export function importSave(code) {
   try {
     const st = JSON.parse(decodeURIComponent(escape(atob(String(code).trim()))));
-    if (!st || !Array.isArray(st.players) || !Array.isArray(st.tiles)) return null;
-    const map = mapDefOf(st.mapKey);
-    return st.tiles.length === tileCountOf(map) ? st : null;
+    return sanitizeState(st);
   } catch (_) { return null; }
 }

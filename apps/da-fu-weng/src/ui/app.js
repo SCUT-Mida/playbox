@@ -653,10 +653,11 @@ export class GameUI {
       const isBuy = res.kind === 'buy';
       const cost = isBuy ? res.price : res.cost;
       const afford = p.cash >= cost;
-      const rents = isBuy
-        ? [1, 2, 3].map((lv) => rentOf(t, lv, false))
-        : [rentOf(t, ts.level + 1, false)];
+      // 展示口径与实收一致：基础租金 × 繁荣系数（见 resolveTile 的租金计算）
+      const boom = boomMult(st.round);
+      const rentNow = (lv, mono) => Math.round(rentOf(t, lv, mono) * boom);
       const done = (fn) => { fn(); this.closeSheet(); this.refresh(); resolve(); };
+      // 点遮罩 = 放弃（与「放弃」按钮同路径），避免 await 挂起软锁
       this.showSheet({
         title: isBuy ? `购买「${t.name}」` : `升级「${t.name}」`,
         body: h('div', { class: 'buy-sheet' },
@@ -671,10 +672,12 @@ export class GameUI {
           ),
           h('div', { class: 'rent-table' },
             isBuy
-              ? rents.map((rv, i) => h('div', { class: 'rent-row' },
-                  h('span', null, `${i + 1} 级租金`), h('b', null, `$${rv}`),
-                  i === 0 ? h('span', { class: 'muted' }, `（垄断 ×1.5 → $${Math.round(rv * 1.5)}）`) : null))
-              : h('div', { class: 'rent-row' }, h('span', null, `升后租金`), h('b', null, `$${rents[0]}`)),
+              ? [1, 2, 3].map((lv) => h('div', { class: 'rent-row' },
+                  h('span', null, `${lv} 级租金`), h('b', null, `$${rentNow(lv, false)}`),
+                  lv === 1 ? h('span', { class: 'muted' }, `（垄断 ×1.5 → $${rentNow(lv, true)}）`) : null))
+              : h('div', { class: 'rent-row' }, h('span', null, `升后租金`), h('b', null, `$${rentNow(ts.level + 1, false)}`)),
+            boom > 1 ? h('div', { class: 'rent-row' },
+              h('span', { class: 'muted' }, `城市繁荣 ×${Number(boom.toFixed(2))}（已计入）`)) : null,
           ),
         ),
         foot: [
@@ -684,7 +687,7 @@ export class GameUI {
             onClick: () => done(() => { isBuy ? buyTile(st, res.tile) : upgradeTile(st, res.tile); }),
           }, isBuy ? `买下 $${cost}` : `升级 $${cost}`),
         ],
-      });
+      }, { onMask: () => done(() => declineDecision(st)) });
     });
   }
 
@@ -703,16 +706,19 @@ export class GameUI {
           h('p', { class: 'card-sheet__text' }, card.text),
         ),
         foot: [h('button', { class: 'btn-primary', onClick: close }, '继续')],
-      });
+      }, { onMask: close }); // 点遮罩 = 继续，避免 await 挂起软锁
     });
   }
 
-  // 商店：道具列表 + 已持有量 + 上限，可连续购买，离开后回到回合流程
+  // 商店：道具列表 + 已持有量 + 上限，可连续购买，离开后回到回合流程。
+  // 点遮罩 = 离开商店（与按钮同路径）：若走默认 closeSheet 会让 playTurn 的
+  // await 永久挂起、busy 卡死，对局软锁。
   showShopSheet() {
     return new Promise((resolve) => {
+      const st = this.state;
       const finish = () => { this.closeSheet(); resolve(); };
+      const leave = () => { leaveShop(st); this.refresh(); finish(); };
       const render = () => {
-        const st = this.state;
         const p = st.players[st.turnIdx];
         const list = SHOP_ITEMS.map((item) => {
           const held = item.id === 'swift'
@@ -737,7 +743,9 @@ export class GameUI {
               onClick: () => {
                 const r = buyItem(st, item.id);
                 this.refresh();
-                if (!r.ok) this.toast(r.reason === 'cap' ? '已达上限' : '现金不足', 'bad');
+                if (!r.ok) this.toast(r.reason === 'cap' ? '已达上限'
+                  : r.reason === 'no_target' ? '没有可平分的存活对手'
+                  : '现金不足', 'bad');
                 render();
               },
             }, capped ? '已满' : '购买'),
@@ -749,8 +757,8 @@ export class GameUI {
             h('p', { class: 'muted' }, '掌柜笑眯眯：客官，来点什么？'),
             ...list,
           ),
-          foot: [h('button', { class: 'btn-primary', onClick: () => { leaveShop(st); this.refresh(); finish(); } }, '离开商店')],
-        });
+          foot: [h('button', { class: 'btn-primary', onClick: leave }, '离开商店')],
+        }, { onMask: leave });
       };
       render();
     });
@@ -765,14 +773,18 @@ export class GameUI {
     const body = [];
     if (t.type === 'prop') {
       const owner = ts && ts.owner >= 0 ? st.players[ts.owner] : null;
+      const boom = boomMult(st.round); // 展示口径与实收一致（含繁荣系数）
+      const rentNow = (lv, mono) => Math.round(rentOf(t, lv, mono) * boom);
       body.push(h('div', { class: 'muted', style: { marginBottom: '0.4rem' } },
         `${d.name} · 地价 $${t.price}`));
       body.push(h('div', { class: 'rent-table' },
         [1, 2, 3].map((lv) => h('div', { class: 'rent-row' },
           h('span', null, `${lv} 级租金`),
-          h('b', null, `$${rentOf(t, lv, false)}`),
-          lv === 3 ? h('span', { class: 'muted' }, `（垄断 $${rentOf(t, 3, true)}）`) : null,
-        ))));
+          h('b', null, `$${rentNow(lv, false)}`),
+          lv === 3 ? h('span', { class: 'muted' }, `（垄断 $${rentNow(3, true)}）`) : null,
+        )),
+        boom > 1 ? h('div', { class: 'rent-row' },
+          h('span', { class: 'muted' }, `城市繁荣 ×${Number(boom.toFixed(2))}（已计入）`)) : null));
       body.push(h('div', { style: { marginTop: '0.4rem' } },
         owner ? `业主：${owner.name} · ${ts.level} 级${hasMonopoly(st, t.district, ts.owner) ? ' · 街区垄断！' : ''}`
           : '尚无业主'));
@@ -813,8 +825,14 @@ export class GameUI {
         ),
       )),
       h('div', { class: 'row', style: { marginTop: '0.6rem' } },
-        h('button', { class: 'btn-ghost', style: { flex: 1 }, onClick: () => this.exportCurrent() }, '导出'),
-        h('button', { class: 'btn-ghost', style: { flex: 1 }, onClick: () => this.importPrompt() }, '导入'),
+        h('button', {
+          class: 'btn-ghost', style: { flex: 1 }, disabled: this.busy,
+          onClick: () => this.exportCurrent(),
+        }, '导出'),
+        h('button', {
+          class: 'btn-ghost', style: { flex: 1 }, disabled: this.busy,
+          onClick: () => this.importPrompt(),
+        }, '导入'),
       ),
       h('button', { class: 'btn-danger btn-block', style: { marginTop: '0.8rem' }, onClick: () => { this.closeSheet(); this.showLauncher(); } }, '退出对局'),
     );
@@ -905,9 +923,17 @@ export class GameUI {
   }
 
   // ============ 弹窗骨架 ============
+  // opts.blocker：点遮罩不可关（终局结算等强制弹窗）；
+  // opts.onMask：点遮罩的自定义回调（供 Promise 门控弹窗安全收尾，避免挂起 await）。
   showSheet({ title, body, foot }, opts = {}) {
     this.closeSheet();
-    const mask = h('div', { class: 'sheet-mask', onClick: () => { if (!opts.blocker) this.closeSheet(); } });
+    const mask = h('div', {
+      class: 'sheet-mask',
+      onClick: () => {
+        if (opts.onMask) { opts.onMask(); return; }
+        if (!opts.blocker) this.closeSheet();
+      },
+    });
     const sheet = h('div', { class: 'sheet' },
       h('div', { class: 'sheet__head' }, h('b', null, title)),
       h('div', { class: 'sheet__body' }, body),

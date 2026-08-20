@@ -255,8 +255,12 @@ export function buyItem(st, itemId) {
     p.items.charms += 1;
     log(st, `${p.name} 购入护身符（持有 ${p.items.charms} 枚）`);
   } else if (itemId === 'equal') {
+    // 无存活对手可平分时回滚扣款、不计限购（避免付费无效果）
+    if (!applyEqualize(st, st.turnIdx)) {
+      p.cash += item.price;
+      return { ok: false, reason: 'no_target' };
+    }
     p.equalBought += 1;
-    applyEqualize(st, st.turnIdx);
   }
   return { ok: true };
 }

@@ -3,7 +3,7 @@
 // 通过 storage 访问器隔离 localStorage，便于 Node 单测注入。
 // ============================================================================
 
-import { MAPS, mapDefOf, perimeterOf } from '../config.js';
+import { MAPS, mapDefOf, tileCountOf } from '../config.js';
 
 export const SAVE_SLOTS = 4;
 const SLOT_PREFIX = 'dfw_save_';
@@ -29,7 +29,7 @@ function reviveState(raw) {
   if (!st || typeof st !== 'object') return null;
   if (!Array.isArray(st.players) || !Array.isArray(st.tiles)) return null;
   const map = mapDefOf(st.mapKey);
-  if (st.tiles.length !== perimeterOf(map)) return null;
+  if (st.tiles.length !== tileCountOf(map)) return null;
   if (typeof st.rng !== 'number' || typeof st.turnIdx !== 'number') return null;
   return st;
 }
@@ -66,7 +66,6 @@ export function slotInfo(slot) {
   const map = MAPS.find((m) => m.key === st.mapKey) || MAPS[0];
   return {
     round: st.round || 1,
-    maxRound: map.rounds,
     mapName: map.name,
     heroName: (hero && hero.name) || '?',
     players: (st.players || []).length,
@@ -92,6 +91,6 @@ export function importSave(code) {
     const st = JSON.parse(decodeURIComponent(escape(atob(String(code).trim()))));
     if (!st || !Array.isArray(st.players) || !Array.isArray(st.tiles)) return null;
     const map = mapDefOf(st.mapKey);
-    return st.tiles.length === perimeterOf(map) ? st : null;
+    return st.tiles.length === tileCountOf(map) ? st : null;
   } catch (_) { return null; }
 }

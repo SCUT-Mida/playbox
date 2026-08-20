@@ -1,7 +1,7 @@
 // ============================================================================
 // DOM 冒烟测试：用 jsdom 驱动真实 UI 流程
-// （启动器 → 选人+选图（锁定/解锁）→ 对局：掷骰/买地弹窗/AI 回合 →
-//   格子详情 → 存读档 → 地图解锁链）。
+// （启动器 → 选人+选图（锁定/解锁/天赋展示）→ 对局：掷双骰/买地弹窗/AI 回合 →
+//   商店购物 → 格子详情 → 存读档 → 地图解锁链）。
 // 运行：node scripts/smoke-dom.mjs   （需先 npm install jsdom）
 // ============================================================================
 import { JSDOM } from 'jsdom';
@@ -34,7 +34,7 @@ async function waitFor(fn, timeoutMs = 12000, label = 'condition') {
 }
 
 const { createGame } = await import(new URL('../src/main.js', import.meta.url).href);
-const { START_CASH, MAPS } = await import(new URL('../src/config.js', import.meta.url).href);
+const { START_CASH, MAPS, SHOP_ITEMS, tileCountOf } = await import(new URL('../src/config.js', import.meta.url).href);
 const { loadMeta } = await import(new URL('../src/core/meta.js', import.meta.url).href);
 
 // ---------- 1) 启动器 ----------
@@ -50,39 +50,56 @@ document.querySelector('.launcher__actions .btn-primary').click();
 await sleep(20);
 ok(document.querySelector('.dfw.create') !== null, '进入选人页');
 ok(document.querySelectorAll('.hero-cell').length === 4, '4 位主角可选');
+ok(document.querySelectorAll('.hero-perk').length === 4, '4 位主角各带天赋标签');
 document.querySelectorAll('.hero-cell')[2].click(); // 剑侠
 await sleep(20);
+ok(/罚金减半/.test(document.querySelector('.perk-note')?.textContent || ''), '选中主角展示天赋说明');
+ok(/天赋/.test(document.querySelector('.create .panel h4')?.textContent || ''), '选人面板提示天赋各异');
 ok(document.querySelectorAll('.ai-toggle button')[1] !== null, 'AI 数量切换渲染');
 const mapCells = document.querySelectorAll('.map-cell');
 ok(mapCells.length === 6, '6 张地图卡');
 ok(document.querySelectorAll('.map-cell.locked').length === 5, '5 张锁定（首图开放）');
 ok(/老城市井/.test(mapCells[0].textContent || ''), '首图「老城市井」可读');
+ok(/淘汰制/.test(mapCells[0].textContent || ''), '地图卡展示淘汰制说明');
 ok(mapCells[1].disabled === true, '锁定图不可点');
 
-// ---------- 3) 对局界面（50 格大棋盘 + 平移层） ----------
+// ---------- 3) 对局界面（72 格大棋盘 + 内街 + 腹地点缀） ----------
 document.querySelector('.create .btn-primary.btn-block').click();
 await sleep(60);
 ok(document.querySelector('.dfw.game') !== null, '进入对局');
 ok(document.querySelector('.board-view') !== null, '棋盘视口（可拖动）渲染');
-ok(document.querySelectorAll('.board .tile').length === 50, '首图 50 格棋盘');
+const TILE_N = tileCountOf(MAPS[0]);
+ok(document.querySelectorAll('.board .tile:not(.deco)').length === TILE_N, `首图 ${TILE_N} 格棋盘`);
+ok(document.querySelectorAll('.board .tile.t-shop').length > 0, '棋盘上有商店格');
+ok(document.querySelectorAll('.board .tile.deco').length > 0, '腹地点缀风景渲染');
+ok(document.querySelector('.board-hud') !== null, '浮动信息条存在');
 ok(document.querySelector('.board-pan') !== null, '平移层存在');
 await sleep(60);
 const panStyle = document.querySelector('.board-pan').style.transform || '';
 ok(/translate3d/.test(panStyle), '镜头跟随已定位棋盘（transform）');
 ok(document.querySelectorAll('.token').length === 3 && document.querySelectorAll('.token svg').length === 3, '3 枚开罗风像素棋子');
 ok(document.querySelectorAll('.hud .pcard').length === 3, 'HUD 3 张玩家卡');
-ok(/R1\/22/.test(document.querySelector('.center-hint')?.textContent || ''), '中央显示回合进度 R1/22');
+ok(/第 1 回合/.test(document.querySelector('.bh-hint')?.textContent || ''), '信息条显示第 1 回合（无回合上限）');
 
 // ---------- 4) 掷骰 + 买地弹窗 ----------
-function rngFirst(seed) {
-  let t = (seed + 0x6d2b79f5) | 0;
-  t = Math.imul(t ^ (t >>> 15), t | 1);
-  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+function rngSeq(seed, k) {
+  const out = [];
+  let t = seed | 0;
+  for (let i = 0; i < k; i++) {
+    t = (t + 0x6d2b79f5) | 0;
+    let x = Math.imul(t ^ (t >>> 15), t | 1);
+    x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+    out.push(((x ^ (x >>> 14)) >>> 0) / 4294967296);
+  }
+  return out;
 }
-let seedDice1 = 1;
-for (let s = 1; s < 99999; s++) { if (Math.floor(rngFirst(s) * 6) + 1 === 1) { seedDice1 = s; break; } }
-ui.state.rng = seedDice1;
+// 找种子：首两掷为 1+2（非对子，共 3 步 → 落 3 号空地触发买地）
+let seedRoll = 1;
+for (let s = 1; s < 999999; s++) {
+  const [a, b] = rngSeq(s, 2);
+  if (Math.floor(a * 6) + 1 === 1 && Math.floor(b * 6) + 1 === 2) { seedRoll = s; break; }
+}
+ui.state.rng = seedRoll;
 const rollBtn = document.querySelector('.turn-btn');
 ok(rollBtn && !rollBtn.disabled, '掷骰按钮可用');
 rollBtn.click();
@@ -93,19 +110,19 @@ ok(!!buyBtn, '弹窗含「买下」按钮');
 buyBtn.click();
 await sleep(200);
 ok(document.querySelector('.sheet') === null, '买地弹窗关闭');
-ok(ui.state.tiles[1].owner === 0, '1 号地已购入');
-ok(ui.state.players[0].cash === START_CASH - ui.state.tiles[1].spent, '买地扣款一致');
+ok(ui.state.tiles[3].owner === 0, '3 号地已购入');
+ok(ui.state.players[0].cash === START_CASH - ui.state.tiles[3].spent, '买地扣款一致');
 
 // ---------- 5) AI 自动回合 → 回到人类回合 ----------
 const humanTurn = await waitFor(() => {
   const btn = document.querySelector('.turn-btn');
   return btn && !btn.disabled;
-}, 15000);
+}, 20000);
 ok(humanTurn, 'AI 回合后回到人类回合（按钮恢复）');
 ok(document.querySelectorAll('.log-strip .ln').length > 0, '日志有内容');
 
 // ---------- 6) 格子详情 ----------
-document.querySelector('.board .tile[data-tile="1"]').click();
+document.querySelector('.board .tile[data-tile="3"]').click();
 await sleep(50);
 const tileSheet = document.querySelector('.sheet');
 ok(tileSheet && /业主/.test(tileSheet.textContent || ''), '格子详情弹窗含业主信息');
@@ -128,13 +145,37 @@ quitBtn.click();
 await sleep(30);
 ok(document.querySelector('.dfw.launcher') !== null, '回到启动器');
 ok(/剑侠/.test(document.querySelector('.slots .slot-row.used')?.textContent || ''), '存档槽显示进度');
+ok(/第 \d+ 回合/.test(document.querySelector('.slots .slot-row.used')?.textContent || ''), '存档槽显示回合（无上限）');
 document.querySelector('.slots .slot-row.used .btn-primary').click();
 await sleep(80);
 ok(document.querySelector('.dfw.game') !== null, '读档回到对局');
-ok(document.querySelectorAll('.board .tile').length === 50, '读档棋盘完整');
-ok(ui.state.tiles[1].owner === 0, '读档保留地产归属');
+ok(document.querySelectorAll('.board .tile:not(.deco)').length === TILE_N, '读档棋盘完整');
+ok(ui.state.tiles[3].owner === 0, '读档保留地产归属');
 
-// ---------- 8) 地图解锁链（meta 持久化） ----------
+// ---------- 8) 商店购物 ----------
+const shopTileEl = document.querySelector('.board .tile.t-shop');
+ok(!!shopTileEl, '存在商店格可交互');
+const shopIdx = Number(shopTileEl.dataset.tile);
+ui.state.players[0].pos = shopIdx;
+ui.state.phase = 'resolve';
+const shopDone = ui.resolveLoop(0); // 不 await：先等弹窗出现
+const shopSheetOk = await waitFor(() => document.querySelector('.sheet') && /商店/.test(document.querySelector('.sheet__head')?.textContent || ''), 5000);
+ok(shopSheetOk, '落地商店弹出购物弹窗');
+ok(document.querySelectorAll('.shop-item').length === SHOP_ITEMS.length, `商店陈列 ${SHOP_ITEMS.length} 件道具`);
+const cashBefore = ui.state.players[0].cash;
+const itemBtn = [...document.querySelectorAll('.shop-item button')].find((b) => /购买/.test(b.textContent));
+itemBtn.click();
+await sleep(80);
+ok(ui.state.players[0].items.swift === 3, '购买顺风骰生效 3 次');
+ok(ui.state.players[0].cash === cashBefore - SHOP_ITEMS[0].price, '购买道具扣款一致');
+const leaveBtn = [...document.querySelectorAll('.sheet__foot button')].find((b) => /离开/.test(b.textContent));
+leaveBtn.click();
+await shopDone;
+await sleep(50);
+ok(ui.state.phase === 'end', '离开商店进入收尾');
+ok(document.querySelector('.sheet') === null, '商店弹窗关闭');
+
+// ---------- 9) 地图解锁链（meta 持久化） ----------
 // 模拟主角夺冠：直接调用解锁逻辑验证 UI 状态联动
 const { unlockNext } = await import(new URL('../src/core/meta.js', import.meta.url).href);
 ok(unlockNext('oldtown') === 'port', '老城夺冠解锁港都');

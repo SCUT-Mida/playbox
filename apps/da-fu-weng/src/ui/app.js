@@ -1,7 +1,8 @@
 // ============================================================================
 // 大富翁 · 环游之城 · UI 渲染与回合驱动（纯原生 DOM，竖屏优先）。
-// 界面：启动器 → 选人+选图（6 张地图逐步解锁）→ 对局
-//   （大棋盘可拖动平移 + 镜头跟随、骰子、玩家 HUD、日志、买地/抽卡/结算弹窗）
+// 界面：启动器 → 选人（天赋各异）+选图（6 张地图逐步解锁）→ 对局
+//   （外环+内街的大棋盘可拖动平移 + 镜头跟随、腹地点缀风景、浮动双骰信息条、
+//    玩家 HUD（含道具徽章）、日志、买地/抽卡/商店/结算弹窗）
 //   → 终局排名（夺冠解锁下一张地图）。
 // 角色形象全部来自共享素材库 _lib/kairo.js（预置 · 开罗风 · 可复用）。
 // ============================================================================
@@ -10,13 +11,15 @@ import { attachKeyboardShell } from '../../../_lib/keyboard-shell.js';
 import { kairoSVG } from '../../../_lib/kairo.js';
 import { h, clear } from './dom.js';
 import {
-  MAPS, mapDefOf, boardOf, perimeterOf, tileGrid, PALETTE,
-  CHARACTERS, AI_CHARACTERS, CHIP_COLORS,
+  MAPS, mapDefOf, boardOf, tileCountOf, pathOf, decoCells, tileGrid, PALETTE,
+  CHARACTERS, AI_CHARACTERS, CHIP_COLORS, SHOP_ITEMS,
+  SWIFT_CAP, CHARM_CAP, EQUAL_CAP, boomMult,
   rentOf,
 } from '../config.js';
 import {
   newGame, rollAndMove, resolveTile, buyTile, upgradeTile, declineDecision,
   endTurn, aiDecide, ranking, ownedTilesOf, hasMonopoly, log as logSt, mapOf,
+  buyItem, leaveShop, aiShopBuy,
 } from '../core/game.js';
 import { makeSeed } from '../core/rng.js';
 import { loadMeta, isUnlocked, unlockNext } from '../core/meta.js';
@@ -35,18 +38,18 @@ function districtOf(st, i) {
   return t && t.district != null ? dists[t.district] : null;
 }
 
-// 地图迷你缩略图：外环小方点按类型/街区着色
+// 地图迷你缩略图：按路径（外环+内街）落子，路径格按类型/街区着色，腹地为浅色
 function miniBoard(map) {
   const tiles = boardOf(map.key);
+  const path = pathOf(map);
   const wrap = h('span', { class: 'map-mini' });
   wrap.style.gridTemplateColumns = `repeat(${map.cols}, 1fr)`;
-  for (let r = 1; r <= map.rows; r++) {
-    for (let c = 1; c <= map.cols; c++) wrap.appendChild(h('i', { class: 'map-mini__cell inner' }));
+  for (let i = 0; i < map.cols * map.rows; i++) {
+    wrap.appendChild(h('i', { class: 'map-mini__cell inner' }));
   }
   tiles.forEach((t, i) => {
-    const { row, col } = tileGrid(i, map.cols, map.rows);
-    const idx = (row - 1) * map.cols + (col - 1);
-    const cell = wrap.children[idx];
+    const g = path[i];
+    const cell = wrap.children[(g.row - 1) * map.cols + (g.col - 1)];
     cell.className = 'map-mini__cell';
     if (t.type === 'prop') cell.style.background = PALETTE[map.districts[t.district].color];
     else cell.dataset.t = t.type;
@@ -82,7 +85,7 @@ export class GameUI {
         info
           ? h('div', null,
             h('b', null, `${info.heroName} · ${info.mapName}`),
-            h('span', { class: 'muted' }, `R${info.round}/${info.maxRound} · ${info.players} 人${info.finished ? ' · 已终局' : ''}`))
+            h('span', { class: 'muted' }, `第 ${info.round} 回合 · ${info.players} 人${info.finished ? ' · 已终局' : ''}`))
           : h('span', { class: 'muted' }, '空档位'),
       ),
       info
@@ -131,8 +134,10 @@ export class GameUI {
         h('span', { class: 'hero-cell__ava', html: kairoSVG(c.look, 56) }),
         h('b', null, c.name),
         h('span', { class: 'muted' }, c.title),
+        h('span', { class: 'hero-perk' }, c.tag),
       ));
     }
+    const hero = CHARACTERS.find((c) => c.key === t.heroKey) || CHARACTERS[0];
     const aiRow = h('div', { class: 'ai-toggle' });
     for (const n of [1, 2, 3]) {
       aiRow.appendChild(h('button', {
@@ -153,7 +158,7 @@ export class GameUI {
         miniBoard(m),
         h('b', null, unlocked ? m.name : '🔒 未解锁'),
         h('span', { class: 'muted' }, unlocked
-          ? `${perimeterOf(m)} 格 · ${m.rounds} 回合`
+          ? `${tileCountOf(m)} 格 · 淘汰制`
           : `在「${prev ? prev.name : ''}」夺冠解锁`),
       ));
     });
@@ -162,12 +167,16 @@ export class GameUI {
         h('button', { class: 'btn-ghost', onClick: () => this.showLauncher() }, '← 返回'),
         h('h1', null, '组建商队'),
       ),
-      h('div', { class: 'panel' }, h('h4', null, '选择主角'), heroRow),
+      h('div', { class: 'panel' },
+        h('h4', null, '选择主角（天赋各异）'),
+        heroRow,
+        h('p', { class: 'perk-note' }, h('b', null, `${hero.name} · ${hero.tag}`), ` — ${hero.desc}`),
+      ),
       h('div', { class: 'panel' },
         h('h4', null, 'AI 对手'),
         aiRow,
         h('p', { class: 'muted', style: { marginTop: '0.4rem' } },
-          `对手依次为：${AI_CHARACTERS.slice(0, t.aiCount).map((a) => a.name).join('、')}`),
+          `对手依次为：${AI_CHARACTERS.slice(0, t.aiCount).map((a) => `${a.name}（${a.tag}）`).join('、')}`),
       ),
       h('div', { class: 'panel' },
         h('h4', null, '选择地图（夺冠逐步解锁）'),
@@ -209,6 +218,7 @@ export class GameUI {
     const st = this.state;
     const map = mapDefOf(st);
     const tiles = boardOf(st.mapKey);
+    const path = pathOf(map);
     // 棋盘视口（可拖动平移）→ 平移层 → 固定像素网格棋盘 + 棋子层
     this.boardView = h('div', { class: 'board-view' });
     this.boardPan = h('div', { class: 'board-pan' });
@@ -217,25 +227,33 @@ export class GameUI {
     this.boardEl.style.gridTemplateRows = `repeat(${map.rows}, ${CELL}px)`;
     this.tileEls = [];
     tiles.forEach((t, i) => {
-      const { row, col } = tileGrid(i, map.cols, map.rows);
+      const g = path[i];
       const el = h('button', { class: `tile t-${t.type}`, dataset: { tile: String(i) }, onClick: () => this.showTileSheet(i) });
-      el.style.gridRow = String(row);
-      el.style.gridColumn = String(col);
+      el.style.gridRow = String(g.row);
+      el.style.gridColumn = String(g.col);
       this.tileEls.push(el);
       this.boardEl.appendChild(el);
     });
-    this.centerEl = h('div', { class: 'board-center' });
-    this.centerEl.style.gridRow = `2 / ${map.rows}`;
-    this.centerEl.style.gridColumn = `2 / ${map.cols}`;
-    this.diceEl = h('div', { class: 'dice' }, '🎲');
-    this.centerName = h('div', { class: 'center-name' }, '—');
-    this.centerHint = h('div', { class: 'center-hint muted' }, '掷骰开始');
-    this.centerEl.append(this.diceEl, this.centerName, this.centerHint);
-    this.boardEl.appendChild(this.centerEl);
+    // 腹地点缀风景（不挡路、不可点），让地图中央有烟火气
+    for (const d of decoCells(map)) {
+      const el = h('div', { class: 'tile deco' }, d.icon);
+      el.style.gridRow = String(d.row);
+      el.style.gridColumn = String(d.col);
+      this.boardEl.appendChild(el);
+    }
     this.tokenLayer = h('div', { class: 'token-layer' });
     this.tokenEls = [];
     this.boardPan.append(this.boardEl, this.tokenLayer);
     this.boardView.appendChild(this.boardPan);
+    // 浮动信息条（悬浮于棋盘上方，不挡拖动）：双骰 + 当前回合 + 提示
+    this.diceEl = h('span', { class: 'bh-dice' }, '🎲🎲');
+    this.centerName = h('b', { class: 'bh-name' }, '—');
+    this.centerHint = h('span', { class: 'bh-hint muted' }, '掷骰开始');
+    this.boardHud = h('div', { class: 'board-hud' },
+      this.diceEl,
+      h('div', { class: 'bh-main' }, this.centerName, this.centerHint),
+    );
+    this.boardView.appendChild(this.boardHud);
     this.stage.appendChild(this.boardView);
     this.wirePan();
     this.measureBoard();
@@ -338,7 +356,7 @@ export class GameUI {
     if (!p.follow || !p.bw) return;
     const st = this.state;
     const map = mapOf(st);
-    const { row, col } = tileGrid(st.players[pIdx].pos, map.cols, map.rows);
+    const { row, col } = tileGrid(st.players[pIdx].pos, map);
     const tx = (col - 0.5) * CELL;
     const ty = (row - 0.5) * CELL;
     p.x = p.w / 2 - tx;
@@ -350,7 +368,7 @@ export class GameUI {
   // —— 棋子定位：格中心 + 同格多人微错位（相对棋盘像素）——
   tokenXY(pIdx, tileIdx) {
     const map = mapOf(this.state);
-    const { row, col } = tileGrid(tileIdx, map.cols, map.rows);
+    const { row, col } = tileGrid(tileIdx, map);
     const cx = (col - 0.5) * CELL;
     const cy = (row - 0.5) * CELL;
     const players = this.state.players;
@@ -421,6 +439,9 @@ export class GameUI {
     // HUD
     clear(this.hudEl);
     st.players.forEach((p, i) => {
+      const badges = [];
+      if (!p.bankrupt && p.items && p.items.swift > 0) badges.push(`🌬️${p.items.swift}`);
+      if (!p.bankrupt && p.items && p.items.charms > 0) badges.push(`🧿${p.items.charms}`);
       this.hudEl.appendChild(h('div', {
         class: `pcard ${i === st.turnIdx ? 'active' : ''} ${p.bankrupt ? 'dead' : ''}`,
         style: { '--chip': CHIP_COLORS[i % CHIP_COLORS.length] },
@@ -430,17 +451,25 @@ export class GameUI {
           h('div', { class: 'pcard__name' }, `${p.name}${p.isAI ? '' : '（你）'}`),
           h('div', { class: 'pcard__cash' }, p.bankrupt ? '破产' : `$${p.cash}`),
         ),
-        h('span', { class: 'pcard__prop' }, `${ownedTilesOf(st, i).length} 处`),
-        p.skipTurns > 0 && !p.bankrupt ? h('span', { class: 'pcard__skip' }, '停') : null,
+        h('div', { class: 'pcard__side' },
+          h('span', { class: 'pcard__prop' }, `${ownedTilesOf(st, i).length} 处`),
+          h('span', { class: 'pcard__items' }, badges.join(' ')),
+          p.skipTurns > 0 && !p.bankrupt ? h('span', { class: 'pcard__skip' }, '停') : null,
+        ),
       ));
     });
-    // 中央信息
+    // 浮动信息条
     const cp = st.players[st.turnIdx];
+    const boom = boomMult(st.round);
+    const boomTxt = boom > 1 ? ` · 繁荣×${Number(boom.toFixed(2))}` : '';
     this.centerName.textContent = st.finished ? '对局结束' : `${cp.name} 的回合`;
     this.centerHint.textContent = st.finished
       ? '查看结算'
-      : `R${st.round}/${map.rounds} · ${st.phase === 'roll' ? (cp.isAI ? '思考中…' : '掷骰前进') : '结算中…'}`;
-    if (!st.finished) this.diceEl.textContent = st.lastDice > 0 ? `🎲 ${st.lastDice}` : '🎲';
+      : `第 ${st.round} 回合${boomTxt} · ${st.phase === 'roll' ? (cp.isAI ? '思考中…' : '掷骰前进') : '结算中…'}`;
+    if (!st.finished) {
+      const [rd1, rd2] = st.lastRoll || [0, 0];
+      this.diceEl.textContent = rd1 + rd2 > 0 ? `🎲${rd1}+${rd2}` : '🎲🎲';
+    }
     // 按钮
     const canRoll = !this.busy && !st.finished && st.phase === 'roll' && !cp.isAI;
     this.rollBtn.disabled = !canRoll;
@@ -480,15 +509,21 @@ export class GameUI {
       this._pan.follow = true; // 新回合恢复镜头跟随
       const from = st.players[pIdx].pos;
       for (let i = 0; i < 6; i++) {
-        this.diceEl.textContent = `🎲 ${1 + ((i * 5 + pIdx) % 6)}`;
+        this.diceEl.textContent = `🎲${1 + ((i * 5 + pIdx) % 6)}+${1 + ((i * 3 + pIdx + 2) % 6)}`;
         await sleep(60);
       }
       const r = rollAndMove(st);
       if (r.skipped) {
         this.refresh();
         this.toast(`${st.players[pIdx].name} 停掷一回合`);
+      } else if (r.jailed) {
+        this.diceEl.textContent = `🎲${r.d1}+${r.d2}`;
+        this.refresh();
+        this.centerOnToken(pIdx, true);
+        this.toast(`${st.players[pIdx].name} 连掷三次对子，被疑出千押入大牢！`, 'bad');
+        await sleep(900);
       } else {
-        this.diceEl.textContent = `🎲 ${r.dice}`;
+        this.diceEl.textContent = `🎲${r.d1}+${r.d2}`;
         await this.animateMove(pIdx, from, r.dest);
         await this.resolveLoop(pIdx);
       }
@@ -554,8 +589,29 @@ export class GameUI {
         break;
       }
       case 'rent': {
-        this.toast(`${p.name} 付给 ${st.players[res.owner].name} 租金 $${res.amount}${res.mono ? '（垄断×1.5）' : ''}`);
+        const boom = boomMult(st.round);
+        this.toast(`${p.name} 付给 ${st.players[res.owner].name} 租金 $${res.amount}`
+          + `${res.mono ? '（垄断×1.5）' : ''}${boom > 1 ? `（繁荣×${Number(boom.toFixed(2))}）` : ''}`);
         await sleep(isAI ? 600 : 800);
+        break;
+      }
+      case 'charm': {
+        this.toast(`🧿 ${p.name} 的护身符碎裂，免除了这笔租金`);
+        await sleep(700);
+        break;
+      }
+      case 'shop': {
+        this.centerOnToken(pIdx, true);
+        if (isAI) {
+          const bought = aiShopBuy(st);
+          leaveShop(st);
+          this.toast(bought.length
+            ? `${p.name} 采购了：${bought.map((id) => SHOP_ITEMS.find((s) => s.id === id).name).join('、')}`
+            : `${p.name} 逛了逛商店，什么也没买`);
+          await sleep(900);
+        } else {
+          await this.showShopSheet();
+        }
         break;
       }
       case 'card': {
@@ -607,7 +663,9 @@ export class GameUI {
           h('div', { class: 'row', style: { alignItems: 'center', gap: '0.6rem' } },
             h('span', { class: 'buy-ava', html: kairoSVG(p.look, 44) }),
             h('div', { class: 'grow' },
-              h('div', null, `${d.name} · ${isBuy ? `地价 $${res.price}` : `当前 ${ts.level} 级 → ${ts.level + 1} 级`}`),
+              h('div', null, `${d.name} · ${isBuy
+                ? (res.listPrice && res.listPrice !== res.price ? `地价 $${res.price}（天赋折扣，原价 $${res.listPrice}）` : `地价 $${res.price}`)
+                : `当前 ${ts.level} 级 → ${ts.level + 1} 级`}`),
               h('div', { class: 'muted' }, `现金 $${p.cash}${afford ? '' : '（不足）'}`),
             ),
           ),
@@ -649,6 +707,55 @@ export class GameUI {
     });
   }
 
+  // 商店：道具列表 + 已持有量 + 上限，可连续购买，离开后回到回合流程
+  showShopSheet() {
+    return new Promise((resolve) => {
+      const finish = () => { this.closeSheet(); resolve(); };
+      const render = () => {
+        const st = this.state;
+        const p = st.players[st.turnIdx];
+        const list = SHOP_ITEMS.map((item) => {
+          const held = item.id === 'swift'
+            ? `生效剩 ${p.items.swift}/${SWIFT_CAP} 次`
+            : item.id === 'charm'
+              ? `持有 ${p.items.charms}/${CHARM_CAP} 枚`
+              : `本局已购 ${p.equalBought}/${EQUAL_CAP} 张`;
+          const capped = (item.id === 'swift' && p.items.swift >= SWIFT_CAP)
+            || (item.id === 'charm' && p.items.charms >= CHARM_CAP)
+            || (item.id === 'equal' && p.equalBought >= EQUAL_CAP);
+          const afford = p.cash >= item.price && !capped;
+          return h('div', { class: 'shop-item' },
+            h('span', { class: 'shop-item__icon' }, item.icon),
+            h('div', { class: 'grow' },
+              h('div', null, h('b', null, item.name), ' ', h('span', { class: 'shop-item__price' }, `$${item.price}`)),
+              h('div', { class: 'muted' }, item.desc),
+              h('div', { class: 'muted shop-item__held' }, held),
+            ),
+            h('button', {
+              class: 'btn-ghost',
+              disabled: !afford,
+              onClick: () => {
+                const r = buyItem(st, item.id);
+                this.refresh();
+                if (!r.ok) this.toast(r.reason === 'cap' ? '已达上限' : '现金不足', 'bad');
+                render();
+              },
+            }, capped ? '已满' : '购买'),
+          );
+        });
+        this.showSheet({
+          title: '🛒 商店',
+          body: h('div', { class: 'shop-sheet' },
+            h('p', { class: 'muted' }, '掌柜笑眯眯：客官，来点什么？'),
+            ...list,
+          ),
+          foot: [h('button', { class: 'btn-primary', onClick: () => { leaveShop(st); this.refresh(); finish(); } }, '离开商店')],
+        });
+      };
+      render();
+    });
+  }
+
   showTileSheet(i) {
     if (this._pan && this._pan.moved) { this._pan.moved = false; return; } // 拖动尾随点击不弹详情
     const st = this.state;
@@ -678,6 +785,7 @@ export class GameUI {
         hospital: '落入者支付医药费。',
         park: '御园赏花，平安无事。',
         tax: '按现金一成缴税（50~500）。',
+        shop: '商店：可购顺风骰（多走几步）、护身符（免一次租金）、均富卡（与最富对手平分现金）。',
       }[t.type] || '';
       body.push(h('p', { class: 'muted' }, desc));
     }
@@ -754,7 +862,10 @@ export class GameUI {
       }
     }
     const map = mapOf(st);
-    const reasonText = st.finished.reason === 'last' ? '对手全部破产，一家独大！' : `${map.rounds} 回合期满，清点资产。`;
+    const reasonText = {
+      last: '对手全部破产，一家独大！',
+      dead: '你已破产出局，商途折戟。',
+    }[st.finished.reason] || '对局结束，清点资产。';
     const body = h('div', { class: 'over-sheet' },
       h('p', { class: 'muted' }, `${map.name} · ${reasonText}`),
       unlockLine,

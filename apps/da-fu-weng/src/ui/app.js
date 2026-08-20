@@ -2,7 +2,8 @@
 // 大富翁 · 环游之城 · UI 渲染与回合驱动（纯原生 DOM，竖屏优先）。
 // 界面：启动器 → 选人（天赋各异）+选图（6 张地图逐步解锁）→ 对局
 //   （外环+内街的大棋盘可拖动平移 + 镜头跟随、腹地点缀风景、浮动双骰信息条、
-//    玩家 HUD（含道具徽章）、日志、买地/抽卡/商店/结算弹窗）
+//    玩家 HUD（4 人自动 2×2 网格防重叠，含道具徽章）、可收缩运行记录（展开可滚动翻历史）、
+//    买地/抽卡/商店/道具栏/结算弹窗——商店等交易弹窗内嵌钱包条，随时看得到现金）
 //   → 终局排名（夺冠解锁下一张地图）。
 // 角色形象全部来自共享素材库 _lib/kairo.js（预置 · 开罗风 · 可复用）。
 // ============================================================================
@@ -19,7 +20,7 @@ import {
 import {
   newGame, rollAndMove, resolveTile, buyTile, upgradeTile, declineDecision,
   endTurn, aiDecide, ranking, ownedTilesOf, hasMonopoly, log as logSt, mapOf,
-  buyItem, leaveShop, aiShopBuy,
+  buyItem, leaveShop, aiShopBuy, useItem,
 } from '../core/game.js';
 import { makeSeed } from '../core/rng.js';
 import { loadMeta, isUnlocked, unlockNext } from '../core/meta.js';
@@ -260,10 +261,44 @@ export class GameUI {
   }
 
   buildHud() {
+    // 玩家 HUD（4 人时切换 2×2 网格，避免名字/金币挤在一行相互重叠）
     this.hudEl = h('div', { class: 'hud' });
     this.stage.appendChild(this.hudEl);
-    this.logEl = h('div', { class: 'log-strip' }, h('div', { class: 'log-strip__lines' }));
+    // 运行记录：默认收缩成一行（头部预览最新一条），点击展开后可滚动翻看全部历史
+    this._logOpen = false;
+    this._logStick = true;    // 用户滚到底部时才自动跟随新日志，翻历史不打扰
+    this._logRendered = '';   // 已渲染日志的签名（长度+末条文本）
+    this.logPeek = h('span', { class: 'log-strip__peek' }, '暂无记录');
+    this.logToggle = h('span', { class: 'log-strip__toggle' }, '▸');
+    this.logLines = h('div', { class: 'log-strip__lines' });
+    this.logLines.addEventListener('scroll', () => {
+      this._logStick = this.logLines.scrollHeight - this.logLines.scrollTop - this.logLines.clientHeight < 24;
+    });
+    this.logEl = h('div', { class: 'log-strip collapsed' },
+      h('div', { class: 'log-strip__head', onClick: () => this.toggleLog() },
+        h('span', { class: 'log-strip__title' }, '运行记录'),
+        this.logPeek,
+        this.logToggle,
+      ),
+      this.logLines,
+    );
     this.stage.appendChild(this.logEl);
+  }
+
+  toggleLog() {
+    this._logOpen = !this._logOpen;
+    this.logEl.classList.toggle('collapsed', !this._logOpen);
+    this.logToggle.textContent = this._logOpen ? '▾' : '▸';
+    if (this._logOpen) {
+      this._logStick = true;
+      this.scrollLog(true);
+    }
+  }
+
+  scrollLog(force = false) {
+    if (!this._logOpen) return;
+    if (!force && !this._logStick) return; // 用户正在翻历史时不抢滚动位置
+    this.logLines.scrollTop = this.logLines.scrollHeight;
   }
 
   buildBottom() {
@@ -272,8 +307,14 @@ export class GameUI {
       onClick: () => this.onRollTap(),
     }, '🎲 掷骰子');
     this.menuBtn = h('button', { class: 'icon-btn', title: '菜单', onClick: () => this.showMenuSheet() }, '☰');
+    this.itemBadge = h('span', { class: 'icon-badge', style: { display: 'none' } }, '0');
+    this.itemBtn = h('button', {
+      class: 'icon-btn item-btn', title: '道具',
+      onClick: () => this.showItemSheet(),
+    }, h('span', null, '🎒'), this.itemBadge);
     this.bottomBar = h('div', { class: 'bottom-bar' },
       this.menuBtn,
+      this.itemBtn,
       this.rollBtn,
     );
     this.stage.appendChild(this.bottomBar);
@@ -436,12 +477,14 @@ export class GameUI {
       this.measureBoard();
     }
     this.refreshTokens();
-    // HUD
+    // HUD（4 人局切 2×2 网格，卡片不再挤压重叠）
     clear(this.hudEl);
+    this.hudEl.className = `hud${st.players.length >= 4 ? ' hud--grid' : ''}`;
     st.players.forEach((p, i) => {
       const badges = [];
       if (!p.bankrupt && p.items && p.items.swift > 0) badges.push(`🌬️${p.items.swift}`);
       if (!p.bankrupt && p.items && p.items.charms > 0) badges.push(`🧿${p.items.charms}`);
+      if (!p.bankrupt && p.items && p.items.equal > 0) badges.push(`🎴${p.items.equal}`);
       this.hudEl.appendChild(h('div', {
         class: `pcard ${i === st.turnIdx ? 'active' : ''} ${p.bankrupt ? 'dead' : ''}`,
         style: { '--chip': CHIP_COLORS[i % CHIP_COLORS.length] },
@@ -473,11 +516,21 @@ export class GameUI {
     // 按钮
     const canRoll = !this.busy && !st.finished && st.phase === 'roll' && !cp.isAI;
     this.rollBtn.disabled = !canRoll;
-    // 日志（末 4 条）
-    const lines = this.logEl.querySelector('.log-strip__lines');
-    clear(lines);
-    st.log.slice(-4).forEach((t) => lines.appendChild(h('div', { class: 'ln' }, t)));
-    lines.scrollTop = lines.scrollHeight;
+    // 道具按钮角标：主角待打出的均富卡数
+    const hero = st.players[0];
+    const eqHeld = hero && hero.items ? (hero.items.equal || 0) : 0;
+    this.itemBadge.textContent = String(eqHeld);
+    this.itemBadge.style.display = eqHeld > 0 ? '' : 'none';
+    // 日志：全量渲染（可滚动翻历史），收缩时仅在标题行预览最新一条。
+    // 日志封顶 80 条后长度不再变化（新增即截断），故以「长度+末条」联合判变更。
+    const logSig = `${st.log.length}:${st.log[st.log.length - 1] || ''}`;
+    if (logSig !== this._logRendered) {
+      clear(this.logLines);
+      st.log.forEach((t) => this.logLines.appendChild(h('div', { class: 'ln' }, t)));
+      this._logRendered = logSig;
+      this.scrollLog();
+    }
+    this.logPeek.textContent = st.log.length ? st.log[st.log.length - 1] : '暂无记录';
   }
 
   toast(text, kind = 'normal') {
@@ -643,6 +696,17 @@ export class GameUI {
     this.refresh();
   }
 
+  // —— 钱包条：交易类弹窗顶部内嵌玩家现金（弹窗为底部抽屉会盖住 HUD，
+  //    不内嵌的话购物/买地时完全看不到自己有多少钱）——
+  walletRow(p) {
+    return h('div', { class: 'wallet-row' },
+      h('span', { class: 'wallet-row__ava', html: kairoSVG(p.look, 34) }),
+      h('b', { class: 'wallet-row__name' }, `${p.name}${p.isAI ? '' : '（你）'}`),
+      h('span', { class: 'grow' }),
+      h('span', { class: 'wallet-row__cash' }, p.bankrupt ? '已破产' : `现金 $${p.cash}`),
+    );
+  }
+
   askDecision(res) {
     return new Promise((resolve) => {
       const st = this.state;
@@ -661,15 +725,11 @@ export class GameUI {
       this.showSheet({
         title: isBuy ? `购买「${t.name}」` : `升级「${t.name}」`,
         body: h('div', { class: 'buy-sheet' },
-          h('div', { class: 'row', style: { alignItems: 'center', gap: '0.6rem' } },
-            h('span', { class: 'buy-ava', html: kairoSVG(p.look, 44) }),
-            h('div', { class: 'grow' },
-              h('div', null, `${d.name} · ${isBuy
-                ? (res.listPrice && res.listPrice !== res.price ? `地价 $${res.price}（天赋折扣，原价 $${res.listPrice}）` : `地价 $${res.price}`)
-                : `当前 ${ts.level} 级 → ${ts.level + 1} 级`}`),
-              h('div', { class: 'muted' }, `现金 $${p.cash}${afford ? '' : '（不足）'}`),
-            ),
-          ),
+          this.walletRow(p),
+          h('div', { class: 'muted buy-sheet__price' },
+            `${d.name} · ${isBuy
+              ? (res.listPrice && res.listPrice !== res.price ? `地价 $${res.price}（天赋折扣，原价 $${res.listPrice}）` : `地价 $${res.price}`)
+              : `当前 ${ts.level} 级 → ${ts.level + 1} 级`}${afford ? '' : ' · 现金不足'}`),
           h('div', { class: 'rent-table' },
             isBuy
               ? [1, 2, 3].map((lv) => h('div', { class: 'rent-row' },
@@ -711,6 +771,7 @@ export class GameUI {
   }
 
   // 商店：道具列表 + 已持有量 + 上限，可连续购买，离开后回到回合流程。
+  // 顶部内嵌钱包条：抽屉弹窗盖住 HUD，不内嵌就看不到自己有多少钱。
   // 点遮罩 = 离开商店（与按钮同路径）：若走默认 closeSheet 会让 playTurn 的
   // await 永久挂起、busy 卡死，对局软锁。
   showShopSheet() {
@@ -725,7 +786,7 @@ export class GameUI {
             ? `生效剩 ${p.items.swift}/${SWIFT_CAP} 次`
             : item.id === 'charm'
               ? `持有 ${p.items.charms}/${CHARM_CAP} 枚`
-              : `本局已购 ${p.equalBought}/${EQUAL_CAP} 张`;
+              : `持有 ${p.items.equal} 张 · 本局限购 ${p.equalBought}/${EQUAL_CAP}`;
           const capped = (item.id === 'swift' && p.items.swift >= SWIFT_CAP)
             || (item.id === 'charm' && p.items.charms >= CHARM_CAP)
             || (item.id === 'equal' && p.equalBought >= EQUAL_CAP);
@@ -746,6 +807,7 @@ export class GameUI {
                 if (!r.ok) this.toast(r.reason === 'cap' ? '已达上限'
                   : r.reason === 'no_target' ? '没有可平分的存活对手'
                   : '现金不足', 'bad');
+                else if (item.id === 'equal') this.toast('均富卡已收入道具栏（🎒），自己回合可打出');
                 render();
               },
             }, capped ? '已满' : '购买'),
@@ -754,6 +816,7 @@ export class GameUI {
         this.showSheet({
           title: '🛒 商店',
           body: h('div', { class: 'shop-sheet' },
+            this.walletRow(p),
             h('p', { class: 'muted' }, '掌柜笑眯眯：客官，来点什么？'),
             ...list,
           ),
@@ -762,6 +825,60 @@ export class GameUI {
       };
       render();
     });
+  }
+
+  // ============ 道具栏（主角道具总览 + 均富卡择机打出） ============
+  // 均富卡购入后不再立即生效，而是收进道具栏：这里展示持有量，
+  // 并在自己回合（掷骰前 roll / 收尾 end 阶段）提供「打出」入口。
+  showItemSheet() {
+    const st = this.state;
+    if (!st) return;
+    const render = () => {
+      const me = st.players[0];
+      const eqHeld = (me.items && me.items.equal) || 0;
+      const myTurn = !st.finished && st.turnIdx === 0 && (st.phase === 'roll' || st.phase === 'end');
+      const canPlay = myTurn && eqHeld > 0 && !this.busy;
+      const rows = [
+        { id: 'swift', icon: '🌬️', name: '顺风骰', note: '掷骰时自动生效，无需操作' },
+        { id: 'charm', icon: '🧿', name: '护身符', note: '交租时自动抵消一次，无需操作' },
+        {
+          id: 'equal', icon: '🎴', name: '均富卡',
+          note: st.finished ? '对局已结束'
+            : !myTurn ? '仅在自己的回合（掷骰前后）可打出'
+            : eqHeld < 1 ? '暂无可打出的均富卡'
+            : '打出后立即与现金最多的对手平分双方现金',
+        },
+      ];
+      this.showSheet({
+        title: '🎒 道具栏',
+        body: h('div', { class: 'item-sheet' },
+          this.walletRow(me),
+          ...rows.map((r) => {
+            const held = r.id === 'swift' ? me.items.swift : r.id === 'charm' ? me.items.charms : eqHeld;
+            return h('div', { class: `shop-item${held > 0 ? '' : ' dim'}` },
+              h('span', { class: 'shop-item__icon' }, r.icon),
+              h('div', { class: 'grow' },
+                h('div', null, h('b', null, r.name), ' ', h('span', { class: 'muted' }, `持有 ${held}`)),
+                h('div', { class: 'muted shop-item__held' }, r.note),
+              ),
+              r.id === 'equal' ? h('button', {
+                class: 'btn-primary', disabled: !canPlay,
+                onClick: () => {
+                  const r2 = useItem(st, 'equal');
+                  if (!r2.ok) { this.toast('现在无法打出', 'bad'); return; }
+                  this.refresh();
+                  this.toast('均富卡生效：已与最富的对手平分现金');
+                  render();
+                },
+              }, '打出') : null,
+            );
+          }),
+          h('p', { class: 'muted item-sheet__tip' }, '顺风骰与护身符会在恰当时机自动生效；均富卡可择机打出，在商店购得后到这里使用。'),
+        ),
+        foot: [h('button', { class: 'btn-primary', onClick: () => this.closeSheet() }, '关闭')],
+      });
+    };
+    render();
   }
 
   showTileSheet(i) {
@@ -797,7 +914,7 @@ export class GameUI {
         hospital: '落入者支付医药费。',
         park: '御园赏花，平安无事。',
         tax: '按现金一成缴税（50~500）。',
-        shop: '商店：可购顺风骰（多走几步）、护身符（免一次租金）、均富卡（与最富对手平分现金）。',
+        shop: '商店：可购顺风骰（掷骰自动多走）、护身符（自动免一次租金）、均富卡（收入道具栏，自己回合可打出，与最富对手平分现金）。',
       }[t.type] || '';
       body.push(h('p', { class: 'muted' }, desc));
     }

@@ -11,6 +11,8 @@
 //
 // 掷双骰：对子（两骰同点）加掷一回合（state.extra），连掷三次对子直接入狱；
 // 顺风骰 buff 在掷骰时自动多走 SWIFT_BONUS 步。
+// 道具：顺风骰/护身符自动生效；均富卡购入收入道具栏（items.equal），
+// 人类玩家可在自己回合（roll/end 阶段）从道具栏打出，AI 即买即用。
 // 不设回合上限：破产淘汰，一家独大者胜；主角破产即终局结算。
 // 所有随机（骰子/抽卡）走 core/rng.js 的确定性种子，存档可完整复现。
 // ============================================================================
@@ -48,7 +50,7 @@ export function newGame({ heroKey, aiCount = 2, mapKey = MAPS[0].key, seed } = {
     cash: START_CASH + ((c.perk && c.perk.cash) || 0), // 天赋本金
     pos: 0, laps: 0,
     skipTurns: 0, bankrupt: false,
-    items: { swift: 0, charms: 0 },                    // 道具：顺风骰次数 / 护身符枚数
+    items: { swift: 0, charms: 0, equal: 0 },          // 道具：顺风骰次数 / 护身符枚数 / 均富卡张数
     equalBought: 0,                                    // 均富卡本局已购数
   });
   const players = [mkPlayer(hero, false), ...ai.map((c) => mkPlayer(c, true))];
@@ -255,12 +257,14 @@ export function buyItem(st, itemId) {
     p.items.charms += 1;
     log(st, `${p.name} 购入护身符（持有 ${p.items.charms} 枚）`);
   } else if (itemId === 'equal') {
-    // 无存活对手可平分时回滚扣款、不计限购（避免付费无效果）
-    if (!applyEqualize(st, st.turnIdx)) {
+    // 无存活对手可平分时回滚扣款、不计限购（破产不可逆，买了也永无打出对象）
+    if (richestOther(st, st.turnIdx) < 0) {
       p.cash += item.price;
       return { ok: false, reason: 'no_target' };
     }
+    p.items.equal += 1;
     p.equalBought += 1;
+    log(st, `${p.name} 购入均富卡（持有 ${p.items.equal} 张，可从道具栏打出）`);
   }
   return { ok: true };
 }
@@ -283,6 +287,23 @@ export function applyEqualize(st, pIdx) {
   return true;
 }
 
+// —— 道具打出（当前仅均富卡需手动触发；顺风骰/护身符在恰当时机自动生效）。
+//    人类玩家限自己回合的掷骰前后（roll/end 阶段）打出；AI 走 useEqualCard 即买即用。
+export function useItem(st, itemId) {
+  if (st.finished) return { ok: false, reason: 'finished' };
+  if (itemId !== 'equal') return { ok: false, reason: 'item' };
+  if (st.phase !== 'roll' && st.phase !== 'end') return { ok: false, reason: 'phase' };
+  return useEqualCard(st, st.turnIdx);
+}
+
+export function useEqualCard(st, pIdx) {
+  const p = st.players[pIdx];
+  if (!p || !(p.items.equal > 0)) return { ok: false, reason: 'empty' };
+  if (!applyEqualize(st, pIdx)) return { ok: false, reason: 'no_target' };
+  p.items.equal -= 1;
+  return { ok: true };
+}
+
 // AI 进店采购：均富卡（明显落后时翻盘）＞ 顺风骰 ＞ 护身符，一次至多买两件
 export function aiShopBuy(st) {
   const p = cur(st);
@@ -297,6 +318,7 @@ export function aiShopBuy(st) {
     if (!want) break;
     const r = buyItem(st, want);
     if (!r.ok) break;
+    if (want === 'equal') useEqualCard(st, st.turnIdx); // AI 即买即用：现金差明显时直接拉平
     bought.push(want);
   }
   return bought;

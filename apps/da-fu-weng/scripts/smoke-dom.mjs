@@ -1,7 +1,8 @@
 // ============================================================================
 // DOM 冒烟测试：用 jsdom 驱动真实 UI 流程
 // （启动器 → 选人+选图（锁定/解锁/天赋展示）→ 对局：掷双骰/买地弹窗/AI 回合 →
-//   商店购物 → 格子详情 → 存读档 → 地图解锁链）。
+//   商店购物（含钱包条）→ 格子详情 → 存读档 → 地图解锁链 →
+//   四人局 HUD 2×2 网格 / 可收缩运行记录 / 道具栏打出均富卡）。
 // 运行：node scripts/smoke-dom.mjs   （需先 npm install jsdom）
 // ============================================================================
 import { JSDOM } from 'jsdom';
@@ -35,6 +36,7 @@ async function waitFor(fn, timeoutMs = 12000, label = 'condition') {
 
 const { createGame } = await import(new URL('../src/main.js', import.meta.url).href);
 const { START_CASH, MAPS, SHOP_ITEMS, tileCountOf } = await import(new URL('../src/config.js', import.meta.url).href);
+const { newGame } = await import(new URL('../src/core/game.js', import.meta.url).href);
 const { loadMeta } = await import(new URL('../src/core/meta.js', import.meta.url).href);
 
 // ---------- 1) 启动器 ----------
@@ -105,6 +107,7 @@ ok(rollBtn && !rollBtn.disabled, '掷骰按钮可用');
 rollBtn.click();
 const sheetShown = await waitFor(() => document.querySelector('.sheet') && /购买/.test(document.querySelector('.sheet__head')?.textContent || ''), 5000);
 ok(sheetShown, '落到空地弹出买地弹窗');
+ok(/现金/.test(document.querySelector('.wallet-row')?.textContent || ''), '买地弹窗内嵌钱包条（可见现金）');
 const buyBtn = [...document.querySelectorAll('.sheet__foot button')].find((b) => /买下/.test(b.textContent));
 ok(!!buyBtn, '弹窗含「买下」按钮');
 buyBtn.click();
@@ -161,6 +164,7 @@ ui.state.phase = 'resolve';
 const shopDone = ui.resolveLoop(0); // 不 await：先等弹窗出现
 const shopSheetOk = await waitFor(() => document.querySelector('.sheet') && /商店/.test(document.querySelector('.sheet__head')?.textContent || ''), 5000);
 ok(shopSheetOk, '落地商店弹出购物弹窗');
+ok(/现金/.test(document.querySelector('.wallet-row')?.textContent || ''), '商店弹窗内嵌钱包条（购物时看得到家底）');
 ok(document.querySelectorAll('.shop-item').length === SHOP_ITEMS.length, `商店陈列 ${SHOP_ITEMS.length} 件道具`);
 const cashBefore = ui.state.players[0].cash;
 const itemBtn = [...document.querySelectorAll('.shop-item button')].find((b) => /购买/.test(b.textContent));
@@ -214,6 +218,58 @@ document.querySelector('.launcher__actions .btn-primary').click();
 await sleep(30);
 ok(document.querySelectorAll('.map-cell.locked').length === 4, '选图页锁定数降为 4');
 ok(/港都商埠/.test(document.querySelectorAll('.map-cell')[1].textContent || ''), '港都商埠已可读');
+
+// ---------- 10) 四人局布局：HUD 2×2 网格 + 可收缩运行记录 ----------
+ui.startGame(newGame({ heroKey: 'lady', aiCount: 3, mapKey: 'oldtown', seed: 31 }), false);
+await sleep(80);
+ok(document.querySelectorAll('.hud .pcard').length === 4, '四人局 HUD 4 张玩家卡');
+ok(document.querySelector('.hud.hud--grid') !== null, '四人局 HUD 切 2×2 网格（名字/金币不再重叠）');
+ok(document.querySelectorAll('.token').length === 4, '四人局 4 枚棋子');
+const logStrip = document.querySelector('.log-strip');
+ok(logStrip !== null && logStrip.classList.contains('collapsed'), '运行记录默认收缩');
+ok(document.querySelectorAll('.log-strip .ln').length > 0, '收缩时历史日志仍全量渲染（展开可滚动翻看）');
+ok(/读档继续对局/.test(document.querySelector('.log-strip__peek')?.textContent || ''), '收缩态预览最新一条日志');
+logStrip.querySelector('.log-strip__head').click();
+await sleep(20);
+ok(!document.querySelector('.log-strip').classList.contains('collapsed'), '点击头部展开运行记录');
+document.querySelector('.log-strip__head').click();
+await sleep(20);
+ok(document.querySelector('.log-strip').classList.contains('collapsed'), '再次点击收缩运行记录');
+// 日志封顶滚动（长度恒为上限）后仍能刷新显示
+const lastLn = () => document.querySelector('.log-strip .ln:last-child')?.textContent || '';
+ui.state.log = Array.from({ length: 80 }, (_, k) => `L${k}`);
+ui.refresh();
+ok(/L79/.test(lastLn()), '日志全量渲染（末条可见）');
+ui.state.log.push('L80new');
+ui.state.log.splice(0, 1); // 模拟封顶：新增即截断，长度不变
+ui.refresh();
+ok(/L80new/.test(lastLn()), '封顶滚动后日志仍刷新（不滞留旧内容）');
+
+// ---------- 11) 道具栏：均富卡持有 + 打出 ----------
+ui.state.players[0].cash = 1000;
+ui.state.players[1].cash = 3000; // 最富对手
+ui.state.players[0].items.equal = 1;
+ui.state.players[0].equalBought = 1;
+ui.state.turnIdx = 0; ui.state.phase = 'roll'; ui.state.finished = null;
+ui.refresh();
+await sleep(20);
+ok(/🎴1/.test(document.querySelector('.hud .pcard .pcard__items')?.textContent || ''), 'HUD 徽章显示持有的均富卡');
+const itemBagBtn = document.querySelector('.bottom-bar .item-btn');
+ok(!!itemBagBtn, '底栏存在道具按钮');
+itemBagBtn.click();
+await sleep(30);
+ok(/道具栏/.test(document.querySelector('.sheet__head')?.textContent || ''), '道具栏弹窗打开');
+ok(/现金/.test(document.querySelector('.wallet-row')?.textContent || ''), '道具栏显示玩家现金');
+const playCardBtn = [...document.querySelectorAll('.sheet button')].find((b) => /打出/.test(b.textContent));
+ok(!!playCardBtn && !playCardBtn.disabled, '均富卡「打出」按钮可用');
+playCardBtn.click();
+await sleep(60);
+ok(ui.state.players[0].items.equal === 0, '打出后消耗均富卡');
+ok(ui.state.players[0].cash === 2000 && ui.state.players[1].cash === 2000, '打出后与最富对手现金拉平');
+ok(/道具栏/.test(document.querySelector('.sheet__head')?.textContent || ''), '打出后道具栏刷新（余量可见）');
+[...document.querySelectorAll('.sheet__foot button')].find((b) => /关闭/.test(b.textContent))?.click();
+await sleep(20);
+ok(document.querySelector('.sheet') === null, '道具栏关闭');
 
 console.log(`\nDOM 冒烟结果: ${pass} 通过, ${fail} 失败`);
 process.exit(fail ? 1 : 0);

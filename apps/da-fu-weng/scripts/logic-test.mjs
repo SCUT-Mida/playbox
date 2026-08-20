@@ -2,7 +2,7 @@
 // 大富翁 · 核心逻辑自测（纯 Node，无浏览器依赖）。
 // 覆盖：地图生成（6 图尺寸/内街闭环/四角/街区/确定性）、经济数值、角色天赋、
 //       移动与起点工资、购地升级租金垄断（含购地折扣）、特殊格（含罚金减免）、
-//       机会命运卡全效果、双骰对子/连三对入狱/顺风骰、商店道具与上限/均富卡/护身符、
+//       机会命运卡全效果、双骰对子/连三对入狱/顺风骰、商店道具与上限/均富卡（道具栏打出）/护身符、
 //       支付与自动变卖、破产终局（淘汰制无回合上限）、回合轮转与对子加掷、
 //       AI 决策与 AI 采购、随机种子确定性、地图解锁、存档往返。
 // 运行：node scripts/logic-test.mjs
@@ -18,6 +18,7 @@ import {
   endTurn, aiDecide, ranking, ownedTilesOf, ownedInDistrict,
   hasMonopoly, movePlayer, payTo, mapOf,
   buyItem, leaveShop, applyEqualize, aiShopBuy, buyPriceOf, fineOf,
+  useItem, useEqualCard,
 } from '../src/core/game.js';
 import { rollDice, rollTwoDice } from '../src/core/rng.js';
 import { saveToSlot, loadFromSlot, deleteSlot, exportSave, importSave, _setStorage } from '../src/core/save.js';
@@ -82,7 +83,7 @@ section('建档与天赋');
 st = newGame({ heroKey: 'lady', aiCount: 2, mapKey: 'port', seed: 42 });
 ok(st.mapKey === 'port' && st.tiles.length === 82, '港都商埠 82 格');
 ok(st.players.length === 3 && st.players[0].name === '千金' && !st.players[0].isAI, '主角千金 + 2 AI');
-ok(st.players.every((p) => p.pos === 0 && p.items && p.items.swift === 0 && p.items.charms === 0 && p.equalBought === 0), '初始位置与道具栏');
+ok(st.players.every((p) => p.pos === 0 && p.items && p.items.swift === 0 && p.items.charms === 0 && p.items.equal === 0 && p.equalBought === 0), '初始位置与道具栏');
 ok(st.players[0].cash === START_CASH + 600, '千金天赋：本金 +600');
 ok(st.players[1].cash === START_CASH + 500 && st.players[1].perk.trade === 0.10, '钱老板天赋：本金 +500 / 九折');
 ok(st.players[2].perk.tough === 0.6 && st.players[2].perk.luck === 0.10, '夜行客天赋：罚金减免 + 骰运');
@@ -311,14 +312,16 @@ ok(buyItem(st, 'charm').ok === true && st.players[0].items.charms === 1, '购护
 buyItem(st, 'charm');
 ok(buyItem(st, 'charm').ok === false && st.players[0].items.charms === 2, '护身符 2 枚上限');
 st.players[1].cash = 3000;
+st.players[0].cash = 1000;
 const mine0 = st.players[0].cash;
-ok(buyItem(st, 'equal').ok === true, '购均富卡');
-const totalEq = mine0 - 260 + 3000; // 购卡先扣 260，再与最富对手平分
-ok(st.players[0].cash === Math.round(totalEq / 2) && st.players[1].cash === totalEq - Math.round(totalEq / 2), '均富卡与最富对手拉平现金');
-ok(st.players[0].equalBought === 1, '均富卡限购计数');
-st.players[0].cash = 5000;
+ok(buyItem(st, 'equal').ok === true && st.players[0].items.equal === 1
+  && st.players[0].cash === mine0 - 260, '购均富卡收入道具栏（不立即生效）');
 buyItem(st, 'equal');
+ok(st.players[0].items.equal === 2 && st.players[0].equalBought === 2, '第二张均富卡入栏并计数');
 ok(buyItem(st, 'equal').ok === false, '均富卡每局限 2 张');
+ok(st.players[0].cash === mine0 - 520 && st.players[1].cash === 3000, '未打出前现金不变（不拉平）');
+// 打出阶段限制：商店阶段（shop）不可打出，掷骰前后（roll/end）可以
+ok(useItem(st, 'equal').ok === false && useItem(st, 'equal').reason === 'phase', '商店阶段不能打出均富卡');
 // 无存活对手时购均富卡：拒绝购买并回滚扣款、不计限购（付费无效果路径）
 {
   const eq = newGame({ heroKey: 'boy', aiCount: 1, mapKey: 'oldtown', seed: 7 });
@@ -329,6 +332,19 @@ ok(buyItem(st, 'equal').ok === false, '均富卡每局限 2 张');
 }
 leaveShop(st);
 ok(st.phase === 'end', '离开商店回到收尾');
+const totalEq = st.players[0].cash + 3000; // 打出时与最富对手平分双方现金
+ok(useItem(st, 'equal').ok === true, '自己回合（end 阶段）打出均富卡');
+ok(st.players[0].cash === Math.round(totalEq / 2) && st.players[1].cash === totalEq - Math.round(totalEq / 2), '打出后与最富对手拉平现金');
+ok(st.players[0].items.equal === 1, '打出消耗一张');
+ok(useEqualCard(st, 0).ok === true && st.players[0].items.equal === 0, '核心直调再次打出');
+ok(useEqualCard(st, 0).ok === false && useEqualCard(st, 0).reason === 'empty', '空栏打出被拒');
+// roll 阶段（掷骰前）同样可打出
+{
+  const er = newGame({ heroKey: 'boy', aiCount: 1, mapKey: 'oldtown', seed: 12 });
+  er.players[0].items.equal = 1; er.players[1].cash = 4000;
+  er.phase = 'roll';
+  ok(useItem(er, 'equal').ok === true && er.players[0].cash === Math.round((START_CASH + 4000) / 2), '掷骰前（roll 阶段）可打出');
+}
 // 护身符自动抵租
 {
   const stC = newGame({ heroKey: 'boy', aiCount: 1, mapKey: 'oldtown', seed: 8 });
@@ -350,6 +366,7 @@ ok(st.phase === 'end', '离开商店回到收尾');
   const bought = aiShopBuy(stA);
   ok(bought.length === 1 && bought.includes('equal'), 'AI 落后时买均富卡');
   ok(stA.players[0].cash + stA.players[1].cash === 2000 + 5000 - 260 && stA.players[0].cash === stA.players[1].cash, '均富卡拉平双方现金');
+  ok(stA.players[1].items.equal === 0, 'AI 即买即用不囤卡');
 }
 
 // —— 支付：自动变卖与破产 ——
@@ -473,7 +490,7 @@ ok(importSave(exportSave({ ...st, tiles: new Array(50).fill(null) })) === null, 
 // 手工存档码缺 items/perk 结构 → 兜底补默认，不致渲染层 TypeError
 {
   const naked = importSave(exportSave({ ...st, players: st.players.map((p) => ({ ...p, items: undefined, perk: undefined })) }));
-  ok(naked !== null && naked.players.every((p) => p.items && p.items.swift === 0 && p.items.charms === 0 && p.perk && typeof p.perk === 'object'), '缺结构存档兜底补默认');
+  ok(naked !== null && naked.players.every((p) => p.items && p.items.swift === 0 && p.items.charms === 0 && p.items.equal === 0 && p.perk && typeof p.perk === 'object'), '缺结构存档兜底补默认');
 }
 // 中间阶段（如商店内）导出的存档 → 拉回掷骰阶段，导入即可继续而非软锁
 {

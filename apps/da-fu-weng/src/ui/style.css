@@ -50,7 +50,16 @@
 .dfw .btn-ghost { background: transparent; }
 .dfw .btn-danger { background: linear-gradient(180deg, #d96a6a, #b04a4a); border: none; color: #fff; }
 .dfw .btn-block { width: 100%; padding: 0.7rem; font-size: 0.95rem; }
-.dfw .icon-btn { padding: 0.45rem 0.6rem; font-size: 1rem; }
+.dfw .icon-btn { position: relative; padding: 0.45rem 0.6rem; font-size: 1rem; }
+/* 道具按钮角标：主角持有的可打出均富卡数 */
+.dfw .icon-badge {
+  position: absolute; top: -7px; right: -7px;
+  min-width: 17px; height: 17px; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bad); color: #fff; border-radius: 999px;
+  font-size: 0.6rem; font-weight: 700; padding: 0 4px;
+  border: 1px solid var(--bg);
+}
 
 /* —— 启动器 / 创角 —— */
 .dfw.launcher { align-items: stretch; padding: 1rem; gap: 0.8rem; overflow-y: auto; }
@@ -193,23 +202,25 @@
 /* 终局解锁提示 */
 .dfw .unlock-line { color: var(--gold); font-weight: 700; text-align: center; margin: 0.2rem 0 0.4rem; }
 
-/* 玩家 HUD */
+/* 玩家 HUD（4 人局自动切 2×2 网格：单行 4 卡会把名字/金币挤到相互重叠） */
 .dfw .hud { display: flex; gap: 0.4rem; flex: none; }
+.dfw .hud.hud--grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.35rem 0.4rem; }
 .dfw .pcard {
   flex: 1; display: flex; align-items: center; gap: 0.35rem;
   background: var(--card); border: 1px solid var(--line); border-radius: 10px;
-  padding: 0.35rem 0.45rem; min-width: 0;
+  padding: 0.35rem 0.45rem; min-width: 0; overflow: hidden;
   border-left: 3px solid var(--chip);
 }
 .dfw .pcard.active { border-color: var(--chip); background: var(--card-2); }
 .dfw .pcard.dead { opacity: 0.45; filter: grayscale(1); }
 .dfw .pcard__ava { flex: none; width: 30px; }
+.dfw .hud--grid .pcard__ava { width: 26px; }
 .dfw .pcard__ava svg { display: block; width: 100%; height: auto; }
 .dfw .pcard__body { flex: 1; min-width: 0; }
 .dfw .pcard__name { font-size: 0.68rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dfw .pcard__cash { font-size: 0.72rem; color: var(--gold); font-variant-numeric: tabular-nums; }
-.dfw .pcard__side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
-.dfw .pcard__prop { font-size: 0.58rem; color: var(--muted); }
+.dfw .pcard__cash { font-size: 0.72rem; color: var(--gold); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dfw .pcard__side { flex: none; max-width: 46%; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; overflow: hidden; }
+.dfw .pcard__prop { font-size: 0.58rem; color: var(--muted); white-space: nowrap; }
 .dfw .pcard__items { font-size: 0.58rem; line-height: 1; white-space: nowrap; }
 .dfw .pcard__skip {
   flex: none; font-size: 0.55rem; background: var(--bad); color: #fff;
@@ -226,14 +237,42 @@
 .dfw .shop-item__price { color: var(--gold); font-weight: 700; }
 .dfw .shop-item__held { font-size: 0.62rem; }
 .dfw .shop-item button { flex: none; min-width: 3.6em; padding: 0.4rem 0.6rem; }
+.dfw .shop-item.dim { opacity: 0.55; }
 
-/* 日志条 */
-.dfw .log-strip {
-  flex: 1; min-height: 3em;
-  background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px;
-  padding: 0.3rem 0.5rem; overflow: hidden;
+/* 钱包条：交易类弹窗（商店/买地/道具栏）顶部内嵌的玩家现金，弹窗盖住 HUD 时也能看到家底 */
+.dfw .wallet-row {
+  display: flex; align-items: center; gap: 0.5rem;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px;
+  padding: 0.4rem 0.6rem; margin: 0.2rem 0 0.55rem;
 }
-.dfw .log-strip__lines { height: 100%; overflow-y: auto; font-size: 0.66rem; color: var(--muted); }
+.dfw .wallet-row__ava { flex: none; width: 34px; }
+.dfw .wallet-row__ava svg { display: block; width: 100%; height: auto; }
+.dfw .wallet-row__name { font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dfw .wallet-row__cash { flex: none; color: var(--gold); font-weight: 800; font-size: 0.9rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* 道具栏 */
+.dfw .item-sheet__tip { margin: 0.5rem 0 0.2rem; font-size: 0.66rem; line-height: 1.5; }
+
+/* 买地/升级弹窗 */
+.dfw .buy-sheet__price { margin: 0 0 0.1rem; font-size: 0.78rem; }
+
+/* 日志条：默认收缩成一行（头部预览最新一条），点击头部展开为可滚动历史面板 */
+.dfw .log-strip {
+  flex: none; min-height: 0;
+  display: flex; flex-direction: column;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 0.28rem 0.55rem; overflow: hidden;
+}
+.dfw .log-strip__head { display: flex; align-items: center; gap: 0.45rem; cursor: pointer; flex: none; }
+.dfw .log-strip__title { flex: none; font-size: 0.68rem; font-weight: 700; color: var(--muted); }
+.dfw .log-strip__peek {
+  flex: 1; min-width: 0; font-size: 0.66rem; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dfw .log-strip__toggle { flex: none; font-size: 0.72rem; color: var(--muted); width: 1em; text-align: center; }
+.dfw .log-strip:not(.collapsed) { height: clamp(110px, 30vh, 240px); }
+.dfw .log-strip__lines { flex: 1; min-height: 0; overflow-y: auto; font-size: 0.66rem; color: var(--muted); }
+.dfw .log-strip.collapsed .log-strip__lines { display: none; }
 .dfw .log-strip .ln { padding: 1px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* 底栏 */
@@ -275,8 +314,6 @@
 .dfw .sheet__foot button { flex: 1; padding: 0.6rem; }
 
 /* 购地/升级弹窗 */
-.dfw .buy-sheet .buy-ava { flex: none; width: 44px; }
-.dfw .buy-sheet .buy-ava svg { display: block; width: 100%; height: auto; }
 .dfw .rent-table { margin-top: 0.55rem; background: var(--bg-2); border-radius: 8px; padding: 0.4rem 0.6rem; }
 .dfw .rent-row { display: flex; align-items: center; gap: 0.5rem; padding: 2px 0; font-size: 0.78rem; }
 .dfw .rent-row b { color: var(--gold); }
@@ -309,7 +346,12 @@
 }
 
 /* 窄屏微调 */
+@media (max-width: 380px) {
+  /* 3 人局在窄屏也排成两列，防止单行挤压重叠 */
+  .dfw .hud { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.3rem 0.35rem; }
+}
 @media (max-width: 360px) {
   .dfw .hero-grid { grid-template-columns: repeat(2, 1fr); }
   .dfw .pcard__name { font-size: 0.62rem; }
+  .dfw .pcard__ava, .dfw .hud--grid .pcard__ava { width: 24px; }
 }

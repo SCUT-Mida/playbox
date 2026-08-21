@@ -219,6 +219,22 @@ await sleep(30);
 ok(document.querySelectorAll('.map-cell.locked').length === 4, '选图页锁定数降为 4');
 ok(/港都商埠/.test(document.querySelectorAll('.map-cell')[1].textContent || ''), '港都商埠已可读');
 
+// ---------- 9b) 第二张地图（及之后每张）棋盘正常渲染 ----------
+// 回归：buildBoard 曾把整个 state 传给 mapDefOf，导致静默回退到第一张图的
+// 72 格路径，而第二张图有 82 格 → path[i] 越界抛异常，棋盘完全渲染不出来。
+for (const m of MAPS.slice(1)) {
+  ui.startGame(newGame({ heroKey: 'boy', aiCount: 2, mapKey: m.key, seed: 7 }), false);
+  await sleep(60);
+  const tiles = document.querySelectorAll('.board .tile:not(.deco)');
+  const want = tileCountOf(m);
+  ok(document.querySelector('.board-view') !== null, `${m.name}：棋盘视口渲染`);
+  ok(tiles.length === want, `${m.name}：棋盘 ${want} 格齐全（实际 ${tiles.length}）`);
+  ok(document.querySelector('.board').style.gridTemplateColumns === `repeat(${m.cols}, 56px)`,
+    `${m.name}：网格列数按本图 ${m.cols} 列生成`);
+  ok(document.querySelectorAll('.token').length === 3, `${m.name}：3 枚棋子渲染`);
+  ok(document.querySelector('.board-hud') !== null, `${m.name}：浮动信息条渲染`);
+}
+
 // ---------- 10) 四人局布局：HUD 2×2 网格 + 可收缩运行记录 ----------
 ui.startGame(newGame({ heroKey: 'lady', aiCount: 3, mapKey: 'oldtown', seed: 31 }), false);
 await sleep(80);

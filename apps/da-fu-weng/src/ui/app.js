@@ -217,7 +217,7 @@ export class GameUI {
 
   buildBoard() {
     const st = this.state;
-    const map = mapDefOf(st);
+    const map = mapOf(st); // 注意：必须按 st.mapKey 解析地图（mapDefOf 传错对象会静默回退到第一张图）
     const tiles = boardOf(st.mapKey);
     const path = pathOf(map);
     // 棋盘视口（可拖动平移）→ 平移层 → 固定像素网格棋盘 + 棋子层
